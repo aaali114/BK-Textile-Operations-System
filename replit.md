@@ -1,6 +1,6 @@
-# [Project name]
+# B.K. Textile Operations
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A new B.K. Textile-owned web system for coordinating garment orders, department work, material receipts, inspections, and production handoffs.
 
 ## Run & Operate
 
@@ -22,15 +22,21 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/bk-textile` — staff-facing web application and interface
+- `artifacts/api-server` — authenticated API and operational routes
+- `lib/api-spec/openapi.yaml` — API contract source of truth
+- `lib/db/src/schema` — PostgreSQL schema
+- `lib/api-client-react` and `lib/api-zod` — generated client hooks and request/response validation
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Build this as an independent implementation; do not port or replace the existing installation until its source/backend are available and reviewed.
+- Keep preview records synthetic. Do not import or enter live company data until the user confirms the access, data-transfer, and rollout plan.
+- Use the existing API contract and PostgreSQL database for the new app; authenticate staff through Replit-managed Clerk.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The business coordinates merchandising, sampling, outsourced yarn/knitting/dyeing, warehouses, cutting, embellishment, stitching, washing, finishing, packing, export, and accounts. The initial slice focuses on orders, department tasks, received material lots, and quality inspections. Expand additional departments in phases after the team reviews the workflows.
 
 ## User preferences
 

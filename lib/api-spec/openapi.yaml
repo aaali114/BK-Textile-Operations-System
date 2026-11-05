@@ -2,14 +2,24 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 0.2.0
+  description: B.K. Textile operations API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Operations overview
+  - name: orders
+    description: Merchandising orders
+  - name: work
+    description: Department work items
+  - name: materials
+    description: Material receipts and stock
+  - name: quality
+    description: Material inspections
 paths:
   /healthz:
     get:
@@ -24,13 +34,375 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get the operations overview
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /orders:
+    get:
+      operationId: getOrders
+      tags: [orders]
+      summary: List orders
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/OrderStatus" }
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Order" }
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Create an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderInput" }
+      responses:
+        "201":
+          description: Created order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+  /orders/{orderId}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get an order
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "404": { description: Order not found }
+    patch:
+      operationId: updateOrder
+      tags: [orders]
+      summary: Update an order
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderUpdate" }
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "404": { description: Order not found }
+  /work-items:
+    get:
+      operationId: getWorkItems
+      tags: [work]
+      summary: List department work items
+      parameters:
+        - name: department
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/Department" }
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/WorkItemStatus" }
+      responses:
+        "200":
+          description: Department work items
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WorkItem" }
+  /work-items/{workItemId}:
+    patch:
+      operationId: updateWorkItem
+      tags: [work]
+      summary: Update a work item
+      parameters:
+        - name: workItemId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WorkItemUpdate" }
+      responses:
+        "200":
+          description: Updated work item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkItem" }
+        "404": { description: Work item not found }
+  /materials:
+    get:
+      operationId: getMaterials
+      tags: [materials]
+      summary: List received material lots
+      responses:
+        "200":
+          description: Material lots
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MaterialLot" }
+    post:
+      operationId: createMaterialLot
+      tags: [materials]
+      summary: Record a material receipt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MaterialLotInput" }
+      responses:
+        "201":
+          description: Created material lot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaterialLot" }
+  /inspections:
+    get:
+      operationId: getInspections
+      tags: [quality]
+      summary: List material inspections
+      responses:
+        "200":
+          description: Inspections
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Inspection" }
+    post:
+      operationId: createInspection
+      tags: [quality]
+      summary: Record a material inspection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InspectionInput" }
+      responses:
+        "201":
+          description: Created inspection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inspection" }
+        "404": { description: Material lot not found }
 components:
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
   schemas:
     HealthStatus:
       type: object
       properties:
-        status:
-          type: string
-      required:
-        - status
+        status: { type: string }
+      required: [status]
+    OrderStatus:
+      type: string
+      enum: [draft, development, in_production, ready_to_ship, shipped]
+    Priority:
+      type: string
+      enum: [low, normal, high, urgent]
+    Department:
+      type: string
+      enum: [merchandising, fabrication, sampling, accessories, greige_warehouse, dyed_warehouse, cutting, embellishment, stitching, washing, finishing, packing, export, accounts, admin]
+    WorkItemStatus:
+      type: string
+      enum: [not_started, in_progress, blocked, completed]
+    MaterialType:
+      type: string
+      enum: [yarn, greige_fabric, dyed_fabric, trims]
+    MaterialStatus:
+      type: string
+      enum: [pending_qc, available, hold, rejected]
+    InspectionType:
+      type: string
+      enum: [greige, dyed, trims]
+    InspectionResult:
+      type: string
+      enum: [accepted, hold, rejected]
+    Order:
+      type: object
+      required: [id, reference, buyer, style, quantity, deliveryDate, status, priority, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        reference: { type: string }
+        buyer: { type: string }
+        poNumber: { type: ["string", "null"] }
+        style: { type: string }
+        description: { type: ["string", "null"] }
+        quantity: { type: integer }
+        deliveryDate: { type: string, format: date }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        priority: { $ref: "#/components/schemas/Priority" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OrderInput:
+      type: object
+      required: [buyer, style, quantity, deliveryDate]
+      properties:
+        buyer: { type: string, minLength: 1 }
+        poNumber: { type: string }
+        style: { type: string, minLength: 1 }
+        description: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        deliveryDate: { type: string, format: date }
+        priority: { $ref: "#/components/schemas/Priority" }
+    OrderUpdate:
+      type: object
+      properties:
+        buyer: { type: string, minLength: 1 }
+        poNumber: { type: ["string", "null"] }
+        style: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+        quantity: { type: integer, minimum: 1 }
+        deliveryDate: { type: string, format: date }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        priority: { $ref: "#/components/schemas/Priority" }
+    WorkItem:
+      type: object
+      required: [id, orderId, orderReference, title, department, dueDate, status, priority, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        orderReference: { type: string }
+        title: { type: string }
+        department: { $ref: "#/components/schemas/Department" }
+        assignee: { type: ["string", "null"] }
+        dueDate: { type: string, format: date }
+        status: { $ref: "#/components/schemas/WorkItemStatus" }
+        priority: { $ref: "#/components/schemas/Priority" }
+        updatedAt: { type: string, format: date-time }
+    WorkItemUpdate:
+      type: object
+      properties:
+        assignee: { type: ["string", "null"] }
+        dueDate: { type: string, format: date }
+        status: { $ref: "#/components/schemas/WorkItemStatus" }
+        priority: { $ref: "#/components/schemas/Priority" }
+    MaterialLot:
+      type: object
+      required: [id, material, type, supplier, lotReference, quantity, unit, status, receivedAt]
+      properties:
+        id: { type: string, format: uuid }
+        orderId: { type: ["string", "null"], format: uuid }
+        orderReference: { type: ["string", "null"] }
+        material: { type: string }
+        type: { $ref: "#/components/schemas/MaterialType" }
+        supplier: { type: string }
+        lotReference: { type: string }
+        quantity: { type: number }
+        unit: { type: string }
+        status: { $ref: "#/components/schemas/MaterialStatus" }
+        receivedAt: { type: string, format: date }
+    MaterialLotInput:
+      type: object
+      required: [material, type, supplier, lotReference, quantity, unit, receivedAt]
+      properties:
+        orderId: { type: ["string", "null"], format: uuid }
+        material: { type: string, minLength: 1 }
+        type: { $ref: "#/components/schemas/MaterialType" }
+        supplier: { type: string, minLength: 1 }
+        lotReference: { type: string, minLength: 1 }
+        quantity: { type: number, exclusiveMinimum: 0 }
+        unit: { type: string, minLength: 1 }
+        receivedAt: { type: string, format: date }
+    Inspection:
+      type: object
+      required: [id, materialId, lotReference, inspectionType, result, defectCount, notes, inspectedAt]
+      properties:
+        id: { type: string, format: uuid }
+        materialId: { type: string, format: uuid }
+        lotReference: { type: string }
+        inspectionType: { $ref: "#/components/schemas/InspectionType" }
+        result: { $ref: "#/components/schemas/InspectionResult" }
+        defectCount: { type: integer }
+        notes: { type: string }
+        inspectedAt: { type: string, format: date-time }
+    InspectionInput:
+      type: object
+      required: [materialId, inspectionType, result, defectCount]
+      properties:
+        materialId: { type: string, format: uuid }
+        inspectionType: { $ref: "#/components/schemas/InspectionType" }
+        result: { $ref: "#/components/schemas/InspectionResult" }
+        defectCount: { type: integer, minimum: 0 }
+        notes: { type: string }
+    DepartmentCount:
+      type: object
+      required: [department, openTasks, overdueTasks]
+      properties:
+        department: { $ref: "#/components/schemas/Department" }
+        openTasks: { type: integer }
+        overdueTasks: { type: integer }
+    AttentionItem:
+      type: object
+      required: [id, title, detail, severity, createdAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        detail: { type: string }
+        severity: { type: string, enum: [info, warning, critical] }
+        orderReference: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    Activity:
+      type: object
+      required: [id, actor, description, entityType, entityId, occurredAt]
+      properties:
+        id: { type: string, format: uuid }
+        actor: { type: string }
+        description: { type: string }
+        entityType: { type: string }
+        entityId: { type: ["string", "null"] }
+        occurredAt: { type: string, format: date-time }
+    DashboardSummary:
+      type: object
+      required: [activeOrders, dueThisMonth, overdueWork, materialsOnHold, readyToCut, departmentPulse, attentionItems, recentActivity]
+      properties:
+        activeOrders: { type: integer }
+        dueThisMonth: { type: integer }
+        overdueWork: { type: integer }
+        materialsOnHold: { type: integer }
+        readyToCut: { type: integer }
+        departmentPulse:
+          type: array
+          items: { $ref: "#/components/schemas/DepartmentCount" }
+        attentionItems:
+          type: array
+          items: { $ref: "#/components/schemas/AttentionItem" }
+        recentActivity:
+          type: array
+          items: { $ref: "#/components/schemas/Activity" }
 

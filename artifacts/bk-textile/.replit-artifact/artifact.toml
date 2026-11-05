@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "B.K. Textile Operations"
+description = "A department-connected garment manufacturing operations system for B.K. Textile, starting with a polished interface for orders, production readiness, materials, QC, and team workflows."
+version = "1.0.0"
+id = "artifacts/bk-textile"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18776
+
+[services.development]
+run = "pnpm --filter @workspace/bk-textile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bk-textile", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/bk-textile/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18776"
+BASE_PATH = "/"

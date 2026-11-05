@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 176 48" role="img" aria-label="B.K. Textile">
+  <rect width="48" height="48" rx="24" fill="#22343b"/>
+  <circle cx="24" cy="24" r="19" fill="none" stroke="#8ba4a2" stroke-width="1.2"/>
+  <path d="M16 14h9a5 5 0 0 1 2.3 9.4A5.5 5.5 0 0 1 25 34h-9zm4 3v5h4a2.5 2.5 0 0 0 0-5zm0 8v6h4.5a3 3 0 0 0 0-6z" fill="#e1b65d"/>
+  <path d="M32 14v20h-4V14z" fill="#d4e0d9"/>
+  <text x="59" y="22" fill="#22343b" font-family="Manrope, sans-serif" font-size="13" font-weight="700" letter-spacing="1.2">B.K. TEXTILE</text>
+  <text x="59" y="36" fill="#657672" font-family="DM Mono, monospace" font-size="8" letter-spacing="1.25">OPERATIONS SYSTEM</text>
+</svg>
