@@ -3,8 +3,8 @@ name: Order intake requirements
 description: The requested mailbox-based intake workflow for B.K. Textile buyer orders.
 ---
 
-Buyer orders should be extracted from email through IMAP and cPanel Mail Filtering, then shown under their respective orders in the register.
+Buyer orders should be extracted from email through POP mail rather than IMAP, then shown under their respective orders in the register. The user is unsure whether cPanel filtering will still work.
 
-**Why:** The user explicitly specified this workflow for their merchandising operations.
+**Why:** The user explicitly changed the intended mail protocol from IMAP to POP.
 
-**How to apply:** Obtain the mailbox server, destination folder, and representative redacted order emails before defining extraction rules. Do not assume a different mail provider or invent buyer-order data.
+**How to apply:** Scope email intake around POP. Confirm mailbox settings and obtain representative redacted order emails before defining extraction rules. Do not assume IMAP folders or a different mail provider. No dedicated-mailbox or forwarding arrangement has been approved yet.
