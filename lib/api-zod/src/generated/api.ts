@@ -154,23 +154,6 @@ export const GetOrderResponse = zod.object({
 
 
 /**
- * @summary Get the change history for an order
- */
-export const GetOrderActivityParams = zod.object({
-  "orderId": zod.coerce.string().uuid()
-})
-
-export const GetOrderActivityResponseItem = zod.object({
-  "id": zod.string().uuid(),
-  "actor": zod.string(),
-  "actorId": zod.string().nullable(),
-  "description": zod.string(),
-  "occurredAt": zod.coerce.date()
-})
-export const GetOrderActivityResponse = zod.array(GetOrderActivityResponseItem)
-
-
-/**
  * @summary Update an order
  */
 export const UpdateOrderParams = zod.object({
@@ -220,6 +203,23 @@ export const UpdateOrderResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Get the change history for an order
+ */
+export const GetOrderActivityParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const GetOrderActivityResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "actor": zod.string(),
+  "actorId": zod.string().nullable(),
+  "description": zod.string(),
+  "occurredAt": zod.coerce.date()
+})
+export const GetOrderActivityResponse = zod.array(GetOrderActivityResponseItem)
 
 
 /**

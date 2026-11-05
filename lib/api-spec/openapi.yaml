@@ -97,22 +97,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Order" }
         "404": { description: Order not found }
-  /orders/{orderId}/activity:
-    get:
-      operationId: getOrderActivity
-      tags: [orders]
-      summary: Get the change history for an order
-      parameters:
-        - $ref: "#/components/parameters/OrderId"
-      responses:
-        "200":
-          description: Order activity history
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/OrderActivity" }
-        "404": { description: Order not found }
     patch:
       operationId: updateOrder
       tags: [orders]
@@ -130,6 +114,22 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Order" }
+        "404": { description: Order not found }
+  /orders/{orderId}/activity:
+    get:
+      operationId: getOrderActivity
+      tags: [orders]
+      summary: Get the change history for an order
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order activity history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OrderActivity" }
         "404": { description: Order not found }
   /work-items:
     get:

@@ -1,0 +1,1 @@
+- [Order intake requirements](order-intake.md) — buyer orders arrive by IMAP with cPanel filtering; preserve the requested intake workflow.
