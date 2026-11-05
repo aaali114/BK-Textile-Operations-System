@@ -1,9 +1,13 @@
-import { date, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { date, integer, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const ordersTable = pgTable("bk_orders", {
   id: uuid("id").primaryKey().defaultRandom(),
   reference: text("reference").notNull().unique(),
   buyer: text("buyer").notNull(),
+  agencyName: text("agency_name"),
+  previousOrderReference: text("previous_order_reference"),
+  orderValue: numeric("order_value", { precision: 14, scale: 2, mode: "number" }),
+  currencyCode: text("currency_code"),
   poNumber: text("po_number"),
   style: text("style").notNull(),
   description: text("description"),

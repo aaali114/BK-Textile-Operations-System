@@ -34,6 +34,7 @@ import type {
   MaterialLot,
   MaterialLotInput,
   Order,
+  OrderActivity,
   OrderInput,
   OrderUpdate,
   WorkItem,
@@ -567,12 +568,113 @@ export function useGetOrder<TData = Awaited<ReturnType<typeof getOrder>>, TError
 
 
 
+export const getGetOrderActivityUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/activity`
+}
+
+/**
+ * @summary Get the change history for an order
+ */
+export const getOrderActivity = async (orderId: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderActivity[]> => {
+
+  return customFetch<OrderActivity[]>(getGetOrderActivityUrl(orderId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOrderActivityQueryKey = (orderId: string,) => {
+    return [
+    `/api/orders/${orderId}/activity`
+    ] as const;
+    }
+
+
+export const getGetOrderActivityQueryOptions = <TData = Awaited<ReturnType<typeof getOrderActivity>>, TError = ErrorType<void>>(orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderActivity>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOrderActivityQueryKey(orderId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrderActivity>>> = ({ signal }) => getOrderActivity(orderId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: orderId !== null && orderId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOrderActivity>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOrderActivityQueryResult = NonNullable<Awaited<ReturnType<typeof getOrderActivity>>>
+export type GetOrderActivityQueryError = ErrorType<void>
+
+
+export function useGetOrderActivity<TData = Awaited<ReturnType<typeof getOrderActivity>>, TError = ErrorType<void>>(
+ orderId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderActivity>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOrderActivity>>,
+          TError,
+          Awaited<ReturnType<typeof getOrderActivity>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOrderActivity<TData = Awaited<ReturnType<typeof getOrderActivity>>, TError = ErrorType<void>>(
+ orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderActivity>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOrderActivity>>,
+          TError,
+          Awaited<ReturnType<typeof getOrderActivity>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOrderActivity<TData = Awaited<ReturnType<typeof getOrderActivity>>, TError = ErrorType<void>>(
+ orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderActivity>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the change history for an order
+ */
+
+export function useGetOrderActivity<TData = Awaited<ReturnType<typeof getOrderActivity>>, TError = ErrorType<void>>(
+ orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderActivity>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOrderActivityQueryOptions(orderId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getUpdateOrderUrl = (orderId: string,) => {
 
 
 
 
-  return `/api/orders/${orderId}`
+  return `/api/orders/${orderId}/activity`
 }
 
 /**

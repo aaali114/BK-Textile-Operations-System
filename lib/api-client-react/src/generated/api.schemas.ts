@@ -104,6 +104,14 @@ export interface Order {
   reference: string;
   buyer: string;
   /** @nullable */
+  agencyName: string | null;
+  /** @nullable */
+  previousOrderReference: string | null;
+  /** @nullable */
+  orderValue: number | null;
+  /** @nullable */
+  currencyCode: string | null;
+  /** @nullable */
   poNumber?: string | null;
   style: string;
   /** @nullable */
@@ -119,6 +127,15 @@ export interface Order {
 export interface OrderInput {
   /** @minLength 1 */
   buyer: string;
+  agencyName?: string;
+  previousOrderReference?: string;
+  /** @minimum 0 */
+  orderValue?: number;
+  /**
+     * @minLength 3
+     * @maxLength 3
+     */
+  currencyCode?: string;
   poNumber?: string;
   /** @minLength 1 */
   style: string;
@@ -133,6 +150,21 @@ export interface OrderUpdate {
   /** @minLength 1 */
   buyer?: string;
   /** @nullable */
+  agencyName?: string | null;
+  /** @nullable */
+  previousOrderReference?: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  orderValue?: number | null;
+  /**
+     * @minLength 3
+     * @maxLength 3
+     * @nullable
+     */
+  currencyCode?: string | null;
+  /** @nullable */
   poNumber?: string | null;
   /** @minLength 1 */
   style?: string;
@@ -143,6 +175,15 @@ export interface OrderUpdate {
   deliveryDate?: string;
   status?: OrderStatus;
   priority?: Priority;
+}
+
+export interface OrderActivity {
+  id: string;
+  actor: string;
+  /** @nullable */
+  actorId: string | null;
+  description: string;
+  occurredAt: string;
 }
 
 export interface WorkItem {

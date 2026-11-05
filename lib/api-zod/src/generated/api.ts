@@ -62,6 +62,10 @@ export const GetOrdersResponseItem = zod.object({
   "id": zod.string().uuid(),
   "reference": zod.string(),
   "buyer": zod.string(),
+  "agencyName": zod.string().nullable(),
+  "previousOrderReference": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "currencyCode": zod.string().nullable(),
   "poNumber": zod.string().nullish(),
   "style": zod.string(),
   "description": zod.string().nullish(),
@@ -79,12 +83,21 @@ export const GetOrdersResponse = zod.array(GetOrdersResponseItem)
  * @summary Create an order
  */
 
+export const createOrderBodyOrderValueMin = 0;
+
+export const createOrderBodyCurrencyCodeMin = 3;
+export const createOrderBodyCurrencyCodeMax = 3;
+
 
 
 
 
 export const CreateOrderBody = zod.object({
   "buyer": zod.string().min(1),
+  "agencyName": zod.string().optional(),
+  "previousOrderReference": zod.string().optional(),
+  "orderValue": zod.number().min(createOrderBodyOrderValueMin).optional(),
+  "currencyCode": zod.string().min(createOrderBodyCurrencyCodeMin).max(createOrderBodyCurrencyCodeMax).optional(),
   "poNumber": zod.string().optional(),
   "style": zod.string().min(1),
   "description": zod.string().optional(),
@@ -97,6 +110,10 @@ export const CreateOrderResponse = zod.object({
   "id": zod.string().uuid(),
   "reference": zod.string(),
   "buyer": zod.string(),
+  "agencyName": zod.string().nullable(),
+  "previousOrderReference": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "currencyCode": zod.string().nullable(),
   "poNumber": zod.string().nullish(),
   "style": zod.string(),
   "description": zod.string().nullish(),
@@ -120,6 +137,10 @@ export const GetOrderResponse = zod.object({
   "id": zod.string().uuid(),
   "reference": zod.string(),
   "buyer": zod.string(),
+  "agencyName": zod.string().nullable(),
+  "previousOrderReference": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "currencyCode": zod.string().nullable(),
   "poNumber": zod.string().nullish(),
   "style": zod.string(),
   "description": zod.string().nullish(),
@@ -133,6 +154,23 @@ export const GetOrderResponse = zod.object({
 
 
 /**
+ * @summary Get the change history for an order
+ */
+export const GetOrderActivityParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const GetOrderActivityResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "actor": zod.string(),
+  "actorId": zod.string().nullable(),
+  "description": zod.string(),
+  "occurredAt": zod.coerce.date()
+})
+export const GetOrderActivityResponse = zod.array(GetOrderActivityResponseItem)
+
+
+/**
  * @summary Update an order
  */
 export const UpdateOrderParams = zod.object({
@@ -140,12 +178,21 @@ export const UpdateOrderParams = zod.object({
 })
 
 
+export const updateOrderBodyOrderValueMin = 0;
+
+export const updateOrderBodyCurrencyCodeMin = 3;
+export const updateOrderBodyCurrencyCodeMax = 3;
+
 
 
 
 
 export const UpdateOrderBody = zod.object({
   "buyer": zod.string().min(1).optional(),
+  "agencyName": zod.string().nullish(),
+  "previousOrderReference": zod.string().nullish(),
+  "orderValue": zod.number().min(updateOrderBodyOrderValueMin).nullish(),
+  "currencyCode": zod.string().min(updateOrderBodyCurrencyCodeMin).max(updateOrderBodyCurrencyCodeMax).nullish(),
   "poNumber": zod.string().nullish(),
   "style": zod.string().min(1).optional(),
   "description": zod.string().nullish(),
@@ -159,6 +206,10 @@ export const UpdateOrderResponse = zod.object({
   "id": zod.string().uuid(),
   "reference": zod.string(),
   "buyer": zod.string(),
+  "agencyName": zod.string().nullable(),
+  "previousOrderReference": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "currencyCode": zod.string().nullable(),
   "poNumber": zod.string().nullish(),
   "style": zod.string(),
   "description": zod.string().nullish(),

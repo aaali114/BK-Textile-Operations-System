@@ -97,6 +97,22 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Order" }
         "404": { description: Order not found }
+  /orders/{orderId}/activity:
+    get:
+      operationId: getOrderActivity
+      tags: [orders]
+      summary: Get the change history for an order
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order activity history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OrderActivity" }
+        "404": { description: Order not found }
     patch:
       operationId: updateOrder
       tags: [orders]
@@ -255,11 +271,15 @@ components:
       enum: [accepted, hold, rejected]
     Order:
       type: object
-      required: [id, reference, buyer, style, quantity, deliveryDate, status, priority, createdAt, updatedAt]
+      required: [id, reference, buyer, agencyName, previousOrderReference, orderValue, currencyCode, style, quantity, deliveryDate, status, priority, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         reference: { type: string }
         buyer: { type: string }
+        agencyName: { type: ["string", "null"] }
+        previousOrderReference: { type: ["string", "null"] }
+        orderValue: { type: ["number", "null"] }
+        currencyCode: { type: ["string", "null"] }
         poNumber: { type: ["string", "null"] }
         style: { type: string }
         description: { type: ["string", "null"] }
@@ -274,6 +294,10 @@ components:
       required: [buyer, style, quantity, deliveryDate]
       properties:
         buyer: { type: string, minLength: 1 }
+        agencyName: { type: string }
+        previousOrderReference: { type: string }
+        orderValue: { type: number, minimum: 0 }
+        currencyCode: { type: string, minLength: 3, maxLength: 3 }
         poNumber: { type: string }
         style: { type: string, minLength: 1 }
         description: { type: string }
@@ -284,6 +308,10 @@ components:
       type: object
       properties:
         buyer: { type: string, minLength: 1 }
+        agencyName: { type: ["string", "null"] }
+        previousOrderReference: { type: ["string", "null"] }
+        orderValue: { type: ["number", "null"], minimum: 0 }
+        currencyCode: { type: ["string", "null"], minLength: 3, maxLength: 3 }
         poNumber: { type: ["string", "null"] }
         style: { type: string, minLength: 1 }
         description: { type: ["string", "null"] }
@@ -291,6 +319,15 @@ components:
         deliveryDate: { type: string, format: date }
         status: { $ref: "#/components/schemas/OrderStatus" }
         priority: { $ref: "#/components/schemas/Priority" }
+    OrderActivity:
+      type: object
+      required: [id, actor, actorId, description, occurredAt]
+      properties:
+        id: { type: string, format: uuid }
+        actor: { type: string }
+        actorId: { type: ["string", "null"] }
+        description: { type: string }
+        occurredAt: { type: string, format: date-time }
     WorkItem:
       type: object
       required: [id, orderId, orderReference, title, department, dueDate, status, priority, updatedAt]

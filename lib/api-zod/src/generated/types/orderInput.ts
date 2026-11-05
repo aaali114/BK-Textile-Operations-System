@@ -10,6 +10,15 @@ import type { Priority } from './priority';
 export interface OrderInput {
   /** @minLength 1 */
   buyer: string;
+  agencyName?: string;
+  previousOrderReference?: string;
+  /** @minimum 0 */
+  orderValue?: number;
+  /**
+     * @minLength 3
+     * @maxLength 3
+     */
+  currencyCode?: string;
   poNumber?: string;
   /** @minLength 1 */
   style: string;

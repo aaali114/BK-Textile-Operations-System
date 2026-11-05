@@ -3,6 +3,8 @@ import { Router, type IRouter } from "express";
 import {
   CreateOrderBody,
   CreateOrderResponse,
+  GetOrderActivityParams,
+  GetOrderActivityResponse,
   GetOrderParams,
   GetOrderResponse,
   GetOrdersQueryParams,
@@ -13,6 +15,7 @@ import {
 } from "@workspace/api-zod";
 import { activityTable, db, ordersTable, workItemsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { getAuditActor } from "../lib/auditActor";
 
 const router: IRouter = Router();
 
@@ -43,6 +46,8 @@ router.get("/orders", async (req, res): Promise<void> => {
     const pattern = `%${parsed.data.search}%`;
     conditions.push(ilike(ordersTable.reference, pattern));
     conditions.push(ilike(ordersTable.buyer, pattern));
+    conditions.push(ilike(ordersTable.agencyName, pattern));
+    conditions.push(ilike(ordersTable.previousOrderReference, pattern));
     conditions.push(ilike(ordersTable.style, pattern));
     conditions.push(ilike(ordersTable.poNumber, pattern));
   }
@@ -64,6 +69,11 @@ router.post("/orders", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const input = parsed.data;
+  if ((input.orderValue !== undefined) !== (input.currencyCode !== undefined)) {
+    res.status(400).json({ error: "Order value and currency must be provided together." });
+    return;
+  }
 
   const order = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(83439042)`);
@@ -74,18 +84,22 @@ router.post("/orders", async (req, res): Promise<void> => {
       const match = row.reference.match(prefixPattern);
       return match ? Math.max(max, Number(match[1])) : max;
     }, 4055);
-    const reference = `${lastNumber + 1}/BK-${initials(parsed.data.buyer)}/${year}`;
+    const reference = `${lastNumber + 1}/BK-${initials(input.buyer)}/${year}`;
     const [created] = await tx
       .insert(ordersTable)
       .values({
         reference,
-        buyer: parsed.data.buyer.trim(),
-        poNumber: parsed.data.poNumber?.trim() || null,
-        style: parsed.data.style.trim(),
-        description: parsed.data.description?.trim() || null,
-        quantity: parsed.data.quantity,
-        deliveryDate: asDateString(parsed.data.deliveryDate),
-        priority: parsed.data.priority ?? "normal",
+        buyer: input.buyer.trim(),
+        agencyName: input.agencyName?.trim() || null,
+        previousOrderReference: input.previousOrderReference?.trim() || null,
+        orderValue: input.orderValue ?? null,
+        currencyCode: input.currencyCode?.trim().toUpperCase() || null,
+        poNumber: input.poNumber?.trim() || null,
+        style: input.style.trim(),
+        description: input.description?.trim() || null,
+        quantity: input.quantity,
+        deliveryDate: asDateString(input.deliveryDate),
+        priority: input.priority ?? "normal",
       })
       .returning();
 
@@ -94,21 +108,23 @@ router.post("/orders", async (req, res): Promise<void> => {
         orderId: created.id,
         title: "Confirm order details",
         department: "merchandising",
-        dueDate: asDateString(parsed.data.deliveryDate),
+        dueDate: asDateString(input.deliveryDate),
         status: "not_started",
-        priority: parsed.data.priority ?? "normal",
+        priority: input.priority ?? "normal",
       },
       {
         orderId: created.id,
         title: "Prepare fabric plan",
         department: "fabrication",
-        dueDate: asDateString(parsed.data.deliveryDate),
+        dueDate: asDateString(input.deliveryDate),
         status: "not_started",
-        priority: parsed.data.priority ?? "normal",
+        priority: input.priority ?? "normal",
       },
     ]);
+    const actor = getAuditActor(req);
     await tx.insert(activityTable).values({
-      actor: "Staff member",
+      actor: actor.label,
+      actorId: actor.id,
       description: `Created order ${created.reference}`,
       entityType: "order",
       entityId: created.id,
@@ -134,6 +150,31 @@ router.get("/orders/:orderId", async (req, res): Promise<void> => {
   res.json(GetOrderResponse.parse(order));
 });
 
+router.get("/orders/:orderId/activity", async (req, res): Promise<void> => {
+  const params = GetOrderActivityParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [order] = await db.select({ id: ordersTable.id }).from(ordersTable).where(eq(ordersTable.id, params.data.orderId));
+  if (!order) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+  const rows = await db
+    .select({
+      id: activityTable.id,
+      actor: activityTable.actor,
+      actorId: activityTable.actorId,
+      description: activityTable.description,
+      occurredAt: activityTable.occurredAt,
+    })
+    .from(activityTable)
+    .where(and(eq(activityTable.entityType, "order"), eq(activityTable.entityId, params.data.orderId)))
+    .orderBy(desc(activityTable.occurredAt));
+  res.json(GetOrderActivityResponse.parse(rows));
+});
+
 router.patch("/orders/:orderId", async (req, res): Promise<void> => {
   const params = UpdateOrderParams.safeParse(req.params);
   if (!params.success) {
@@ -147,25 +188,80 @@ router.patch("/orders/:orderId", async (req, res): Promise<void> => {
   }
   const data = parsed.data;
   const update: Record<string, unknown> = { updatedAt: new Date() };
-  for (const key of ["buyer", "poNumber", "style", "description", "quantity", "status", "priority"] as const) {
+  const hasAmount = data.orderValue !== undefined;
+  const hasCurrency = data.currencyCode !== undefined;
+  if (hasAmount !== hasCurrency || (hasAmount && ((data.orderValue === null) !== (data.currencyCode === null)))) {
+    res.status(400).json({ error: "Order value and currency must be updated together." });
+    return;
+  }
+  if (hasAmount) {
+    update.currencyCode = data.currencyCode === null ? null : data.currencyCode?.trim().toUpperCase();
+  }
+  for (const key of [
+    "buyer",
+    "agencyName",
+    "previousOrderReference",
+    "orderValue",
+    "currencyCode",
+    "poNumber",
+    "style",
+    "description",
+    "quantity",
+    "status",
+    "priority",
+  ] as const) {
     if (data[key] !== undefined) update[key] = data[key];
   }
+  if (typeof update.currencyCode === "string") update.currencyCode = update.currencyCode.trim().toUpperCase();
+  if (typeof update.agencyName === "string") update.agencyName = update.agencyName.trim() || null;
+  if (typeof update.previousOrderReference === "string") update.previousOrderReference = update.previousOrderReference.trim() || null;
+  if (typeof update.poNumber === "string") update.poNumber = update.poNumber.trim() || null;
+  if (typeof update.description === "string") update.description = update.description.trim() || null;
   if (data.deliveryDate !== undefined) update.deliveryDate = asDateString(data.deliveryDate);
-  const [order] = await db
-    .update(ordersTable)
-    .set(update)
-    .where(eq(ordersTable.id, params.data.orderId))
-    .returning();
-  if (!order) {
+  const result = await db.transaction(async (tx) => {
+    const [before] = await tx.select().from(ordersTable).where(eq(ordersTable.id, params.data.orderId));
+    if (!before) return null;
+    const [order] = await tx
+      .update(ordersTable)
+      .set(update)
+      .where(eq(ordersTable.id, params.data.orderId))
+      .returning();
+    const fields: Array<[string, string, string, string]> = [
+      ["buyer", "Buyer", before.buyer, order.buyer],
+      ["agencyName", "Agency", before.agencyName ?? "", order.agencyName ?? ""],
+      ["previousOrderReference", "Previous order reference", before.previousOrderReference ?? "", order.previousOrderReference ?? ""],
+      ["orderValue", "Order value", before.orderValue === null ? "" : `${before.orderValue} ${before.currencyCode ?? ""}`.trim(), order.orderValue === null ? "" : `${order.orderValue} ${order.currencyCode ?? ""}`.trim()],
+      ["poNumber", "Buyer PO", before.poNumber ?? "", order.poNumber ?? ""],
+      ["style", "Style", before.style, order.style],
+      ["description", "Order notes", before.description ?? "", order.description ?? ""],
+      ["quantity", "Quantity", String(before.quantity), String(order.quantity)],
+      ["deliveryDate", "Delivery date", before.deliveryDate, order.deliveryDate],
+      ["status", "Status", before.status, order.status],
+      ["priority", "Priority", before.priority, order.priority],
+    ];
+    const changes = fields
+      .filter(([field]) => field === "orderValue"
+        ? Object.prototype.hasOwnProperty.call(data, "orderValue") || Object.prototype.hasOwnProperty.call(data, "currencyCode")
+        : Object.prototype.hasOwnProperty.call(data, field))
+      .filter(([, , previous, next]) => previous !== next)
+      .map(([, label, previous, next]) => `${label}: ${previous || "—"} → ${next || "—"}`);
+    if (changes.length) {
+      const actor = getAuditActor(req);
+      await tx.insert(activityTable).values({
+        actor: actor.label,
+        actorId: actor.id,
+        description: `Updated ${order.reference} · ${changes.join("; ")}`,
+        entityType: "order",
+        entityId: order.id,
+      });
+    }
+    return order;
+  });
+  if (!result) {
     res.status(404).json({ error: "Order not found" });
     return;
   }
-  await db.insert(activityTable).values({
-    actor: "Staff member",
-    description: `Updated order ${order.reference}`,
-    entityType: "order",
-    entityId: order.id,
-  });
+  const order = result;
   res.json(UpdateOrderResponse.parse(order));
 });
 

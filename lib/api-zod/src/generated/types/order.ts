@@ -13,6 +13,14 @@ export interface Order {
   reference: string;
   buyer: string;
   /** @nullable */
+  agencyName: string | null;
+  /** @nullable */
+  previousOrderReference: string | null;
+  /** @nullable */
+  orderValue: number | null;
+  /** @nullable */
+  currencyCode: string | null;
+  /** @nullable */
   poNumber?: string | null;
   style: string;
   /** @nullable */

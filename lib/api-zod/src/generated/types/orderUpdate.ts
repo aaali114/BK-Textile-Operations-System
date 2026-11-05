@@ -12,6 +12,21 @@ export interface OrderUpdate {
   /** @minLength 1 */
   buyer?: string;
   /** @nullable */
+  agencyName?: string | null;
+  /** @nullable */
+  previousOrderReference?: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  orderValue?: number | null;
+  /**
+     * @minLength 3
+     * @maxLength 3
+     * @nullable
+     */
+  currencyCode?: string | null;
+  /** @nullable */
   poNumber?: string | null;
   /** @minLength 1 */
   style?: string;

@@ -407,6 +407,67 @@
 @media(max-width:760px){.sidebar{display:none}.topbar{height:60px;padding:0 17px}.mobile-menu{display:inline-flex}.page-wrap{padding:25px 16px 90px}.page-title-row{align-items:flex-start;flex-direction:column}.page-title-row .btn{align-self:stretch}.metric-grid{gap:8px}.metric{padding:15px}.metric-value{font-size:27px}.dept-row{grid-template-columns:100px 1fr 37px 37px;gap:8px;padding:12px}.data-table{min-width:720px}.table-scroll{overflow-x:auto}.panel-head{padding:15px}.public-top{padding:18px 20px}.hero-body{grid-template-columns:1fr;padding:55px 23px 45px;gap:35px}.hero-title{font-size:clamp(48px,13vw,72px)}.hero-visual{height:300px}.hero-foot{gap:14px;flex-wrap:wrap;padding:15px 20px}.auth-page{grid-template-columns:1fr}.auth-context{display:none}.auth-form-side{min-height:100dvh;padding:24px}.auth-box{width:min(440px,100%)}.signed-user{display:none}.detail-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:1fr}.form-field.full{grid-column:auto}.mobile-nav{position:fixed;z-index:30;bottom:0;left:0;right:0;display:flex;background:#22343b;padding:8px 5px max(8px,env(safe-area-inset-bottom));justify-content:space-around;border-top:1px solid #405157}.mobile-nav a{display:flex;flex-direction:column;align-items:center;gap:4px;color:#b9c8c3;text-decoration:none;font-size:9px;padding:4px}.mobile-nav a.active{color:#e1b65d}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 
+/* Order register and record: compact, ledger-like hierarchy */
+.optional-label { color:#8b9690;font-size:9px;font-weight:500;margin-left:4px;text-transform:uppercase;letter-spacing:.04em }
+.currency-input { display:grid;grid-template-columns:minmax(0,1fr) 78px;gap:8px }
+.currency-code { text-transform:uppercase;text-align:center;font-family:var(--app-font-mono);letter-spacing:.06em }
+.register-context { display:flex;gap:8px;flex-wrap:wrap;margin-top:5px;color:#77847f;font:9px var(--app-font-mono) }
+.register-context span+span:before { content:"·";margin-right:8px;color:#c0a96e }
+.commercial-record { margin:0 0 18px;overflow:hidden }
+.record-banner { display:flex;align-items:center;justify-content:space-between;gap:20px;padding:17px 20px;background:#f3f0e7;border-bottom:1px solid #e8e3d9 }
+.record-banner .eyebrow { margin:0 0 5px }
+.record-ref { color:#2b6670;font-size:13px;font-weight:500 }
+.record-amount { display:grid;gap:4px;text-align:right }
+.record-amount strong { color:#26393e;font:700 18px var(--app-font-serif) }
+.commercial-record .detail-grid { grid-template-columns:repeat(3,minmax(0,1fr));gap:0;padding:4px 10px 10px }
+.commercial-record .detail-cell { padding:13px 12px;background:transparent;border-bottom:1px solid #eeeae1;border-radius:0;min-width:0 }
+.commercial-record .detail-value { overflow-wrap:anywhere }
+.order-support-grid { display:grid;grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr);gap:18px;margin:18px 0 }
+.document-list { padding:3px 18px 15px }
+.document-row { display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid #eeeae1 }
+.document-row:last-of-type { border-bottom:0 }
+.document-icon { width:34px;height:34px;display:grid;place-items:center;border:1px solid #e3dfd4;background:#f4f1e9;color:#557a7a;border-radius:4px;flex:none }
+.document-copy { display:grid;gap:4px;min-width:0;flex:1 }
+.document-copy strong { color:#34464a;font-size:12px }
+.document-copy span,.support-note { color:#87918a;font-size:10px;line-height:1.5 }
+.template-status { flex:none;padding:5px 7px;border:1px solid #e7d8b8;background:#f7f0df;border-radius:3px;color:#886c35;font:9px var(--app-font-mono);text-transform:uppercase;letter-spacing:.04em }
+.support-note { margin:8px 2px 0 }
+.image-unavailable { min-height:158px;padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;color:#6e8580;background:repeating-linear-gradient(135deg,#f8f6f0,#f8f6f0 12px,#f3f0e8 12px,#f3f0e8 24px);margin:15px;border:1px dashed #d7d2c5;border-radius:4px }
+.image-unavailable strong { color:#455c5b;font-size:12px }
+.image-unavailable span { max-width:280px;color:#7e8984;font-size:10px;line-height:1.5 }
+.order-description { margin-bottom:18px }
+.description-body { padding:18px 20px;color:#556762;font-size:12px;line-height:1.7;white-space:pre-wrap }
+.muted-copy { color:#929b95 }
+.order-activity { margin-bottom:20px }
+.order-timeline { padding:4px 22px 10px }
+.timeline-entry { display:grid;grid-template-columns:18px minmax(0,1fr);gap:12px;position:relative;padding:14px 0 }
+.timeline-entry:not(:last-child):before { content:"";position:absolute;left:6px;top:25px;bottom:-13px;width:1px;background:#d9e1da }
+.timeline-node { position:relative;z-index:1;width:13px;height:13px;margin-top:2px;border:3px solid #fbfaf6;border-radius:50%;background:#628681;box-shadow:0 0 0 1px #a8bfba }
+.timeline-content { min-width:0 }
+.timeline-top { display:flex;justify-content:space-between;align-items:baseline;gap:14px }
+.timeline-top strong { color:#364d4e;font-size:12px }
+.timeline-top time { color:#83908a;font:9px var(--app-font-mono);text-align:right }
+.timeline-content p { color:#64736f;font-size:12px;line-height:1.55;margin:5px 0 0 }
+.order-activity .blank-state { padding:32px 20px }
+.page-wrap > .order-support-grid { animation-delay:.05s }
+.page-wrap > .order-activity { animation-delay:.08s }
+
+@media(max-width:760px) {
+  .commercial-record .detail-grid { grid-template-columns:repeat(2,minmax(0,1fr));padding:0 8px 8px }
+  .record-banner { padding:15px;align-items:flex-start }
+  .record-amount strong { font-size:15px }
+  .order-support-grid { grid-template-columns:1fr;gap:14px;margin:14px 0 }
+  .timeline-top { align-items:flex-start;flex-direction:column;gap:4px }
+  .template-status { font-size:8px }
+  .document-row { gap:9px }
+}
+@media(max-width:420px) {
+  .commercial-record .detail-grid { grid-template-columns:1fr 1fr }
+  .record-banner { flex-direction:column;gap:12px }
+  .record-amount { text-align:left }
+  .currency-input { grid-template-columns:minmax(0,1fr) 70px }
+}
+
 /**
  * Using the elevate system.
  * Automatic contrast adjustment.

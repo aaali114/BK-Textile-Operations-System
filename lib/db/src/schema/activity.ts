@@ -3,6 +3,7 @@ import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 export const activityTable = pgTable("bk_activity", {
   id: uuid("id").primaryKey().defaultRandom(),
   actor: text("actor").notNull(),
+  actorId: text("actor_id"),
   description: text("description").notNull(),
   entityType: text("entity_type").notNull(),
   entityId: text("entity_id"),

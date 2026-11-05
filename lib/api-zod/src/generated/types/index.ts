@@ -24,6 +24,7 @@ export * from './materialLotInput';
 export * from './materialStatus';
 export * from './materialType';
 export * from './order';
+export * from './orderActivity';
 export * from './orderInput';
 export * from './orderStatus';
 export * from './orderUpdate';

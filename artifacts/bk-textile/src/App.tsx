@@ -15,14 +15,14 @@ import {
 } from 'lucide-react';
 import {
   getGetDashboardSummaryQueryKey, getGetInspectionsQueryKey, getGetMaterialsQueryKey,
-  getGetOrderQueryKey, getGetOrdersQueryKey, getGetWorkItemsQueryKey, getHealthCheckQueryKey,
+  getGetOrderActivityQueryKey, getGetOrderQueryKey, getGetOrdersQueryKey, getGetWorkItemsQueryKey, getHealthCheckQueryKey,
   useCreateInspection, useCreateMaterialLot, useCreateOrder, useGetDashboardSummary,
-  useGetInspections, useGetMaterials, useGetOrder, useGetOrders, useGetWorkItems,
+  useGetInspections, useGetMaterials, useGetOrder, useGetOrderActivity, useGetOrders, useGetWorkItems,
   useHealthCheck, useUpdateOrder, useUpdateWorkItem,
 } from '@workspace/api-client-react';
 import type {
   DashboardSummary, Department, Inspection, InspectionInput, MaterialLot, MaterialLotInput,
-  Order, OrderInput, OrderStatus, Priority, WorkItem, WorkItemStatus,
+  Order, OrderActivity, OrderInput, OrderStatus, Priority, WorkItem, WorkItemStatus,
 } from '@workspace/api-client-react';
 
 const queryClient = new QueryClient();
@@ -216,12 +216,32 @@ function Dashboard() {
   </PageFrame>;
 }
 
-function OrderForm({ onSubmit, busy, initial, onCancel }: { onSubmit: (data: OrderInput) => void; busy: boolean; initial?: Order; onCancel?: () => void }) {
-  const [form, setForm] = useState({ buyer: initial?.buyer ?? '', poNumber: initial?.poNumber ?? '', style: initial?.style ?? '', description: initial?.description ?? '', quantity: initial?.quantity?.toString() ?? '', deliveryDate: toInputDate(initial?.deliveryDate), priority: initial?.priority ?? 'normal' as Priority });
+type OrderFormData = Omit<OrderInput, 'orderValue' | 'currencyCode'> & { orderValue: number | null; currencyCode: string | null };
+function OrderForm({ onSubmit, busy, initial, onCancel }: { onSubmit: (data: OrderFormData) => void; busy: boolean; initial?: Order; onCancel?: () => void }) {
+  const [form, setForm] = useState({ buyer: initial?.buyer ?? '', agencyName: initial?.agencyName ?? '', previousOrderReference: initial?.previousOrderReference ?? '', orderValue: initial?.orderValue?.toString() ?? '', currencyCode: initial?.currencyCode ?? '', poNumber: initial?.poNumber ?? '', style: initial?.style ?? '', description: initial?.description ?? '', quantity: initial?.quantity?.toString() ?? '', deliveryDate: toInputDate(initial?.deliveryDate), priority: initial?.priority ?? 'normal' as Priority });
   const set = (key: keyof typeof form, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
-  const submit = (event: React.FormEvent) => { event.preventDefault(); onSubmit({ buyer: form.buyer.trim(), poNumber: form.poNumber.trim() || undefined, style: form.style.trim(), description: form.description.trim() || undefined, quantity: Number(form.quantity), deliveryDate: form.deliveryDate, priority: form.priority as Priority }); };
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const currencyCode = form.currencyCode.trim().toUpperCase();
+    onSubmit({
+      buyer: form.buyer.trim(),
+      agencyName: form.agencyName.trim(),
+      previousOrderReference: form.previousOrderReference.trim(),
+      orderValue: form.orderValue.trim() ? Number(form.orderValue) : null,
+      currencyCode: currencyCode || null,
+      poNumber: form.poNumber.trim(),
+      style: form.style.trim(),
+      description: form.description.trim(),
+      quantity: Number(form.quantity),
+      deliveryDate: form.deliveryDate,
+      priority: form.priority as Priority,
+    });
+  };
   return <form onSubmit={submit}><div className="form-grid">
     <div className="form-field"><label htmlFor="order-buyer">Buyer name *</label><input id="order-buyer" className="field" required value={form.buyer} onChange={(e) => set('buyer', e.target.value)} data-testid="input-order-buyer" /></div>
+    <div className="form-field"><label htmlFor="order-agency">Agency <span className="optional-label">Optional</span></label><input id="order-agency" className="field" value={form.agencyName} onChange={(e) => set('agencyName', e.target.value)} /></div>
+    <div className="form-field"><label htmlFor="order-previous">Previous order reference <span className="optional-label">Optional</span></label><input id="order-previous" className="field" value={form.previousOrderReference} onChange={(e) => set('previousOrderReference', e.target.value)} /></div>
+    <div className="form-field"><label htmlFor="order-value">Order value <span className="optional-label">Optional</span></label><div className="currency-input"><input id="order-value" className="field" type="number" min="0" step="0.01" required={!!form.currencyCode} value={form.orderValue} onChange={(e) => set('orderValue', e.target.value)} placeholder="0.00" /><input aria-label="3-letter currency code" className="field currency-code" maxLength={3} minLength={3} pattern="[A-Za-z]{3}" required={!!form.orderValue} value={form.currencyCode} onChange={(e) => set('currencyCode', e.target.value.toUpperCase())} placeholder="USD" /></div></div>
     <div className="form-field"><label htmlFor="order-po">Buyer PO reference</label><input id="order-po" className="field" value={form.poNumber} onChange={(e) => set('poNumber', e.target.value)} /></div>
     <div className="form-field"><label htmlFor="order-style">Style *</label><input id="order-style" className="field" required value={form.style} onChange={(e) => set('style', e.target.value)} /></div>
     <div className="form-field"><label htmlFor="order-qty">Quantity *</label><input id="order-qty" className="field" type="number" min="1" required value={form.quantity} onChange={(e) => set('quantity', e.target.value)} /></div>
@@ -239,10 +259,17 @@ function Orders() {
   const query = useGetOrders(params);
   const create = useCreateOrder();
   const client = useQueryClient();
-  const save = (data: OrderInput) => create.mutate({ data }, {
+  const save = (formData: OrderFormData) => {
+    const data: OrderInput = {
+      ...formData,
+      orderValue: formData.orderValue ?? undefined,
+      currencyCode: formData.currencyCode ?? undefined,
+    };
+    return create.mutate({ data }, {
     onSuccess: () => { void client.invalidateQueries({ queryKey: getGetOrdersQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); setNotice({ message: 'Order created and added to the register.' }); setModal(false); },
     onError: (err) => setNotice({ message: errorMessage(err), error: true }),
-  });
+    });
+  };
   const orders = query.data as Order[] | undefined;
   return <PageFrame><PageHeading eyebrow="Production office · Register" title="Order register" subtitle="Buyer commitments, delivery dates and production status in one place." action={<button className="btn btn-primary" onClick={() => { setModal(true); setNotice(null); }} data-testid="button-create-order"><Plus size={16} />Create order</button>} />
     {notice && <Notice message={notice.message} error={notice.error} onClose={() => setNotice(null)} />}
@@ -251,8 +278,8 @@ function Orders() {
       <select className="select" aria-label="Filter by order status" value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: 160 }}><option value="">All statuses</option>{['draft', 'development', 'in_production', 'ready_to_ship', 'shipped'].map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}</select>
     </div></div>
       {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <SkeletonRows /> : !orders?.length ? <EmptyState title={search || status ? 'No matching orders' : 'The order register is clear'} text={search || status ? 'Adjust the search or status filter to see other orders.' : 'Create the first order to begin tracking buyer commitments.'} action={!search && !status ? <button className="btn btn-primary" onClick={() => setModal(true)}><Plus size={15} />Create order</button> : undefined} /> :
-      <div className="table-scroll"><table className="data-table"><thead><tr><th>Reference / buyer</th><th>Style</th><th>Qty</th><th>Delivery</th><th>Priority</th><th>Status</th><th aria-label="Details" /></tr></thead><tbody>{orders.map((order) => <tr key={order.id} data-testid={`row-order-${order.id}`}><td><Link href={`/orders/${order.id}`} className="ref-link">{order.reference}</Link><div style={{ fontSize: 11, color: '#7d8984', marginTop: 4 }}>{order.buyer}{order.poNumber && <span> · PO {order.poNumber}</span>}</div></td><td><strong>{order.style}</strong></td><td className="mono">{numberText(order.quantity)}</td><td>{dateText(order.deliveryDate)}</td><td><span className={`priority-marker ${order.priority}`}>{order.priority}</span></td><td><StatusPill status={order.status} /></td><td><Link href={`/orders/${order.id}`} className="ref-link" aria-label={`View ${order.reference}`}><ArrowRight size={16} /></Link></td></tr>)}</tbody></table></div>}
-    </section><DataDisclaimer />
+       <div className="table-scroll"><table className="data-table"><thead><tr><th>Reference / buyer</th><th>Style</th><th>Order value</th><th>Qty</th><th>Delivery</th><th>Priority</th><th>Status</th><th aria-label="Details" /></tr></thead><tbody>{orders.map((order) => <tr key={order.id} data-testid={`row-order-${order.id}`}><td><Link href={`/orders/${order.id}`} className="ref-link">{order.reference}</Link><div style={{ fontSize: 11, color: '#7d8984', marginTop: 4 }}>{order.buyer}{order.poNumber && <span> · PO {order.poNumber}</span>}</div>{(order.agencyName || order.previousOrderReference) && <div className="register-context">{order.agencyName && <span>{order.agencyName}</span>}{order.previousOrderReference && <span>Prev. {order.previousOrderReference}</span>}</div>}</td><td><strong>{order.style}</strong></td><td className="mono">{order.orderValue != null ? `${order.currencyCode || ''} ${Number(order.orderValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim() : '—'}</td><td className="mono">{numberText(order.quantity)}</td><td>{dateText(order.deliveryDate)}</td><td><span className={`priority-marker ${order.priority}`}>{order.priority}</span></td><td><StatusPill status={order.status} /></td><td><Link href={`/orders/${order.id}`} className="ref-link" aria-label={`View ${order.reference}`}><ArrowRight size={16} /></Link></td></tr>)}</tbody></table></div>}
+     </section>
     {modal && <div className="modal-scrim" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setModal(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="create-order-title"><div className="modal-head"><div><div className="eyebrow">New buyer commitment</div><h2 id="create-order-title" className="panel-title" style={{ fontSize: 20 }}>Create order</h2></div><button className="icon-btn" aria-label="Close" onClick={() => setModal(false)}><X size={17} /></button></div><div className="modal-content"><OrderForm onSubmit={save} busy={create.isPending} onCancel={() => setModal(false)} /></div></section></div>}
   </PageFrame>;
 }
@@ -260,32 +287,55 @@ function Orders() {
 function OrderDetails() {
   const { orderId = '' } = useParams<{ orderId: string }>();
   const query = useGetOrder(orderId, { query: { queryKey: getGetOrderQueryKey(orderId), enabled: !!orderId } });
+  const activityQuery = useGetOrderActivity(orderId, { query: { queryKey: getGetOrderActivityQueryKey(orderId), enabled: !!orderId } });
   const update = useUpdateOrder();
   const client = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState<{ message: string; error?: boolean } | null>(null);
   const order = query.data as Order | undefined;
-  const save = (input: OrderInput) => update.mutate({ orderId, data: input }, {
-    onSuccess: (saved) => { client.setQueryData(getGetOrderQueryKey(orderId), saved); void client.invalidateQueries({ queryKey: getGetOrdersQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); setEditing(false); setNotice({ message: 'Order details saved.' }); },
+  const save = (input: OrderFormData) => update.mutate({ orderId, data: input }, {
+     onSuccess: (saved) => { client.setQueryData(getGetOrderQueryKey(orderId), saved); void client.invalidateQueries({ queryKey: getGetOrdersQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); void client.invalidateQueries({ queryKey: getGetOrderActivityQueryKey(orderId) }); setEditing(false); setNotice({ message: 'Order details saved.' }); },
     onError: (err) => setNotice({ message: errorMessage(err), error: true }),
   });
   const changeStatus = (next: string) => update.mutate({ orderId, data: { status: next as OrderStatus } }, {
-    onSuccess: (saved) => { client.setQueryData(getGetOrderQueryKey(orderId), saved); void client.invalidateQueries({ queryKey: getGetOrdersQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); setNotice({ message: 'Order status updated.' }); },
+     onSuccess: (saved) => { client.setQueryData(getGetOrderQueryKey(orderId), saved); void client.invalidateQueries({ queryKey: getGetOrdersQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); void client.invalidateQueries({ queryKey: getGetOrderActivityQueryKey(orderId) }); setNotice({ message: 'Order status updated.' }); },
     onError: (err) => setNotice({ message: errorMessage(err), error: true }),
   });
   return <PageFrame><div style={{ marginBottom: 22 }}><Link href="/orders" className="ref-link"><ArrowLeft size={14} style={{ verticalAlign: 'middle', marginRight: 5 }} />Back to order register</Link></div>
     {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <div className="panel"><SkeletonRows /></div> : order && <>
       <PageHeading eyebrow={`Order record · ${order.reference}`} title={order.buyer} subtitle={`${order.style}${order.poNumber ? ` · Buyer PO ${order.poNumber}` : ''}`} action={<button className="btn btn-quiet" onClick={() => { setEditing(!editing); setNotice(null); }}><FilePlus2 size={15} />{editing ? 'Cancel edit' : 'Edit order'}</button>} />
       {notice && <Notice message={notice.message} error={notice.error} onClose={() => setNotice(null)} />}
-      <div className="detail-grid" style={{ marginBottom: 18 }}>
-        {[['Order reference', order.reference], ['Style', order.style], ['Quantity', numberText(order.quantity)], ['Delivery date', dateText(order.deliveryDate)], ['Buyer PO', order.poNumber || 'Not provided'], ['Last updated', dateText(order.updatedAt)]].map(([label, value]) => <div className="detail-cell" key={label}><div className="detail-label">{label}</div><div className="detail-value">{value}</div></div>)}
-      </div>
+       <section className="panel commercial-record" aria-label="Commercial order record">
+         <div className="record-banner"><div><div className="eyebrow">Commercial record</div><div className="record-ref mono">{order.reference}</div></div><div className="record-amount"><span className="detail-label">Order value</span><strong>{order.orderValue != null ? `${order.currencyCode || ''} ${Number(order.orderValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim() : 'Not provided'}</strong></div></div>
+         <div className="detail-grid">
+           {[
+             ['Buyer', order.buyer],
+             ['Agency', order.agencyName || 'Not provided'],
+             ['Previous order', order.previousOrderReference || 'Not provided'],
+             ['Buyer PO', order.poNumber || 'Not provided'],
+             ['Style', order.style],
+             ['Quantity', numberText(order.quantity)],
+             ['Delivery date', dateText(order.deliveryDate)],
+             ['Currency', order.currencyCode || 'Not provided'],
+             ['Last updated', dateText(order.updatedAt)],
+           ].map(([label, value]) => <div className="detail-cell" key={label}><div className="detail-label">{label}</div><div className="detail-value">{value}</div></div>)}
+         </div>
+       </section>
       <section className="panel" style={{ marginBottom: 18 }}><div className="panel-head"><div><p className="panel-kicker">Production control</p><h2 className="panel-title">Order status & priority</h2></div><StatusPill status={order.status} /></div>
         <div style={{ padding: 20, display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'end' }}><div className="form-field"><label htmlFor="detail-status">Status</label><select id="detail-status" className="select status-select" value={order.status} disabled={update.isPending} onChange={(e) => changeStatus(e.target.value)}>{['draft', 'development', 'in_production', 'ready_to_ship', 'shipped'].map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}</select></div><div className="form-field"><label>Priority</label><div className={`priority-marker ${order.priority}`}>{order.priority}</div></div><div className="form-field"><label>Created</label><div style={{ fontSize: 12, color: '#5d706c' }}>{dateText(order.createdAt)}</div></div></div>
       </section>
       {editing && <section className="panel" style={{ marginBottom: 18 }}><div className="panel-head"><div><p className="panel-kicker">Editable fields</p><h2 className="panel-title">Update order information</h2></div></div><div style={{ padding: 22 }}><OrderForm initial={order} onSubmit={save} busy={update.isPending} onCancel={() => setEditing(false)} /></div></section>}
-      {order.description && <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Production notes</p><h2 className="panel-title">Description</h2></div></div><div style={{ padding: 20, fontSize: 13, lineHeight: 1.6, color: '#556762' }}>{order.description}</div></section>}
-      <DataDisclaimer />
+       <div className="order-support-grid">
+         <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Reference material</p><h2 className="panel-title">Documents</h2></div></div><div className="document-list">
+           {['Cutting letter', 'Packing list'].map((name) => <div className="document-row" key={name}><span className="document-icon"><FilePlus2 size={16} /></span><div className="document-copy"><strong>{name}</strong><span>Awaiting your template</span></div><span className="template-status">Template needed</span></div>)}
+           <p className="support-note">Document templates have not been provided. No files are stored on this record.</p>
+         </div></section>
+         <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Style reference</p><h2 className="panel-title">Garment picture</h2></div></div><div className="image-unavailable"><Shirt size={24} strokeWidth={1.5} /><strong>Image storage is not available yet</strong><span>Garment imagery will appear here when image storage is supported.</span></div></section>
+       </div>
+       <section className="panel order-description"><div className="panel-head"><div><p className="panel-kicker">Production notes</p><h2 className="panel-title">Description</h2></div></div><div className="description-body">{order.description || <span className="muted-copy">No order notes have been added.</span>}</div></section>
+       <section className="panel order-activity"><div className="panel-head"><div><p className="panel-kicker">Record history</p><h2 className="panel-title">Order activity</h2></div><Activity size={16} color="#66807e" /></div>
+         {activityQuery.isError ? <QueryError onRetry={() => activityQuery.refetch()} /> : activityQuery.isLoading ? <SkeletonRows count={3} /> : (activityQuery.data as OrderActivity[] | undefined)?.length ? <div className="order-timeline">{(activityQuery.data as OrderActivity[]).map((item) => <article className="timeline-entry" key={item.id} data-testid={`activity-${item.id}`}><span className="timeline-node" aria-hidden="true" /><div className="timeline-content"><div className="timeline-top"><strong>{item.actor}</strong><time dateTime={item.occurredAt}>{new Date(item.occurredAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time></div><p>{item.description}</p></div></article>)}</div> : <EmptyState title="No activity recorded" text="Updates to this order will appear here with the staff member and time." />}
+       </section>
     </>}
   </PageFrame>;
 }
