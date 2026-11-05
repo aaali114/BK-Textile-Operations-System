@@ -1,1 +1,1 @@
-- [Order intake requirements](order-intake.md) — use POP mail rather than IMAP; cPanel filtering compatibility must be considered.
+- [Order intake requirements](order-intake.md) — use POP with the existing shared mailbox, not IMAP or a dedicated import mailbox.
