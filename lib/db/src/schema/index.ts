@@ -20,4 +20,5 @@
 export * from "./activity";
 export * from "./materials";
 export * from "./orders";
+export * from "./orderFiles";
 export * from "./work";

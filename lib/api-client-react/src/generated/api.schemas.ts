@@ -186,6 +186,58 @@ export interface OrderActivity {
   occurredAt: string;
 }
 
+export type OrderFileFileType = typeof OrderFileFileType[keyof typeof OrderFileFileType];
+
+
+export const OrderFileFileType = {
+  document: 'document',
+  garment_image: 'garment_image',
+} as const;
+
+export interface OrderFile {
+  id: string;
+  orderId: string;
+  fileType: OrderFileFileType;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedBy: string;
+  uploadedByName: string;
+  uploadedAt: string;
+}
+
+export type OrderFileUploadRequestFileType = typeof OrderFileUploadRequestFileType[keyof typeof OrderFileUploadRequestFileType];
+
+
+export const OrderFileUploadRequestFileType = {
+  document: 'document',
+  garment_image: 'garment_image',
+} as const;
+
+export interface OrderFileUploadRequest {
+  fileType: OrderFileUploadRequestFileType;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  contentType: string;
+  /**
+     * @minimum 1
+     * @maximum 26214400
+     */
+  sizeBytes: number;
+}
+
+export interface OrderFileUploadResponse {
+  fileId: string;
+  uploadURL: string;
+}
+
 export interface WorkItem {
   id: string;
   orderId: string;

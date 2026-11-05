@@ -35,6 +35,9 @@ import type {
   MaterialLotInput,
   Order,
   OrderActivity,
+  OrderFile,
+  OrderFileUploadRequest,
+  OrderFileUploadResponse,
   OrderInput,
   OrderUpdate,
   WorkItem,
@@ -562,101 +565,6 @@ export function useGetOrder<TData = Awaited<ReturnType<typeof getOrder>>, TError
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-
-
-
-
-
-
-export const getUpdateOrderUrl = (orderId: string,) => {
-
-
-
-
-  return `/api/orders/${orderId}`
-}
-
-/**
- * @summary Update an order
- */
-export const updateOrder = async (orderId: string,
-    orderUpdate: OrderUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customFetch<Order>(getUpdateOrderUrl(orderId),
-  {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(orderUpdate)
-  }
-);}
-
-
-
-
-
-export const getUpdateOrderMutationKey = () => ['updateOrder'] as const;
-
-export const getUpdateOrderMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrder>>, TError,UpdateOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateOrder>>, TError,UpdateOrderMutationVariables, TContext> => {
-
-const mutationKey = getUpdateOrderMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOrder>>, UpdateOrderMutationVariables> = (props) => {
-          const {orderId,data} = props ?? {};
-
-          return  updateOrder(orderId,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type UpdateOrderMutationResult = NonNullable<Awaited<ReturnType<typeof updateOrder>>>
-    export type UpdateOrderMutationBody = BodyType<OrderUpdate>
-    export type UpdateOrderMutationError = ErrorType<void>
-    export type UpdateOrderMutationVariables = {orderId: string;data: BodyType<OrderUpdate>}
-
-    /**
- * @summary Update an order
- */
-export const useUpdateOrder = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrder>>, TError,UpdateOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof updateOrder>>,
-        TError,
-        UpdateOrderMutationVariables,
-        TContext
-      > => {
-      return useMutation(getUpdateOrderMutationOptions(options), queryClient);
-    }
-
 export const getGetOrderActivityUrl = (orderId: string,) => {
 
 
@@ -751,6 +659,585 @@ export function useGetOrderActivity<TData = Awaited<ReturnType<typeof getOrderAc
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+
+export const getGetOrderFilesUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/files`
+}
+
+/**
+ * @summary List files attached to an order
+ */
+export const getOrderFiles = async (orderId: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderFile[]> => {
+
+  return customFetch<OrderFile[]>(getGetOrderFilesUrl(orderId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOrderFilesQueryKey = (orderId: string,) => {
+    return [
+    `/api/orders/${orderId}/files`
+    ] as const;
+    }
+
+
+export const getGetOrderFilesQueryOptions = <TData = Awaited<ReturnType<typeof getOrderFiles>>, TError = ErrorType<void>>(orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderFiles>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOrderFilesQueryKey(orderId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrderFiles>>> = ({ signal }) => getOrderFiles(orderId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: orderId !== null && orderId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOrderFiles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOrderFilesQueryResult = NonNullable<Awaited<ReturnType<typeof getOrderFiles>>>
+export type GetOrderFilesQueryError = ErrorType<void>
+
+
+export function useGetOrderFiles<TData = Awaited<ReturnType<typeof getOrderFiles>>, TError = ErrorType<void>>(
+ orderId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderFiles>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOrderFiles>>,
+          TError,
+          Awaited<ReturnType<typeof getOrderFiles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOrderFiles<TData = Awaited<ReturnType<typeof getOrderFiles>>, TError = ErrorType<void>>(
+ orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderFiles>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOrderFiles>>,
+          TError,
+          Awaited<ReturnType<typeof getOrderFiles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOrderFiles<TData = Awaited<ReturnType<typeof getOrderFiles>>, TError = ErrorType<void>>(
+ orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderFiles>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List files attached to an order
+ */
+
+export function useGetOrderFiles<TData = Awaited<ReturnType<typeof getOrderFiles>>, TError = ErrorType<void>>(
+ orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderFiles>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOrderFilesQueryOptions(orderId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRequestOrderFileUploadUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/files/upload-url`
+}
+
+/**
+ * @summary Request a private upload URL for an order file
+ */
+export const requestOrderFileUpload = async (orderId: string,
+    orderFileUploadRequest: OrderFileUploadRequest, options?: Parameters<typeof customFetch>[1]): Promise<OrderFileUploadResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderFileUploadResponse>(getRequestOrderFileUploadUrl(orderId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderFileUploadRequest)
+  }
+);}
+
+
+
+
+
+export const getRequestOrderFileUploadMutationKey = () => ['requestOrderFileUpload'] as const;
+
+export const getRequestOrderFileUploadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestOrderFileUpload>>, TError,RequestOrderFileUploadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestOrderFileUpload>>, TError,RequestOrderFileUploadMutationVariables, TContext> => {
+
+const mutationKey = getRequestOrderFileUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestOrderFileUpload>>, RequestOrderFileUploadMutationVariables> = (props) => {
+          const {orderId,data} = props ?? {};
+
+          return  requestOrderFileUpload(orderId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestOrderFileUploadMutationResult = NonNullable<Awaited<ReturnType<typeof requestOrderFileUpload>>>
+    export type RequestOrderFileUploadMutationBody = BodyType<OrderFileUploadRequest>
+    export type RequestOrderFileUploadMutationError = ErrorType<void>
+    export type RequestOrderFileUploadMutationVariables = {orderId: string;data: BodyType<OrderFileUploadRequest>}
+
+    /**
+ * @summary Request a private upload URL for an order file
+ */
+export const useRequestOrderFileUpload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestOrderFileUpload>>, TError,RequestOrderFileUploadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof requestOrderFileUpload>>,
+        TError,
+        RequestOrderFileUploadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestOrderFileUploadMutationOptions(options), queryClient);
+    }
+
+export const getCompleteOrderFileUploadUrl = (orderId: string,
+    fileId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/files/${fileId}/complete`
+}
+
+/**
+ * @summary Confirm that an order file upload completed
+ */
+export const completeOrderFileUpload = async (orderId: string,
+    fileId: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderFile> => {
+
+  return customFetch<OrderFile>(getCompleteOrderFileUploadUrl(orderId,fileId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCompleteOrderFileUploadMutationKey = () => ['completeOrderFileUpload'] as const;
+
+export const getCompleteOrderFileUploadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeOrderFileUpload>>, TError,CompleteOrderFileUploadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeOrderFileUpload>>, TError,CompleteOrderFileUploadMutationVariables, TContext> => {
+
+const mutationKey = getCompleteOrderFileUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeOrderFileUpload>>, CompleteOrderFileUploadMutationVariables> = (props) => {
+          const {orderId,fileId} = props ?? {};
+
+          return  completeOrderFileUpload(orderId,fileId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteOrderFileUploadMutationResult = NonNullable<Awaited<ReturnType<typeof completeOrderFileUpload>>>
+
+    export type CompleteOrderFileUploadMutationError = ErrorType<void>
+    export type CompleteOrderFileUploadMutationVariables = {orderId: string;fileId: string}
+
+    /**
+ * @summary Confirm that an order file upload completed
+ */
+export const useCompleteOrderFileUpload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeOrderFileUpload>>, TError,CompleteOrderFileUploadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof completeOrderFileUpload>>,
+        TError,
+        CompleteOrderFileUploadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCompleteOrderFileUploadMutationOptions(options), queryClient);
+    }
+
+export const getDownloadOrderFileUrl = (orderId: string,
+    fileId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/files/${fileId}/content`
+}
+
+/**
+ * @summary View or download a private order file
+ */
+export const downloadOrderFile = async (orderId: string,
+    fileId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadOrderFileUrl(orderId,fileId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadOrderFileQueryKey = (orderId: string,
+    fileId: string,) => {
+    return [
+    `/api/orders/${orderId}/files/${fileId}/content`
+    ] as const;
+    }
+
+
+export const getDownloadOrderFileQueryOptions = <TData = Awaited<ReturnType<typeof downloadOrderFile>>, TError = ErrorType<void>>(orderId: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadOrderFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadOrderFileQueryKey(orderId,fileId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadOrderFile>>> = ({ signal }) => downloadOrderFile(orderId,fileId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: orderId !== null && orderId !== undefined && fileId !== null && fileId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadOrderFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type DownloadOrderFileQueryResult = NonNullable<Awaited<ReturnType<typeof downloadOrderFile>>>
+export type DownloadOrderFileQueryError = ErrorType<void>
+
+
+export function useDownloadOrderFile<TData = Awaited<ReturnType<typeof downloadOrderFile>>, TError = ErrorType<void>>(
+ orderId: string,
+    fileId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadOrderFile>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadOrderFile>>,
+          TError,
+          Awaited<ReturnType<typeof downloadOrderFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDownloadOrderFile<TData = Awaited<ReturnType<typeof downloadOrderFile>>, TError = ErrorType<void>>(
+ orderId: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadOrderFile>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadOrderFile>>,
+          TError,
+          Awaited<ReturnType<typeof downloadOrderFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDownloadOrderFile<TData = Awaited<ReturnType<typeof downloadOrderFile>>, TError = ErrorType<void>>(
+ orderId: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadOrderFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary View or download a private order file
+ */
+
+export function useDownloadOrderFile<TData = Awaited<ReturnType<typeof downloadOrderFile>>, TError = ErrorType<void>>(
+ orderId: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadOrderFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getDownloadOrderFileQueryOptions(orderId,fileId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPreviewOrderFileUrl = (orderId: string,
+    fileId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/files/${fileId}/preview`
+}
+
+/**
+ * @summary View a private order file inline
+ */
+export const previewOrderFile = async (orderId: string,
+    fileId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getPreviewOrderFileUrl(orderId,fileId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPreviewOrderFileQueryKey = (orderId: string,
+    fileId: string,) => {
+    return [
+    `/api/orders/${orderId}/files/${fileId}/preview`
+    ] as const;
+    }
+
+
+export const getPreviewOrderFileQueryOptions = <TData = Awaited<ReturnType<typeof previewOrderFile>>, TError = ErrorType<void>>(orderId: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof previewOrderFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPreviewOrderFileQueryKey(orderId,fileId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof previewOrderFile>>> = ({ signal }) => previewOrderFile(orderId,fileId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: orderId !== null && orderId !== undefined && fileId !== null && fileId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof previewOrderFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PreviewOrderFileQueryResult = NonNullable<Awaited<ReturnType<typeof previewOrderFile>>>
+export type PreviewOrderFileQueryError = ErrorType<void>
+
+
+export function usePreviewOrderFile<TData = Awaited<ReturnType<typeof previewOrderFile>>, TError = ErrorType<void>>(
+ orderId: string,
+    fileId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof previewOrderFile>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof previewOrderFile>>,
+          TError,
+          Awaited<ReturnType<typeof previewOrderFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePreviewOrderFile<TData = Awaited<ReturnType<typeof previewOrderFile>>, TError = ErrorType<void>>(
+ orderId: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof previewOrderFile>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof previewOrderFile>>,
+          TError,
+          Awaited<ReturnType<typeof previewOrderFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePreviewOrderFile<TData = Awaited<ReturnType<typeof previewOrderFile>>, TError = ErrorType<void>>(
+ orderId: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof previewOrderFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary View a private order file inline
+ */
+
+export function usePreviewOrderFile<TData = Awaited<ReturnType<typeof previewOrderFile>>, TError = ErrorType<void>>(
+ orderId: string,
+    fileId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof previewOrderFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPreviewOrderFileQueryOptions(orderId,fileId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateOrderUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}`
+}
+
+/**
+ * @summary Update an order
+ */
+export const updateOrder = async (orderId: string,
+    orderUpdate: OrderUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Order>(getUpdateOrderUrl(orderId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateOrderMutationKey = () => ['updateOrder'] as const;
+
+export const getUpdateOrderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrder>>, TError,UpdateOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOrder>>, TError,UpdateOrderMutationVariables, TContext> => {
+
+const mutationKey = getUpdateOrderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOrder>>, UpdateOrderMutationVariables> = (props) => {
+          const {orderId,data} = props ?? {};
+
+          return  updateOrder(orderId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOrderMutationResult = NonNullable<Awaited<ReturnType<typeof updateOrder>>>
+    export type UpdateOrderMutationBody = BodyType<OrderUpdate>
+    export type UpdateOrderMutationError = ErrorType<void>
+    export type UpdateOrderMutationVariables = {orderId: string;data: BodyType<OrderUpdate>}
+
+    /**
+ * @summary Update an order
+ */
+export const useUpdateOrder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrder>>, TError,UpdateOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateOrder>>,
+        TError,
+        UpdateOrderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateOrderMutationOptions(options), queryClient);
+    }
 
 
 

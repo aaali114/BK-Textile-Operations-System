@@ -5,6 +5,7 @@ import dashboardRouter from "./dashboard";
 import ordersRouter from "./orders";
 import workRouter from "./work";
 import materialsRouter from "./materials";
+import orderFilesRouter from "./orderFiles";
 
 const router: IRouter = Router();
 
@@ -23,6 +24,7 @@ router.use((req, res, next) => {
 router.use(healthRouter);
 router.use(dashboardRouter);
 router.use(ordersRouter);
+router.use(orderFilesRouter);
 router.use(workRouter);
 router.use(materialsRouter);
 

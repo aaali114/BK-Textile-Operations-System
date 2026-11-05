@@ -223,6 +223,98 @@ export const GetOrderActivityResponse = zod.array(GetOrderActivityResponseItem)
 
 
 /**
+ * @summary List files attached to an order
+ */
+export const GetOrderFilesParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const GetOrderFilesResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "orderId": zod.string().uuid(),
+  "fileType": zod.enum(['document', 'garment_image']),
+  "originalName": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedByName": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})
+export const GetOrderFilesResponse = zod.array(GetOrderFilesResponseItem)
+
+
+/**
+ * @summary Request a private upload URL for an order file
+ */
+export const RequestOrderFileUploadParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const requestOrderFileUploadBodyNameMax = 255;
+
+export const requestOrderFileUploadBodyContentTypeMax = 100;
+
+export const requestOrderFileUploadBodySizeBytesMax = 26214400;
+
+
+
+export const RequestOrderFileUploadBody = zod.object({
+  "fileType": zod.enum(['document', 'garment_image']),
+  "name": zod.string().min(1).max(requestOrderFileUploadBodyNameMax),
+  "contentType": zod.string().min(1).max(requestOrderFileUploadBodyContentTypeMax),
+  "sizeBytes": zod.number().int().min(1).max(requestOrderFileUploadBodySizeBytesMax)
+})
+
+export const RequestOrderFileUploadResponse = zod.object({
+  "fileId": zod.string().uuid(),
+  "uploadURL": zod.string().url()
+})
+
+
+/**
+ * @summary Confirm that an order file upload completed
+ */
+export const CompleteOrderFileUploadParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "fileId": zod.coerce.string().uuid()
+})
+
+export const CompleteOrderFileUploadResponse = zod.object({
+  "id": zod.string().uuid(),
+  "orderId": zod.string().uuid(),
+  "fileType": zod.enum(['document', 'garment_image']),
+  "originalName": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "uploadedBy": zod.string(),
+  "uploadedByName": zod.string(),
+  "uploadedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary View or download a private order file
+ */
+export const DownloadOrderFileParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "fileId": zod.coerce.string().uuid()
+})
+
+export const DownloadOrderFileResponse = zod.unknown()
+
+
+/**
+ * @summary View a private order file inline
+ */
+export const PreviewOrderFileParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "fileId": zod.coerce.string().uuid()
+})
+
+export const PreviewOrderFileResponse = zod.unknown()
+
+
+/**
  * @summary List department work items
  */
 export const GetWorkItemsQueryParams = zod.object({

@@ -14,6 +14,8 @@ tags:
     description: Operations overview
   - name: orders
     description: Merchandising orders
+  - name: order-files
+    description: Private documents and garment images attached to orders
   - name: work
     description: Department work items
   - name: materials
@@ -131,6 +133,96 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/OrderActivity" }
         "404": { description: Order not found }
+  /orders/{orderId}/files:
+    get:
+      operationId: getOrderFiles
+      tags: [order-files]
+      summary: List files attached to an order
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Uploaded order files
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OrderFile" }
+        "404": { description: Order not found }
+  /orders/{orderId}/files/upload-url:
+    post:
+      operationId: requestOrderFileUpload
+      tags: [order-files]
+      summary: Request a private upload URL for an order file
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderFileUploadRequest" }
+      responses:
+        "200":
+          description: Upload URL and pending file record
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderFileUploadResponse" }
+        "400": { description: Invalid file metadata }
+        "404": { description: Order not found }
+  /orders/{orderId}/files/{fileId}/complete:
+    post:
+      operationId: completeOrderFileUpload
+      tags: [order-files]
+      summary: Confirm that an order file upload completed
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Stored file metadata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderFile" }
+        "404": { description: Order or pending file not found }
+  /orders/{orderId}/files/{fileId}/content:
+    get:
+      operationId: downloadOrderFile
+      tags: [order-files]
+      summary: View or download a private order file
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Private file content
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+        "404": { description: Order file not found }
+  /orders/{orderId}/files/{fileId}/preview:
+    get:
+      operationId: previewOrderFile
+      tags: [order-files]
+      summary: View a private order file inline
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Private file content displayed inline
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+        "404": { description: Order file not found }
   /work-items:
     get:
       operationId: getWorkItems
@@ -328,6 +420,33 @@ components:
         actorId: { type: ["string", "null"] }
         description: { type: string }
         occurredAt: { type: string, format: date-time }
+    OrderFile:
+      type: object
+      required: [id, orderId, fileType, originalName, contentType, sizeBytes, uploadedBy, uploadedByName, uploadedAt]
+      properties:
+        id: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        fileType: { type: string, enum: [document, garment_image] }
+        originalName: { type: string }
+        contentType: { type: string }
+        sizeBytes: { type: integer }
+        uploadedBy: { type: string }
+        uploadedByName: { type: string }
+        uploadedAt: { type: string, format: date-time }
+    OrderFileUploadRequest:
+      type: object
+      required: [fileType, name, contentType, sizeBytes]
+      properties:
+        fileType: { type: string, enum: [document, garment_image] }
+        name: { type: string, minLength: 1, maxLength: 255 }
+        contentType: { type: string, minLength: 1, maxLength: 100 }
+        sizeBytes: { type: integer, minimum: 1, maximum: 26214400 }
+    OrderFileUploadResponse:
+      type: object
+      required: [fileId, uploadURL]
+      properties:
+        fileId: { type: string, format: uuid }
+        uploadURL: { type: string, format: uri }
     WorkItem:
       type: object
       required: [id, orderId, orderReference, title, department, dueDate, status, priority, updatedAt]
