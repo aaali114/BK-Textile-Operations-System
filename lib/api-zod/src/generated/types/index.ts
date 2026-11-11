@@ -3,15 +3,24 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 
 export * from './activity';
+export * from './activitySource';
 export * from './attentionItem';
 export * from './attentionItemSeverity';
+export * from './buyer';
+export * from './colourway';
+export * from './currentUser';
 export * from './dashboardSummary';
 export * from './department';
 export * from './departmentCount';
+export * from './emailAttachment';
+export * from './emailAttachmentExtractStatus';
+export * from './emailCategory';
+export * from './emailMatchMethod';
+export * from './emailMatchStatus';
 export * from './getOrdersParams';
 export * from './getWorkItemsParams';
 export * from './healthStatus';
@@ -19,21 +28,36 @@ export * from './inspection';
 export * from './inspectionInput';
 export * from './inspectionResult';
 export * from './inspectionType';
+export * from './invoiceCounter';
+export * from './invoiceCounterUpdate';
 export * from './materialLot';
 export * from './materialLotInput';
 export * from './materialStatus';
 export * from './materialType';
 export * from './order';
 export * from './orderActivity';
+export * from './orderActivityDetails';
+export * from './orderBreakdown';
+export * from './orderEmail';
+export * from './orderEmailDetail';
+export * from './orderEmailParseStatus';
+export * from './orderEmailUpdate';
+export * from './orderEmailUpdateMatchStatus';
+export * from './orderFabric';
 export * from './orderFile';
 export * from './orderFileFileType';
 export * from './orderFileUploadRequest';
 export * from './orderFileUploadRequestFileType';
 export * from './orderFileUploadResponse';
 export * from './orderInput';
+export * from './orderInvoiceUpdate';
+export * from './orderLine';
 export * from './orderStatus';
+export * from './orderTrim';
 export * from './orderUpdate';
 export * from './priority';
+export * from './sizeQuantity';
+export * from './trimType';
 export * from './workItem';
 export * from './workItemStatus';
 export * from './workItemUpdate';

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 export interface HealthStatus {
   status: string;
@@ -104,6 +104,37 @@ export interface Order {
   reference: string;
   buyer: string;
   /** @nullable */
+  buyerId: string | null;
+  /**
+     * BK invoice number, e.g. 4040
+     * @nullable
+     */
+  invoiceNumber: number | null;
+  /**
+     * BK invoice reference, e.g. 4040/BK-SAS/2026
+     * @nullable
+     */
+  invoiceRef: string | null;
+  /** @nullable */
+  poReceivedAt: string | null;
+  /** @nullable */
+  poIssueDate: string | null;
+  /** @nullable */
+  endCustomer: string | null;
+  /** @nullable */
+  priceTerms: string | null;
+  /** @nullable */
+  paymentTerms: string | null;
+  /** @nullable */
+  shipVia: string | null;
+  /** @nullable */
+  countryOfOrigin: string | null;
+  /**
+     * e.g. 3 for 3% over PO quantity allowed
+     * @nullable
+     */
+  overShipTolerancePct: number | null;
+  /** @nullable */
   agencyName: string | null;
   /** @nullable */
   previousOrderReference: string | null;
@@ -124,9 +155,26 @@ export interface Order {
   updatedAt: string;
 }
 
+/**
+ * Creating an order assigns the next BK invoice number. A PO number is required. Give buyerId, or a buyer name/abbreviation that matches a known buyer.
+ */
 export interface OrderInput {
   /** @minLength 1 */
   buyer: string;
+  buyerId?: string;
+  /** Defaults to now; its year goes into the invoice reference */
+  poReceivedAt?: string;
+  poIssueDate?: string;
+  endCustomer?: string;
+  priceTerms?: string;
+  paymentTerms?: string;
+  shipVia?: string;
+  countryOfOrigin?: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  overShipTolerancePct?: number;
   agencyName?: string;
   previousOrderReference?: string;
   /** @minimum 0 */
@@ -146,7 +194,28 @@ export interface OrderInput {
   priority?: Priority;
 }
 
+/**
+ * The buyer and BK invoice cannot be changed here (invoice changes go through the admin endpoint).
+ */
 export interface OrderUpdate {
+  /** @nullable */
+  poIssueDate?: string | null;
+  /** @nullable */
+  endCustomer?: string | null;
+  /** @nullable */
+  priceTerms?: string | null;
+  /** @nullable */
+  paymentTerms?: string | null;
+  /** @nullable */
+  shipVia?: string | null;
+  /** @nullable */
+  countryOfOrigin?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     * @nullable
+     */
+  overShipTolerancePct?: number | null;
   /** @minLength 1 */
   buyer?: string;
   /** @nullable */
@@ -177,12 +246,43 @@ export interface OrderUpdate {
   priority?: Priority;
 }
 
+/**
+ * Structured change data. For field changes: { changes: [{ field, from, to }] }
+ * @nullable
+ */
+export type OrderActivityDetails = { [key: string]: unknown } | null;
+
+export type ActivitySource = typeof ActivitySource[keyof typeof ActivitySource];
+
+
+export const ActivitySource = {
+  staff: 'staff',
+  email_intake: 'email_intake',
+  system: 'system',
+} as const;
+
 export interface OrderActivity {
   id: string;
   actor: string;
   /** @nullable */
   actorId: string | null;
   description: string;
+  source: ActivitySource;
+  /**
+     * Machine-readable verb, e.g. size_qty.updated
+     * @nullable
+     */
+  action: string | null;
+  /**
+     * Structured change data. For field changes: { changes: [{ field, from, to }] }
+     * @nullable
+     */
+  details: OrderActivityDetails;
+  /**
+     * Email the change was read from, when source is email_intake
+     * @nullable
+     */
+  sourceEmailId: string | null;
   occurredAt: string;
 }
 
@@ -236,6 +336,284 @@ export interface OrderFileUploadRequest {
 export interface OrderFileUploadResponse {
   fileId: string;
   uploadURL: string;
+}
+
+export interface CurrentUser {
+  userId: string;
+  isAdmin: boolean;
+}
+
+export interface Buyer {
+  id: string;
+  name: string;
+  abbreviation: string;
+  emailDomains: string[];
+}
+
+export interface SizeQuantity {
+  sizeLabel: string;
+  sizeSort: number;
+  quantity: number;
+}
+
+export interface Colourway {
+  id: string;
+  /** @nullable */
+  lineId: string | null;
+  code: string;
+  name: string;
+  /** @nullable */
+  buyerReference: string | null;
+  sortOrder: number;
+  /** @nullable */
+  sourceEmailId: string | null;
+  /** Only sizes that have a row; missing sizes mean "not on the PO", not zero. */
+  sizes: SizeQuantity[];
+  total: number;
+}
+
+export interface OrderLine {
+  id: string;
+  styleNumber: string;
+  description: string;
+  /** @nullable */
+  unitPrice: number | null;
+  /** Quantity stated on the PO line */
+  quantity: number;
+  sortOrder: number;
+  /** @nullable */
+  sourceEmailId: string | null;
+  colourways: Colourway[];
+  /** Sum of the size grid under this line */
+  gridTotal: number;
+}
+
+export interface OrderBreakdown {
+  orderId: string;
+  /** @nullable */
+  currencyCode: string | null;
+  /** Grid columns in PO order */
+  sizeLabels: string[];
+  lines: OrderLine[];
+  /** Colours not yet placed under a line */
+  unassignedColourways: Colourway[];
+  gridTotal: number;
+  orderQuantity: number;
+  /** True when the grid total differs from the order quantity */
+  quantityMismatch: boolean;
+}
+
+export interface OrderFabric {
+  id: string;
+  /**
+     * Null means all colours
+     * @nullable
+     */
+  colourwayId: string | null;
+  placement: string;
+  description: string;
+  /** @nullable */
+  composition: string | null;
+  /** @nullable */
+  construction: string | null;
+  /** @nullable */
+  gsm: number | null;
+  /** @nullable */
+  widthCm: number | null;
+  /** @nullable */
+  colour: string | null;
+  /** @nullable */
+  supplier: string | null;
+  /** @nullable */
+  consumptionPerPiece: number | null;
+  /** @nullable */
+  consumptionUnit: string | null;
+  notes: string;
+  /** @nullable */
+  sourceEmailId: string | null;
+  updatedAt: string;
+}
+
+export type TrimType = typeof TrimType[keyof typeof TrimType];
+
+
+export const TrimType = {
+  main_label: 'main_label',
+  care_label: 'care_label',
+  size_label: 'size_label',
+  hangtag: 'hangtag',
+  button: 'button',
+  zip: 'zip',
+  thread: 'thread',
+  polybag: 'polybag',
+  carton: 'carton',
+  other: 'other',
+} as const;
+
+export interface OrderTrim {
+  id: string;
+  /**
+     * Null means all colours
+     * @nullable
+     */
+  colourwayId: string | null;
+  /** @nullable */
+  sizeLabel: string | null;
+  trimType: TrimType;
+  description: string;
+  /** @nullable */
+  supplier: string | null;
+  /** @nullable */
+  quantityPerPiece: number | null;
+  /** @nullable */
+  unit: string | null;
+  buyerSupplied: boolean;
+  notes: string;
+  /** @nullable */
+  sourceEmailId: string | null;
+  updatedAt: string;
+}
+
+export type EmailCategory = typeof EmailCategory[keyof typeof EmailCategory];
+
+
+export const EmailCategory = {
+  order_details: 'order_details',
+  tech_pack: 'tech_pack',
+  trims_accessories: 'trims_accessories',
+  sample_requirements: 'sample_requirements',
+  packaging: 'packaging',
+  amendment: 'amendment',
+  other: 'other',
+  unclassified: 'unclassified',
+} as const;
+
+export type EmailMatchStatus = typeof EmailMatchStatus[keyof typeof EmailMatchStatus];
+
+
+export const EmailMatchStatus = {
+  matched: 'matched',
+  needs_review: 'needs_review',
+  ignored: 'ignored',
+} as const;
+
+export type EmailMatchMethod = typeof EmailMatchMethod[keyof typeof EmailMatchMethod];
+
+
+export const EmailMatchMethod = {
+  po_subject: 'po_subject',
+  invoice_ref: 'invoice_ref',
+  thread: 'thread',
+  po_body_only: 'po_body_only',
+  manual: 'manual',
+} as const;
+
+export type EmailAttachmentExtractStatus = typeof EmailAttachmentExtractStatus[keyof typeof EmailAttachmentExtractStatus];
+
+
+export const EmailAttachmentExtractStatus = {
+  pending: 'pending',
+  extracted: 'extracted',
+  failed: 'failed',
+  not_applicable: 'not_applicable',
+} as const;
+
+export interface EmailAttachment {
+  id: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  isInline: boolean;
+  extractStatus: EmailAttachmentExtractStatus;
+  /**
+     * Set when the attachment was promoted into the order's files
+     * @nullable
+     */
+  orderFileId: string | null;
+}
+
+export type OrderEmailParseStatus = typeof OrderEmailParseStatus[keyof typeof OrderEmailParseStatus];
+
+
+export const OrderEmailParseStatus = {
+  pending: 'pending',
+  parsed: 'parsed',
+  partial: 'partial',
+  failed: 'failed',
+} as const;
+
+export interface OrderEmail {
+  id: string;
+  subject: string;
+  fromAddress: string;
+  /** @nullable */
+  fromName: string | null;
+  /** @nullable */
+  sentAt: string | null;
+  receivedAt: string;
+  category: EmailCategory;
+  parseStatus: OrderEmailParseStatus;
+  matchStatus: EmailMatchStatus;
+  matchMethod: EmailMatchMethod;
+  /** @nullable */
+  matchReason: string | null;
+  matchedAt: string;
+  attachments: EmailAttachment[];
+}
+
+export type OrderEmailDetail = OrderEmail & ({
+  toAddresses: string[];
+  ccAddresses: string[];
+  /**
+     * Plain text only. Render as text, never as HTML.
+     * @nullable
+     */
+  bodyText: string | null;
+  /** @nullable */
+  parseError: string | null;
+});
+
+export type OrderEmailUpdateMatchStatus = typeof OrderEmailUpdateMatchStatus[keyof typeof OrderEmailUpdateMatchStatus];
+
+
+export const OrderEmailUpdateMatchStatus = {
+  matched: 'matched',
+  ignored: 'ignored',
+} as const;
+
+export interface OrderEmailUpdate {
+  matchStatus?: OrderEmailUpdateMatchStatus;
+  category?: EmailCategory;
+}
+
+export interface InvoiceCounter {
+  lastNumber: number;
+  nextNumber: number;
+  /**
+     * Highest invoice number on any order
+     * @nullable
+     */
+  highestUsed: number | null;
+}
+
+export interface InvoiceCounterUpdate {
+  /** @minimum 1 */
+  lastNumber: number;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  reason: string;
+}
+
+export interface OrderInvoiceUpdate {
+  /** @minimum 1 */
+  invoiceNumber: number;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  reason: string;
 }
 
 export interface WorkItem {

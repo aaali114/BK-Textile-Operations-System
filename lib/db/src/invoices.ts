@@ -5,6 +5,11 @@ import { buyersTable, invoiceCounterTable } from "./schema";
 
 type Tx = Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0];
 
+/** The calendar year of a moment in Pakistan time, used in invoice references. */
+export function invoiceYear(moment: Date): number {
+  return Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Karachi", year: "numeric" }).format(moment));
+}
+
 /** Formats a BK invoice reference: 4040/BK-SAS/2026. */
 export function formatInvoiceRef(invoiceNumber: number, buyerAbbreviation: string, year: number): string {
   return `${invoiceNumber}/BK-${buyerAbbreviation}/${year}`;
@@ -35,9 +40,7 @@ export async function assignInvoiceNumber(
     .returning({ lastNumber: invoiceCounterTable.lastNumber });
   if (!counter) throw new Error("bk_invoice_counter is not initialised");
 
-  const year = Number(
-    new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Karachi", year: "numeric" }).format(poReceivedAt),
-  );
+  const year = invoiceYear(poReceivedAt);
   return {
     invoiceNumber: counter.lastNumber,
     invoiceRef: formatInvoiceRef(counter.lastNumber, buyer.abbreviation, year),

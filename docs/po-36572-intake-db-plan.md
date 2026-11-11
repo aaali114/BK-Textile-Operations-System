@@ -170,7 +170,7 @@ Messages that match nothing are not stored. To find missed emails:
 
 ## Next
 
-1. **API endpoints and codegen:** order lines, colourways with the size grid, fabrics, trims, the order's emails and attachments, the change log (old → new), `POST /source-emails/import`, attachment promotion, and confirming a `needs_review` link. Order creation uses `assignInvoiceNumber()`.
+1. ~~API endpoints and codegen~~ — delivered in API 0.3.0 (breakdown, fabrics, trims, order emails and attachments, richer change log, buyers, invoice admin). `POST /source-emails/import` comes with the IMAP worker.
 2. **IMAP worker:** the matching above, storing `.eml` files and attachments, extracting attachment text (XLS / XLSX / PDF).
 3. **PO-sheet and trims-sheet readers:** fill the tables per "Applying extracted data", tested on the four sample PO 36572 emails (kept outside git).
 

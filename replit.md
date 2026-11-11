@@ -12,6 +12,7 @@ A new B.K. Textile-owned web system for coordinating garment orders, department 
 - `pnpm --filter @workspace/db run generate -- --name <change>` — generate a new migration after a schema change (backend only)
 - Database changes belong to the backend developer and arrive as reviewed migrations. Replit Agent must not run `push`, `push-force` or `generate`.
 - Required env: `DATABASE_URL` — Postgres connection string
+- Optional env: `ADMIN_USER_IDS` — comma-separated Clerk user IDs allowed to use `/api/admin/*` (invoice overrides). A signed-in user sees their own ID at `/api/me`. Unset = nobody is an admin.
 
 ## Stack
 
@@ -71,7 +72,9 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 ## Orders and BK invoices
 
 - One order = one buyer PO = one BK invoice. PO numbers are unique per buyer. A revised PO with the same number updates the existing order; a new PO number is always a new order, whatever its style or delivery date. No sub-invoices.
-- The BK invoice is assigned automatically when an order is first created: `{number}/BK-{buyer abbreviation}/{year PO received}`, e.g. `4040/BK-SAS/2026`. One sequence across all buyers and years (4051 on 31 Dec → 4052 on 1 Jan). Always use `assignInvoiceNumber()` from `@workspace/db` inside the order-creating transaction; it guarantees no gaps or duplicates.
+- The BK invoice is assigned automatically when an order is first created: `{number}/BK-{buyer abbreviation}/{year PO received}`, e.g. `4040/BK-SAS/2026`. One sequence across all buyers and years (4051 on 31 Dec → 4052 on 1 Jan). Orders are created through `createOrderWithInvoice()` (api-server `lib/orderCreation.ts`), which resolves the buyer (ID, name or abbreviation), requires a PO, and calls `assignInvoiceNumber()` inside the same transaction, so numbers have no gaps or duplicates.
+- **Restricted invoice overrides (admins only):** `PUT /api/admin/invoice-counter` sets the last-used number (never below a number already on an order); `PUT /api/admin/orders/:id/invoice` overwrites one order's number and rebuilds its reference. Both need a reason and are logged in the activity log.
+- Orders created before invoice numbering are synthetic and were relabelled `TEST-…` by migration `0005`.
 - Buyers and abbreviations: Spartan Apparel Sourcing (SAS), Rainbow Sourcing (RS), Metropolitan Manufacturing INC (MMI), God's Love Overcomes (LIF). Email domains to be added.
 - A PO can have several priced lines (style + process), e.g. one style in two finishes at different prices; colours sit under their line.
 - Fetches are idempotent: each message is keyed by mailbox + UIDVALIDITY + UID, plus `Message-ID`.

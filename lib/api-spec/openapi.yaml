@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.2.0
+  version: 0.3.0
   description: B.K. Textile operations API
 servers:
   - url: /api
@@ -16,6 +16,14 @@ tags:
     description: Merchandising orders
   - name: order-files
     description: Private documents and garment images attached to orders
+  - name: buyers
+    description: Buyers and sourcing agents that issue POs
+  - name: order-detail
+    description: Order lines, colour x size grid, fabrics and trims
+  - name: order-emails
+    description: Source emails and attachments linked to an order
+  - name: admin
+    description: Restricted operations (ADMIN_USER_IDS only)
   - name: work
     description: Department work items
   - name: materials
@@ -223,6 +231,197 @@ paths:
             "*/*":
               schema: { type: string, format: binary }
         "404": { description: Order file not found }
+  /me:
+    get:
+      operationId: getCurrentUser
+      tags: [admin]
+      summary: The signed-in user's ID and whether they are an admin
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CurrentUser" }
+  /buyers:
+    get:
+      operationId: getBuyers
+      tags: [buyers]
+      summary: List buyers and their invoice abbreviations
+      responses:
+        "200":
+          description: Buyers
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Buyer" }
+  /orders/{orderId}/breakdown:
+    get:
+      operationId: getOrderBreakdown
+      tags: [order-detail]
+      summary: Priced lines, colours and the colour x size grid for an order
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order breakdown
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderBreakdown" }
+        "404": { description: Order not found }
+  /orders/{orderId}/fabrics:
+    get:
+      operationId: getOrderFabrics
+      tags: [order-detail]
+      summary: Fabrics for an order
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Fabrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OrderFabric" }
+        "404": { description: Order not found }
+  /orders/{orderId}/trims:
+    get:
+      operationId: getOrderTrims
+      tags: [order-detail]
+      summary: Trims and accessories for an order
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Trims
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OrderTrim" }
+        "404": { description: Order not found }
+  /orders/{orderId}/emails:
+    get:
+      operationId: getOrderEmails
+      tags: [order-emails]
+      summary: Emails linked to an order, newest first, with attachment metadata
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Linked emails
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OrderEmail" }
+        "404": { description: Order not found }
+  /orders/{orderId}/emails/{emailId}:
+    get:
+      operationId: getOrderEmail
+      tags: [order-emails]
+      summary: One linked email with its plain-text body
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/EmailId"
+      responses:
+        "200":
+          description: Email detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderEmailDetail" }
+        "404": { description: Email not linked to this order }
+    patch:
+      operationId: updateOrderEmail
+      tags: [order-emails]
+      summary: Confirm or ignore an email link, or correct its category
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/EmailId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderEmailUpdate" }
+      responses:
+        "200":
+          description: Updated email link
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderEmail" }
+        "404": { description: Email not linked to this order }
+  /orders/{orderId}/emails/{emailId}/attachments/{attachmentId}/content:
+    get:
+      operationId: downloadOrderEmailAttachment
+      tags: [order-emails]
+      summary: Download an attachment of a linked email
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/EmailId"
+        - name: attachmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Attachment content
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+        "404": { description: Attachment not found }
+  /admin/invoice-counter:
+    get:
+      operationId: getInvoiceCounter
+      tags: [admin]
+      summary: Current BK invoice counter (admins only)
+      responses:
+        "200":
+          description: Counter state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvoiceCounter" }
+        "403": { description: Not an admin }
+    put:
+      operationId: setInvoiceCounter
+      tags: [admin]
+      summary: Set the last-used BK invoice number (admins only)
+      description: The next new order gets lastNumber + 1. Cannot go below the highest invoice number already on an order.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvoiceCounterUpdate" }
+      responses:
+        "200":
+          description: Updated counter
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvoiceCounter" }
+        "403": { description: Not an admin }
+        "409": { description: Below an invoice number already in use }
+  /admin/orders/{orderId}/invoice:
+    put:
+      operationId: setOrderInvoiceNumber
+      tags: [admin]
+      summary: Overwrite one order's BK invoice number (admins only)
+      description: Rebuilds the reference with the buyer's abbreviation and the year the PO was received. Does not move the counter.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderInvoiceUpdate" }
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "403": { description: Not an admin }
+        "404": { description: Order not found }
+        "409": { description: "Invoice number already used by another order, or order has no buyer" }
   /work-items:
     get:
       operationId: getWorkItems
@@ -331,6 +530,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    EmailId:
+      name: emailId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
   schemas:
     HealthStatus:
       type: object
@@ -363,11 +567,22 @@ components:
       enum: [accepted, hold, rejected]
     Order:
       type: object
-      required: [id, reference, buyer, agencyName, previousOrderReference, orderValue, currencyCode, style, quantity, deliveryDate, status, priority, createdAt, updatedAt]
+      required: [id, reference, buyer, buyerId, invoiceNumber, invoiceRef, poReceivedAt, poIssueDate, endCustomer, priceTerms, paymentTerms, shipVia, countryOfOrigin, overShipTolerancePct, agencyName, previousOrderReference, orderValue, currencyCode, style, quantity, deliveryDate, status, priority, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         reference: { type: string }
         buyer: { type: string }
+        buyerId: { type: ["string", "null"], format: uuid }
+        invoiceNumber: { type: ["integer", "null"], description: "BK invoice number, e.g. 4040" }
+        invoiceRef: { type: ["string", "null"], description: "BK invoice reference, e.g. 4040/BK-SAS/2026" }
+        poReceivedAt: { type: ["string", "null"], format: date-time }
+        poIssueDate: { type: ["string", "null"], format: date }
+        endCustomer: { type: ["string", "null"] }
+        priceTerms: { type: ["string", "null"] }
+        paymentTerms: { type: ["string", "null"] }
+        shipVia: { type: ["string", "null"] }
+        countryOfOrigin: { type: ["string", "null"] }
+        overShipTolerancePct: { type: ["number", "null"], description: "e.g. 3 for 3% over PO quantity allowed" }
         agencyName: { type: ["string", "null"] }
         previousOrderReference: { type: ["string", "null"] }
         orderValue: { type: ["number", "null"] }
@@ -383,9 +598,19 @@ components:
         updatedAt: { type: string, format: date-time }
     OrderInput:
       type: object
+      description: Creating an order assigns the next BK invoice number. A PO number is required. Give buyerId, or a buyer name/abbreviation that matches a known buyer.
       required: [buyer, style, quantity, deliveryDate]
       properties:
         buyer: { type: string, minLength: 1 }
+        buyerId: { type: string, format: uuid }
+        poReceivedAt: { type: string, format: date-time, description: "Defaults to now; its year goes into the invoice reference" }
+        poIssueDate: { type: string, format: date }
+        endCustomer: { type: string }
+        priceTerms: { type: string }
+        paymentTerms: { type: string }
+        shipVia: { type: string }
+        countryOfOrigin: { type: string }
+        overShipTolerancePct: { type: number, minimum: 0, maximum: 100 }
         agencyName: { type: string }
         previousOrderReference: { type: string }
         orderValue: { type: number, minimum: 0 }
@@ -398,7 +623,15 @@ components:
         priority: { $ref: "#/components/schemas/Priority" }
     OrderUpdate:
       type: object
+      description: The buyer and BK invoice cannot be changed here (invoice changes go through the admin endpoint).
       properties:
+        poIssueDate: { type: ["string", "null"], format: date }
+        endCustomer: { type: ["string", "null"] }
+        priceTerms: { type: ["string", "null"] }
+        paymentTerms: { type: ["string", "null"] }
+        shipVia: { type: ["string", "null"] }
+        countryOfOrigin: { type: ["string", "null"] }
+        overShipTolerancePct: { type: ["number", "null"], minimum: 0, maximum: 100 }
         buyer: { type: string, minLength: 1 }
         agencyName: { type: ["string", "null"] }
         previousOrderReference: { type: ["string", "null"] }
@@ -413,13 +646,23 @@ components:
         priority: { $ref: "#/components/schemas/Priority" }
     OrderActivity:
       type: object
-      required: [id, actor, actorId, description, occurredAt]
+      required: [id, actor, actorId, description, source, action, details, sourceEmailId, occurredAt]
       properties:
         id: { type: string, format: uuid }
         actor: { type: string }
         actorId: { type: ["string", "null"] }
         description: { type: string }
+        source: { $ref: "#/components/schemas/ActivitySource" }
+        action: { type: ["string", "null"], description: "Machine-readable verb, e.g. size_qty.updated" }
+        details:
+          description: "Structured change data. For field changes: { changes: [{ field, from, to }] }"
+          type: ["object", "null"]
+          additionalProperties: true
+        sourceEmailId: { type: ["string", "null"], format: uuid, description: "Email the change was read from, when source is email_intake" }
         occurredAt: { type: string, format: date-time }
+    ActivitySource:
+      type: string
+      enum: [staff, email_intake, system]
     OrderFile:
       type: object
       required: [id, orderId, fileType, originalName, contentType, sizeBytes, uploadedBy, uploadedByName, uploadedAt]
@@ -447,6 +690,191 @@ components:
       properties:
         fileId: { type: string, format: uuid }
         uploadURL: { type: string, format: uri }
+    CurrentUser:
+      type: object
+      required: [userId, isAdmin]
+      properties:
+        userId: { type: string }
+        isAdmin: { type: boolean }
+    Buyer:
+      type: object
+      required: [id, name, abbreviation, emailDomains]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        abbreviation: { type: string }
+        emailDomains: { type: array, items: { type: string } }
+    SizeQuantity:
+      type: object
+      required: [sizeLabel, sizeSort, quantity]
+      properties:
+        sizeLabel: { type: string }
+        sizeSort: { type: integer }
+        quantity: { type: integer }
+    Colourway:
+      type: object
+      required: [id, lineId, code, name, buyerReference, sortOrder, sourceEmailId, sizes, total]
+      properties:
+        id: { type: string, format: uuid }
+        lineId: { type: ["string", "null"], format: uuid }
+        code: { type: string }
+        name: { type: string }
+        buyerReference: { type: ["string", "null"] }
+        sortOrder: { type: integer }
+        sourceEmailId: { type: ["string", "null"], format: uuid }
+        sizes:
+          type: array
+          description: Only sizes that have a row; missing sizes mean "not on the PO", not zero.
+          items: { $ref: "#/components/schemas/SizeQuantity" }
+        total: { type: integer }
+    OrderLine:
+      type: object
+      required: [id, styleNumber, description, unitPrice, quantity, sortOrder, sourceEmailId, colourways, gridTotal]
+      properties:
+        id: { type: string, format: uuid }
+        styleNumber: { type: string }
+        description: { type: string }
+        unitPrice: { type: ["number", "null"] }
+        quantity: { type: integer, description: Quantity stated on the PO line }
+        sortOrder: { type: integer }
+        sourceEmailId: { type: ["string", "null"], format: uuid }
+        colourways:
+          type: array
+          items: { $ref: "#/components/schemas/Colourway" }
+        gridTotal: { type: integer, description: Sum of the size grid under this line }
+    OrderBreakdown:
+      type: object
+      required: [orderId, currencyCode, sizeLabels, lines, unassignedColourways, gridTotal, orderQuantity, quantityMismatch]
+      properties:
+        orderId: { type: string, format: uuid }
+        currencyCode: { type: ["string", "null"] }
+        sizeLabels:
+          type: array
+          description: Grid columns in PO order
+          items: { type: string }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/OrderLine" }
+        unassignedColourways:
+          type: array
+          description: Colours not yet placed under a line
+          items: { $ref: "#/components/schemas/Colourway" }
+        gridTotal: { type: integer }
+        orderQuantity: { type: integer }
+        quantityMismatch: { type: boolean, description: True when the grid total differs from the order quantity }
+    OrderFabric:
+      type: object
+      required: [id, colourwayId, placement, description, composition, construction, gsm, widthCm, colour, supplier, consumptionPerPiece, consumptionUnit, notes, sourceEmailId, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        colourwayId: { type: ["string", "null"], format: uuid, description: Null means all colours }
+        placement: { type: string }
+        description: { type: string }
+        composition: { type: ["string", "null"] }
+        construction: { type: ["string", "null"] }
+        gsm: { type: ["integer", "null"] }
+        widthCm: { type: ["number", "null"] }
+        colour: { type: ["string", "null"] }
+        supplier: { type: ["string", "null"] }
+        consumptionPerPiece: { type: ["number", "null"] }
+        consumptionUnit: { type: ["string", "null"] }
+        notes: { type: string }
+        sourceEmailId: { type: ["string", "null"], format: uuid }
+        updatedAt: { type: string, format: date-time }
+    TrimType:
+      type: string
+      enum: [main_label, care_label, size_label, hangtag, button, zip, thread, polybag, carton, other]
+    OrderTrim:
+      type: object
+      required: [id, colourwayId, sizeLabel, trimType, description, supplier, quantityPerPiece, unit, buyerSupplied, notes, sourceEmailId, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        colourwayId: { type: ["string", "null"], format: uuid, description: Null means all colours }
+        sizeLabel: { type: ["string", "null"] }
+        trimType: { $ref: "#/components/schemas/TrimType" }
+        description: { type: string }
+        supplier: { type: ["string", "null"] }
+        quantityPerPiece: { type: ["number", "null"] }
+        unit: { type: ["string", "null"] }
+        buyerSupplied: { type: boolean }
+        notes: { type: string }
+        sourceEmailId: { type: ["string", "null"], format: uuid }
+        updatedAt: { type: string, format: date-time }
+    EmailCategory:
+      type: string
+      enum: [order_details, tech_pack, trims_accessories, sample_requirements, packaging, amendment, other, unclassified]
+    EmailMatchStatus:
+      type: string
+      enum: [matched, needs_review, ignored]
+    EmailMatchMethod:
+      type: string
+      enum: [po_subject, invoice_ref, thread, po_body_only, manual]
+    EmailAttachment:
+      type: object
+      required: [id, filename, contentType, sizeBytes, isInline, extractStatus, orderFileId]
+      properties:
+        id: { type: string, format: uuid }
+        filename: { type: string }
+        contentType: { type: string }
+        sizeBytes: { type: integer }
+        isInline: { type: boolean }
+        extractStatus: { type: string, enum: [pending, extracted, failed, not_applicable] }
+        orderFileId: { type: ["string", "null"], format: uuid, description: Set when the attachment was promoted into the order's files }
+    OrderEmail:
+      type: object
+      required: [id, subject, fromAddress, fromName, sentAt, receivedAt, category, parseStatus, matchStatus, matchMethod, matchReason, matchedAt, attachments]
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: string }
+        fromAddress: { type: string }
+        fromName: { type: ["string", "null"] }
+        sentAt: { type: ["string", "null"], format: date-time }
+        receivedAt: { type: string, format: date-time }
+        category: { $ref: "#/components/schemas/EmailCategory" }
+        parseStatus: { type: string, enum: [pending, parsed, partial, failed] }
+        matchStatus: { $ref: "#/components/schemas/EmailMatchStatus" }
+        matchMethod: { $ref: "#/components/schemas/EmailMatchMethod" }
+        matchReason: { type: ["string", "null"] }
+        matchedAt: { type: string, format: date-time }
+        attachments:
+          type: array
+          items: { $ref: "#/components/schemas/EmailAttachment" }
+    OrderEmailDetail:
+      allOf:
+        - $ref: "#/components/schemas/OrderEmail"
+        - type: object
+          required: [toAddresses, ccAddresses, bodyText, parseError]
+          properties:
+            toAddresses: { type: array, items: { type: string } }
+            ccAddresses: { type: array, items: { type: string } }
+            bodyText:
+              type: ["string", "null"]
+              description: Plain text only. Render as text, never as HTML.
+            parseError: { type: ["string", "null"] }
+    OrderEmailUpdate:
+      type: object
+      properties:
+        matchStatus: { type: string, enum: [matched, ignored] }
+        category: { $ref: "#/components/schemas/EmailCategory" }
+    InvoiceCounter:
+      type: object
+      required: [lastNumber, nextNumber, highestUsed]
+      properties:
+        lastNumber: { type: integer }
+        nextNumber: { type: integer }
+        highestUsed: { type: ["integer", "null"], description: Highest invoice number on any order }
+    InvoiceCounterUpdate:
+      type: object
+      required: [lastNumber, reason]
+      properties:
+        lastNumber: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 3, maxLength: 500 }
+    OrderInvoiceUpdate:
+      type: object
+      required: [invoiceNumber, reason]
+      properties:
+        invoiceNumber: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 3, maxLength: 500 }
     WorkItem:
       type: object
       required: [id, orderId, orderReference, title, department, dueDate, status, priority, updatedAt]
