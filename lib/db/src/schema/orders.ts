@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
 import {
-  type AnyPgColumn,
   check,
   date,
   index,
@@ -9,33 +8,47 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import { buyersTable } from "./buyers";
 
+// One order = one buyer PO = one BK invoice. The PO number is the key for
+// extraction, sorting and communication; a revised PO with the same number
+// updates this order, a new PO number is always a new order.
 export const ordersTable = pgTable(
   "bk_orders",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     reference: text("reference").notNull().unique(),
     buyer: text("buyer").notNull(),
+    // Null only on synthetic preview orders created before buyers existed.
+    buyerId: uuid("buyer_id").references(() => buyersTable.id, { onDelete: "restrict" }),
     agencyName: text("agency_name"),
+    // The brand / end customer behind a sourcing agent, when the PO names one.
+    endCustomer: text("end_customer"),
     previousOrderReference: text("previous_order_reference"),
     orderValue: numeric("order_value", { precision: 14, scale: 2, mode: "number" }),
     currencyCode: text("currency_code"),
-    // Buyer's purchase order number. Not unique: sub-invoices (e.g. 4040 and
-    // 4040-A) can share one PO.
+    // Buyer's PO number. Unique per buyer.
     poNumber: text("po_number"),
-    // BK Team invoice number: 4 digits, optionally a sub-invoice suffix
-    // ("4040", "4040-A"; a sub-invoice suffix is always one letter). The
-    // intake matches emails on this plus the PO.
-    bkInvoiceNumber: text("bk_invoice_number").unique(),
-    // A sub-invoice (4040-A) points at its parent invoice's order (4040).
-    parentOrderId: uuid("parent_order_id").references((): AnyPgColumn => ordersTable.id, {
-      onDelete: "set null",
-    }),
+    // BK invoice: sequential number plus the formatted reference
+    // "{number}/BK-{buyer abbreviation}/{year received}", e.g. 4040/BK-SAS/2026.
+    invoiceNumber: integer("invoice_number").unique(),
+    invoiceRef: text("invoice_ref").unique(),
+    // When the PO first reached BK; its year goes into invoiceRef.
+    poReceivedAt: timestamp("po_received_at", { withTimezone: true }),
+    poIssueDate: date("po_issue_date", { mode: "string" }),
+    priceTerms: text("price_terms"),
+    paymentTerms: text("payment_terms"),
+    shipVia: text("ship_via"),
+    countryOfOrigin: text("country_of_origin"),
+    // Over-shipment the buyer allows, e.g. 3.00 for "3% over PO quantity".
+    overShipTolerancePct: numeric("over_ship_tolerance_pct", { precision: 5, scale: 2, mode: "number" }),
     style: text("style").notNull(),
     description: text("description"),
     quantity: integer("quantity").notNull(),
+    // Ship date on the PO.
     deliveryDate: date("delivery_date", { mode: "string" }).notNull(),
     status: text("status").notNull().default("development"),
     priority: text("priority").notNull().default("normal"),
@@ -44,10 +57,14 @@ export const ordersTable = pgTable(
   },
   (t) => [
     index("bk_orders_po_number_idx").on(t.poNumber),
-    index("bk_orders_parent_order_id_idx").on(t.parentOrderId),
+    unique("bk_orders_buyer_po_unique").on(t.buyerId, t.poNumber),
     check(
-      "bk_orders_bk_invoice_number_format",
-      sql`${t.bkInvoiceNumber} IS NULL OR ${t.bkInvoiceNumber} ~ '^[0-9]{4}(-[A-Z])?$'`,
+      "bk_orders_invoice_ref_format",
+      sql`${t.invoiceRef} IS NULL OR ${t.invoiceRef} ~ '^[0-9]+/BK-[A-Z]{2,5}/[0-9]{4}$'`,
+    ),
+    check(
+      "bk_orders_invoice_number_with_ref",
+      sql`(${t.invoiceNumber} IS NULL) = (${t.invoiceRef} IS NULL)`,
     ),
   ],
 );

@@ -50,9 +50,10 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 
 ## Data rules
 
-- **Real data is allowed for one order only: PO 36572 (BK Inv. 4040), including its sub-invoices (4040-A, 4040-B…).** Its real colourways, size×colour quantities, fabrics, trims, source emails, and attachments may be stored in the database and object storage.
+- **Real data is allowed for one order only: PO 36572 (BK invoice 4040/BK-SAS/2026).** Its real colourways, size×colour quantities, fabrics, trims, source emails, and attachments may be stored in the database and object storage.
 - All other records stay synthetic until the user approves the next order or a wider rollout.
-- Real data lives only in the database and object storage. Never commit it to git: no real emails, attachments, PO sheets, seed files, fixtures, or screenshots of them. Test fixtures must be synthetic.
+- The buyer list (names and abbreviations) and the invoice counter's starting number are reference data and live in migration `0004`.
+- Real order data lives only in the database and object storage. Never commit it to git: no real emails, attachments, PO sheets, seed files, fixtures, or screenshots of them. Test fixtures must be synthetic.
 - Do not copy real PO 36572 data into Replit chat prompts, mockups, or `mockup-sandbox`.
 
 ## Email intake
@@ -62,9 +63,17 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 - Secrets (Replit Secrets only, never in code, chat or logs): `IMAP_HOST=mail.bktextile.com`, `IMAP_PORT=993`, `IMAP_USER=orders@bktextile.com`, `IMAP_PASSWORD`.
 - How mail gets there: cPanel filters on BK's two primary mailboxes forward the selected buyer/agent senders' mail to `orders@bktextile.com` automatically. Sender selection happens in cPanel, so the intake does not filter by sender. The same email can arrive twice (once via each primary mailbox); it is stored once, keyed on `Message-ID`.
 - The intake is read-only on the mailbox: fetch with `BODY.PEEK` so messages are not marked as read, and never move, flag, or delete messages.
-- During the PO 36572 phase, only messages that match PO 36572 / BK Inv. 4040 (and its sub-invoices such as 4040-A) are stored. Other messages are skipped and not persisted.
-- Matching uses the BK invoice number and the buyer PO **together**, from the subject or the body. Invoice forms: `BK Inv XXXX`, `Inv XXXX` and close variants (`BK Inv. XXXX`, `Inv# XXXX`, `Invoice XXXX`), with an optional sub-invoice suffix of exactly one letter (`4040-A`). A bare 4-digit number does not count. Sub-invoices are named in the subject. Full rules: `docs/po-36572-intake-db-plan.md` → Email matching.
+- During the PO 36572 phase, only messages that match PO 36572 are stored. Other messages are skipped and not persisted.
+- **The buyer's PO number is the key** for matching, sorting and communication. A PO number in the subject decides the order. BK's own invoice reference (e.g. `4040/BK-SAS/2026`) in a reply also matches, and so does a reply in an already-matched thread. A different PO mentioned only in the body (customers often reference older POs for repeat specs) is flagged for review, never auto-linked. Full rules: `docs/po-36572-intake-db-plan.md` → Email matching.
 - Many order details sit in attachments (PO sheets, tech packs, trim lists), so attachments are stored and their text extracted for parsing.
+- Extracted data goes **straight into the order** during the trial (no approval step). Every change is logged in `bk_activity` with old value, new value and source email. **The later email wins**: the PO sheet sets the starting values, and later emails (trims, accessories, hang tags) override them; PO placeholders like "TBA" never overwrite real details.
+
+## Orders and BK invoices
+
+- One order = one buyer PO = one BK invoice. PO numbers are unique per buyer. A revised PO with the same number updates the existing order; a new PO number is always a new order, whatever its style or delivery date. No sub-invoices.
+- The BK invoice is assigned automatically when an order is first created: `{number}/BK-{buyer abbreviation}/{year PO received}`, e.g. `4040/BK-SAS/2026`. One sequence across all buyers and years (4051 on 31 Dec → 4052 on 1 Jan). Always use `assignInvoiceNumber()` from `@workspace/db` inside the order-creating transaction; it guarantees no gaps or duplicates.
+- Buyers and abbreviations: Spartan Apparel Sourcing (SAS), Rainbow Sourcing (RS), Metropolitan Manufacturing INC (MMI), God's Love Overcomes (LIF). Email domains to be added.
+- A PO can have several priced lines (style + process), e.g. one style in two finishes at different prices; colours sit under their line.
 - Fetches are idempotent: each message is keyed by mailbox + UIDVALIDITY + UID, plus `Message-ID`.
 
 ## Product

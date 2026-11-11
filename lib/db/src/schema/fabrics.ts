@@ -1,5 +1,6 @@
 import { index, integer, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { colourwaysTable, provenanceColumns } from "./colourways";
+import { colourwaysTable } from "./colourways";
+import { provenanceColumns } from "./provenance";
 import { ordersTable } from "./orders";
 
 export const fabricsTable = pgTable(
