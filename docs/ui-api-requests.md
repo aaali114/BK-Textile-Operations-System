@@ -13,11 +13,18 @@ requests to seed a database. Real data is approved only for PO 36572 (BK Inv.
 
 **Backend status (updated by the backend owner):**
 
-- Database tables exist for colourways, size × colour quantities, fabrics,
-  trims, source emails, email ↔ order links, and attachments
-  (`docs/po-36572-intake-db-plan.md`). No API operations expose them yet.
-- Requests A–D overlap with the intake design; the backend owner will answer
-  them in the OpenAPI contract and mark each one here as it is delivered.
+- Database tables exist for buyers, order lines (style + process + price),
+  colourways, size × colour quantities, fabrics, trims, source emails, email ↔
+  order links, and attachments (`docs/po-36572-intake-db-plan.md`). No API
+  operations expose them yet; they come in the next backend PR.
+- Owner decisions that change these requests:
+  - The buyer's **PO number is the key**. One PO = one order = one BK invoice,
+    shown as e.g. `4040/BK-SAS/2026`. No sub-invoices.
+  - During the trial, email data goes **straight into the order**; there are no
+    draft or amendment approval steps. Requests B and D are parked. Request A
+    becomes a per-order **Emails** list; Request C (order detail with lines,
+    size grid, fabrics, trims and a change log with old → new values) is next.
+  - The later email wins; the change log shows what each email changed.
 - Request E (generated documents) waits for the owner to supply the
   cutting-letter and packing-list templates.
 There are currently no new UI mock fixtures; if prototypes are added before

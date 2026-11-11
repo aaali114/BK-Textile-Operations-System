@@ -22,6 +22,20 @@
       "when": 1794400834905,
       "tag": "0002_sub_invoice_one_letter",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794407316658,
+      "tag": "0003_remove_sub_invoices",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794407350924,
+      "tag": "0004_po_key_buyers_invoices_lines",
+      "breakpoints": true
     }
   ]
 }

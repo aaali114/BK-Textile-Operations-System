@@ -1,16 +1,8 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { ordersTable } from "./orders";
-import { sourceEmailAttachmentsTable, sourceEmailsTable } from "./sourceEmails";
-
-// Provenance columns shared by every table the intake fills in. Null means a
-// staff member entered the row by hand.
-export const provenanceColumns = () => ({
-  sourceEmailId: uuid("source_email_id").references(() => sourceEmailsTable.id, { onDelete: "set null" }),
-  sourceAttachmentId: uuid("source_attachment_id").references(() => sourceEmailAttachmentsTable.id, {
-    onDelete: "set null",
-  }),
-});
+import { orderLinesTable } from "./orderLines";
+import { provenanceColumns } from "./provenance";
 
 export const colourwaysTable = pgTable(
   "bk_order_colourways",
@@ -19,6 +11,9 @@ export const colourwaysTable = pgTable(
     orderId: uuid("order_id")
       .notNull()
       .references(() => ordersTable.id, { onDelete: "cascade" }),
+    // The PO line (style + process) this colour belongs to. The same colour
+    // name can appear under two lines.
+    lineId: uuid("line_id").references(() => orderLinesTable.id, { onDelete: "cascade" }),
     code: text("code").notNull(),
     name: text("name").notNull(),
     buyerReference: text("buyer_reference"),
@@ -27,7 +22,7 @@ export const colourwaysTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
   },
-  (t) => [unique("bk_order_colourways_order_code_unique").on(t.orderId, t.code)],
+  (t) => [unique("bk_order_colourways_order_line_code_unique").on(t.orderId, t.lineId, t.code).nullsNotDistinct()],
 );
 
 // One row per colourway x size, so any size range fits without schema changes.

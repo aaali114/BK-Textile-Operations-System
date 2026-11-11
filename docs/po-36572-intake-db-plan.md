@@ -2,14 +2,16 @@
 
 Status: **schema implemented** in `lib/db/src/schema` with migrations in `lib/db/migrations`. The API endpoints and the IMAP worker come in later PRs.
 
-Scope: hold everything the `orders@bktextile.com` IMAP intake pulls in for PO 36572 (BK Inv. 4040) and its sub-invoices. Each value records where it came from, so staff can trace it back to the email or attachment it was read from.
+Scope: hold everything the `orders@bktextile.com` IMAP intake pulls in for PO 36572 (BK invoice 4040/BK-SAS/2026). Each value records where it came from, so staff can trace it back to the email or attachment it was read from.
 
 ## Decisions from review
 
-- BK Inv. 4040 is entered as a **new order** with real data, used to test the intake end to end.
+- PO 36572 is entered as a **new order** with real data, used to test the intake end to end. It gets BK invoice **4040/BK-SAS/2026**.
 - The work log is only the record of who changed what, by staff or by the email intake. There is no hours or notes log.
-- Emails are matched on the BK invoice number **and** the buyer PO together, from the subject or the body.
-- An invoice can have sub-invoices created by BK Team (`4040-A`), each with its own style and/or PO. Sub-invoices are named in the subject. One email can cover an invoice and its sub-invoice.
+- **The buyer's PO number is the key** (unique per buyer). One PO = one order = one BK invoice. A revised PO with the same number updates the order; a new PO number is always a new order. **No sub-invoices.**
+- BK invoices are assigned by the system: `{number}/BK-{buyer abbreviation}/{year PO received}`, one sequence across all buyers and years, with no gaps.
+- Customers often reference **older POs** for repeat specs, so a PO mentioned only in the body never decides the order.
+- During the trial, extracted data goes **straight into the order**, and **the later email wins**. Agents send a mostly generic PO with the essentials changed (PO#, style, quantities, prices); accessories and trims come in later emails and override the PO's placeholders.
 - Mail reaches `orders@bktextile.com` through cPanel filters and forwarders on BK's two primary mailboxes. Senders are chosen in cPanel, not by the intake.
 - Many order details are in attachments, not the email body.
 
@@ -24,10 +26,10 @@ Scope: hold everything the `orders@bktextile.com` IMAP intake pulls in for PO 36
 ## Entity overview
 
 ```
-bk_orders (existing; + bk_invoice_number, parent_order_id)
- ├── bk_orders (sub-invoices: 4040-A → parent 4040)
- ├── bk_order_colourways
- │     └── bk_order_size_quantities     (one row per colourway × size)
+bk_buyers ── bk_orders (existing; + buyer_id, invoice, PO terms)      bk_invoice_counter (single row)
+ ├── bk_order_lines                     (style + process + price + qty)
+ │     └── bk_order_colourways
+ │           └── bk_order_size_quantities   (one row per colourway × size)
  ├── bk_order_fabrics                   (optionally per colourway)
  ├── bk_order_trims                     (optionally per colourway / size)
  ├── bk_source_email_orders ── bk_source_emails    (many-to-many)
@@ -41,13 +43,24 @@ bk_orders (existing; + bk_invoice_number, parent_order_id)
 
 | column | type | notes |
 |---|---|---|
-| `bk_invoice_number` | text, **unique**, nullable | `4040`, `4040-A`. Check constraint: `^[0-9]{4}(-[A-Z])?$`. A sub-invoice suffix is always one letter. |
-| `parent_order_id` | uuid → bk_orders, `set null` | a sub-invoice points at its parent invoice's order |
+| `buyer_id` | uuid → bk_buyers, `restrict` | null only on old synthetic preview orders |
+| `po_number` | text | **unique together with `buyer_id`**; also indexed alone for matching |
+| `invoice_number` | integer, unique | e.g. 4040 |
+| `invoice_ref` | text, unique | `4040/BK-SAS/2026`; format check `^[0-9]+/BK-[A-Z]{2,5}/[0-9]{4}$`; set together with `invoice_number` |
+| `po_received_at` | timestamptz | when the PO first reached BK; its year (Pakistan time) goes into `invoice_ref` |
+| `po_issue_date` | date | from the PO sheet |
+| `end_customer` | text | brand behind the buyer, e.g. "CB" |
+| `price_terms`, `payment_terms`, `ship_via`, `country_of_origin` | text | e.g. FOB PAKISTAN, D/P, OCEAN, PAKISTAN |
+| `over_ship_tolerance_pct` | numeric(5,2) | e.g. 3.00 for "3% over PO quantity allowed" |
 
-- `po_number` stays **not unique**, because sub-invoices can share a PO. It gets an index for matching.
-- Each sub-invoice is its own order row, with its own style, quantities, colourways, fabrics and trims.
-- `quantity` stays as the header total. The API reports a mismatch when it differs from the sum of `bk_order_size_quantities`. It is not overwritten automatically.
-- First real rows: `4040` (PO 36572). Sub-invoices are created when they appear.
+- `delivery_date` holds the PO ship date. `quantity` stays as the header total; the API reports a mismatch when it differs from the size grid. It is not overwritten automatically.
+- `bk_invoice_number` and `parent_order_id` (sub-invoices) were removed in migration `0003`.
+
+### `bk_buyers` and `bk_invoice_counter`
+
+- `bk_buyers`: `name` (unique), `abbreviation` (unique, 2–5 capitals), `email_domains[]`. Seeded with SAS, RS, MMI, LIF; domains to follow.
+- `bk_invoice_counter`: a single row holding the last number used, seeded at 4039 so PO 36572 gets 4040.
+- `assignInvoiceNumber(tx, buyerId, poReceivedAt)` in `lib/db/src/invoices.ts` increments the counter inside the order-creating transaction. The row lock makes concurrent orders queue, and a failed order gives its number back. Tested: 10 simultaneous creations with one failure produced 4040–4048 with no gaps; 31 Dec 21:00 UTC (1 Jan in Karachi) gets `/2027`.
 
 ### `bk_activity` → work log
 
@@ -65,9 +78,13 @@ Index: `(order_id, occurred_at desc)`.
 
 ## New tables
 
+### `bk_order_lines`
+
+`order_id`, `style_number`, `description` (the process as written, e.g. `SALT WASH CORDED CREW`), `unit_price` numeric(12,4), `quantity` (check `>= 0`), `sort_order`, provenance, timestamps. Unique `(order_id, style_number, description)`.
+
 ### `bk_order_colourways`
 
-`order_id`, `code`, `name`, `buyer_reference`, `sort_order`, provenance, timestamps. Unique `(order_id, code)`.
+`order_id`, `line_id` (→ bk_order_lines; the same colour can appear under two lines), `code`, `name`, `buyer_reference`, `sort_order`, provenance, timestamps. Unique `(order_id, line_id, code)` with `NULLS NOT DISTINCT`.
 
 ### `bk_order_size_quantities`
 
@@ -103,9 +120,9 @@ One row per stored message.
 
 ### `bk_source_email_orders`
 
-Links emails to orders. An email can concern more than one order, such as 4040 and 4040-A.
+Links emails to orders. Normally one order per email; a link table keeps room for an email that genuinely covers two POs.
 
-`email_id`, `order_id` (unique together), `match_status` (`matched` \| `needs_review` \| `ignored`), `match_method` (`invoice_and_po` \| `invoice_only` \| `po_only` \| `thread` \| `manual`), `match_reason` (the evidence, e.g. `subject: "BK Inv 4040-A"; body: "PO 36572"`), `matched_at`, `reviewed_by`, `reviewed_at`.
+`email_id`, `order_id` (unique together), `match_status` (`matched` \| `needs_review` \| `ignored`), `match_method` (`po_subject` \| `invoice_ref` \| `thread` \| `po_body_only` \| `manual`), `match_reason` (the evidence, e.g. `subject: "PO# 36572"`), `matched_at`, `reviewed_by`, `reviewed_at`.
 
 ### `bk_source_email_attachments`
 
@@ -113,58 +130,53 @@ Links emails to orders. An email can concern more than one order, such as 4040 a
 
 ## Email matching
 
-The worker loads the known orders' `(bk_invoice_number, po_number)` pairs. During this phase that means 4040 and its sub-invoices. It then scans the subject and plain-text body of each new message.
+The worker loads the known orders' `(buyer, po_number, invoice_ref)` values. During this phase that is only PO 36572. For each new message:
 
-**Invoice references.** These count: `BK Inv XXXX`, `Inv XXXX`, and close variants such as `BK Inv. XXXX`, `BK-Inv XXXX`, `Inv# XXXX`, `Inv No. XXXX`, `Invoice XXXX`. Matching is case-insensitive, and each can have a sub-invoice suffix of exactly one letter: `4040-A`, `4040 A`, `4040A`, all normalised to `4040-A`. A bare 4-digit number is not enough, because quantities, prices and years are 4 digits too.
-
-**PO references.** A known PO number appears as a whole number, with or without a `PO` / `P.O.` / `PO#` prefix.
-
-For each order, the outcome is:
-
-| found in subject + body | result |
+| evidence | result |
 |---|---|
-| order's invoice **and** its PO | `matched` (`invoice_and_po`) |
-| only the invoice, or only the PO | `needs_review` (`invoice_only` / `po_only`) |
-| a reply in a thread already matched to the order | `matched` (`thread`) |
-| invoice and PO belong to different orders | `needs_review` on both |
+| a known PO number in the **subject** (`PO# 36572`, `PO 36572`, `PO#36572`, `purchase order # 36572`) | `matched` (`po_subject`) |
+| BK's invoice reference (`4040/BK-SAS/2026`, or `Inv 4040` / `BK Inv 4040` written by BK) in the subject or body | `matched` (`invoice_ref`) |
+| a reply in a thread already matched to the order (`In-Reply-To` / `References`) | `matched` (`thread`) |
+| a known PO number **only in the body** | `needs_review` (`po_body_only`): customers often cite older POs for repeat specs, so this never decides the order on its own |
+| the subject names two different known POs | `needs_review` on both |
 
-**Sub-invoices:**
+- PO numbers are whole numbers; `36572` inside a longer number does not count.
+- When two buyers could share a PO number, the sender's email domain (`bk_buyers.email_domains`) picks the buyer. Until domains are filled in, an ambiguous PO goes to `needs_review`.
+- **Never** take the PO number from artwork or label attachments: a reused care-label layout for PO 36572 shows `PO # 33655` from 2024.
 
-- A sub-invoice named in the **subject** decides which order the email belongs to. For example, `BK Inv 4040-A` together with `PO 36572` links to order 4040-A, not to 4040.
-- If the body also covers the parent invoice with its PO (a redirect within the same email), the email is linked to both orders.
-- A sub-invoice that has no order yet, e.g. a new `4040-B` in the subject, is linked to the parent order 4040 as `needs_review`, with the reason `new sub-invoice 4040-B`, so staff can create the order.
+Messages that match nothing are not stored. To find missed emails:
 
-Messages that match nothing are not stored. To find emails that were missed:
-
-- Each run writes one `bk_activity` row (`action = 'intake.run'`) with counts and the skipped IMAP UIDs only. It never stores subjects, senders or bodies.
+- Each run writes one `bk_activity` row (`action = 'intake.run'`) with counts and the skipped IMAP UIDs only, never subjects, senders or bodies.
 - A staff endpoint, `POST /source-emails/import`, attaches a missed email by IMAP UID or `Message-ID` (`match_method = 'manual'`).
-- When manual imports show a pattern, such as a new invoice spelling or numbers that only appear inside attachments, a matching rule is added.
+
+## Applying extracted data
+
+- **The PO sheet** (buyer's purchase-order spreadsheet) sets the starting values: header terms and dates, priced lines, colours and the size grid, fabric description and processes, packing and quality notes. A revised PO for the same number updates these in place; tables are found by their headings (`Style#`, `COLORS`, size labels), never by fixed rows, because revisions shift rows.
+- **Later emails win.** Trims sheets, accessory details and hang-tag artwork sent after the PO override the PO's values. The PO's placeholders (`TBA`, blank) never overwrite a real value. Example: PO 36572 says "Hang Tag: Not Required", and the later trims email adds a hang tag from Tariq Jamil, so the hang tag is recorded.
+- Size labels are normalised: `2X` = `2XL` = `XXL`, `3X` = `3XL` = `XXXL`.
+- Every write is logged in `bk_activity` with old value, new value and source email, so a wrong reading can be seen and reversed.
 
 ## Migrations
 
 - `0000_baseline.sql` holds the tables that existed before migrations, created with `push`. It is hand-edited to be idempotent: it does nothing on the existing Replit database and builds everything on an empty one.
 - `0001_po_36572_intake.sql` adds the new tables and columns. It only adds things, so existing rows and routes keep working.
+- `0002` restricted sub-invoice suffixes; `0003` removes sub-invoices entirely (`bk_invoice_number`, `parent_order_id`).
+- `0004` adds buyers, the invoice counter, order lines, PO terms on orders, and links colourways to lines. It seeds the four buyers and sets the counter to 4039.
 - `scripts/post-merge.sh` now runs `migrate` instead of `push`.
 - Both migrations were tested on Postgres 16 in two cases:
   - a database built with `push` from the previous schema, with sample rows: the rows were kept and a second migrate run did nothing
   - an empty database
-- Constraint checks were also tested: invoice format, duplicate invoice, negative quantity, a duplicate `Message-ID`, and one email linked to both 4040 and 4040-A.
+- Constraint checks were also tested: invoice format, duplicate invoice, negative quantity, a duplicate `Message-ID`, and one email linked to two orders. Migration `0004` was tested on a database at the `0002` state with data in it: existing orders and colourways were kept.
 
 ## Next
 
-1. OpenAPI endpoints and codegen:
-   - `GET /orders/:id/colourways` (with size quantities)
-   - `PUT /orders/:id/size-quantities`
-   - fabrics and trims
-   - `GET /orders/:id/source-emails`
-   - `POST /source-emails/import`
-   - `POST /source-email-attachments/:id/promote`
-   - confirm or override a `needs_review` link
-2. IMAP worker: the matching above, storing `.eml` files and attachments, and extracting attachment text (PDF / XLSX).
-3. Field extraction into colourways, size quantities, fabrics and trims. This needs sample emails and attachments.
+1. **API endpoints and codegen:** order lines, colourways with the size grid, fabrics, trims, the order's emails and attachments, the change log (old → new), `POST /source-emails/import`, attachment promotion, and confirming a `needs_review` link. Order creation uses `assignInvoiceNumber()`.
+2. **IMAP worker:** the matching above, storing `.eml` files and attachments, extracting attachment text (XLS / XLSX / PDF).
+3. **PO-sheet and trims-sheet readers:** fill the tables per "Applying extracted data", tested on the four sample PO 36572 emails (kept outside git).
 
 ## Not in scope
 
 - Per-size measurement specs, costing, and shipment splits.
-- Automatic overwriting of the `bk_orders` header from emails. Header changes stay staff-confirmed.
-- Any order other than PO 36572 / BK Inv. 4040 and its sub-invoices.
+- A staff approval step before extracted data reaches the order (parked; revisit if the trial readings are not reliable enough).
+- Buffer and wastage calculations on top of buyer quantities (parameters to come from the owner).
+- Any order other than PO 36572 (4040/BK-SAS/2026).

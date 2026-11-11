@@ -59,8 +59,8 @@ export const sourceEmailsTable = pgTable(
   ],
 );
 
-// An email can concern several orders: an invoice and its sub-invoice
-// (4040 and 4040-A), or a sub-invoice redirected within the same email.
+// Links emails to orders. Normally one order per email; the link table keeps
+// room for an email that genuinely covers two POs, and records how it matched.
 export const sourceEmailOrdersTable = pgTable(
   "bk_source_email_orders",
   {
@@ -73,9 +73,9 @@ export const sourceEmailOrdersTable = pgTable(
       .references(() => ordersTable.id, { onDelete: "cascade" }),
     // matched | needs_review | ignored
     matchStatus: text("match_status").notNull(),
-    // invoice_and_po | invoice_only | po_only | thread | manual
+    // po_subject | invoice_ref | thread | po_body_only | manual
     matchMethod: text("match_method").notNull(),
-    // Human-readable evidence, e.g. 'subject: "BK Inv 4040-A"; body: "PO 36572"'.
+    // Human-readable evidence, e.g. 'subject: "PO# 36572"'.
     matchReason: text("match_reason"),
     matchedAt: timestamp("matched_at", { withTimezone: true }).notNull().defaultNow(),
     // Set when staff confirm or override a needs_review link.
