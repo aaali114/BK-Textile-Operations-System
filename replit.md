@@ -52,6 +52,7 @@ A new B.K. Textile-owned web system for coordinating garment orders, department 
 - Credentials come from secrets only: `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASSWORD`. Never hard-code or log them.
 - The mailbox is shared and read-only to the intake: fetch with `BODY.PEEK` so messages are not marked as read, and never move, flag, or delete messages.
 - During the PO 36572 phase, only messages that match PO 36572 / BK Inv. 4040 are stored. Other messages in the mailbox are skipped and not persisted.
+- Matching is by the buyer PO number and the BK invoice number (4-digit, sequential), not by sender, because many senders write about one order. A bare 4-digit number only counts with an invoice prefix (`BK Inv.`, `Inv`, `Invoice`). Replies in a matched thread also match. Full rules: `docs/po-36572-intake-db-plan.md` → Email matching.
 - Fetches are idempotent: each message is keyed by mailbox + UIDVALIDITY + UID, plus `Message-ID`.
 
 ## Product

@@ -29,13 +29,12 @@ bk_orders (existing)
 
 ### `bk_orders`
 
-No new columns needed for PO 36572:
+**Decided in review:** BK Inv. 4040 is entered as a **new order** with real data, used to test the intake end to end.
 
-- `po_number` = `36572`
-- `reference` = the BK invoice reference (`BK Inv. 4040`)
+- Add `bk_invoice_number` text, nullable, **unique**. BK invoice numbers are a sequential 4-digit series, and together with the buyer PO they are the keys the intake matches emails on, so they get their own indexed column instead of sharing `reference`.
+- Add a unique index on `po_number` where it is not null, so one PO can't match two orders.
+- New order row: `po_number = '36572'`, `bk_invoice_number = '4040'`. `reference` keeps its current meaning (internal order code) and can also be `4040` for this order.
 - `quantity` stays as the header total. The API reports a mismatch when it differs from the sum of `bk_order_size_quantities`. It is not overwritten automatically.
-
-> **Review question 1:** is `reference` the right home for "BK Inv. 4040", or do you want a separate `bk_invoice_number` column so `reference` can stay an internal order code?
 
 ### `bk_order_files`
 
@@ -43,6 +42,8 @@ No new columns needed for PO 36572:
 - `uploaded_by` / `uploaded_by_name` for promoted files: `system:email-intake` / `Email intake`.
 
 ### `bk_activity` → work log
+
+**Decided in review:** the work log is only the record of who changed what (staff and the email intake). No hours or notes log for now.
 
 Extend this table instead of adding a second audit table, so the dashboard feed and the order activity tab keep working unchanged. All new columns are nullable or defaulted, so existing rows and routes are unaffected.
 
@@ -55,8 +56,6 @@ Extend this table instead of adding a second audit table, so the dashboard feed 
 | `source_email_id` | uuid → bk_source_emails, `set null` | |
 
 Index: `(order_id, occurred_at desc)`.
-
-> **Review question 2:** by "work log" do you mean this audit trail, or also a staff-facing log of hours and notes per department? If you want the second one, it should be its own table attached to `bk_work_items`.
 
 ## New tables
 
@@ -159,8 +158,10 @@ One row per IMAP message that was persisted. During the PO 36572 phase, only mat
 | `received_at` | timestamptz not null | IMAP INTERNALDATE |
 | `body_text` | text | plain-text body, used for search and parsing |
 | `raw_object_path` | text not null unique | full `.eml` in object storage; HTML bodies are read from here |
-| `match_status` | text not null default `'unmatched'` | `unmatched` \| `matched` \| `ignored` \| `needs_review` |
-| `match_reason` | text | e.g. `subject contains PO 36572` |
+| `match_status` | text not null default `'matched'` | `matched` \| `ignored` \| `needs_review` |
+| `match_method` | text not null | `po_number` \| `bk_invoice_number` \| `both` \| `thread` \| `manual` (see Email matching) |
+| `match_reason` | text | e.g. `subject: "PO 36572"`, `reply to <msg-id>` |
+| `category` | text not null default `'unclassified'` | `order_details` \| `tech_pack` \| `trims_accessories` \| `sample_requirements` \| `packaging` \| `amendment` \| `other` \| `unclassified`. Staff can change it. |
 | `parse_status` | text not null default `'pending'` | `pending` \| `parsed` \| `failed` \| `partial` |
 | `parse_error` | text | |
 | `fetched_at` | timestamptz not null default now() | |
@@ -186,6 +187,24 @@ Index: `(order_id, received_at desc)`.
 | `created_at` | timestamptz | |
 
 Index: `(sha256)`.
+
+## Email matching
+
+From the review: each order involves several senders (order details, tech packs, trims and accessories, sample requirements, packaging, amendments), so matching **does not depend on the sender**. It looks for the order's two numbers.
+
+The worker loads the known `(po_number, bk_invoice_number)` pairs from `bk_orders`. During this phase that is only PO 36572 / 4040. A message matches an order when any of these holds:
+
+1. **PO number:** `36572` appears as a whole number in the subject, the plain-text body, or an attachment filename.
+2. **BK invoice number:** `4040` appears with an invoice prefix, e.g. `BK Inv. 4040`, `Inv 4040`, `Invoice #4040`, `BK-4040`. A bare 4-digit number on its own is **not** enough, because quantities, prices, years and style codes are also 4 digits.
+3. **Thread:** the message's `In-Reply-To` / `References` points at an email already matched to the order. This catches replies such as "approved, go ahead" that don't repeat the numbers.
+
+The two numbers can point at different orders; for example, a PO for one order and an invoice number for another. In that case the message is stored as `needs_review` rather than guessed.
+
+Messages that match nothing are not stored. To help find emails that were missed:
+
+- Each run writes one `bk_activity` row (`action = 'intake.run'`) with counts: fetched, matched, skipped. Its `details` hold the skipped IMAP UIDs only, never subjects, senders or bodies, so other orders' data stays out of the database.
+- A staff endpoint, `POST /source-emails/import`, takes an IMAP UID or `Message-ID` and attaches that email to a chosen order (`match_method = 'manual'`).
+- If manual imports show a pattern (a sender's own reference format, numbers only inside PDFs), we add that rule. Reading text inside attachments is left for later.
 
 ## Migration approach
 
