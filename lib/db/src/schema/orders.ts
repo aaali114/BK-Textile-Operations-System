@@ -26,7 +26,8 @@ export const ordersTable = pgTable(
     // 4040-A) can share one PO.
     poNumber: text("po_number"),
     // BK Team invoice number: 4 digits, optionally a sub-invoice suffix
-    // ("4040", "4040-A"). The intake matches emails on this plus the PO.
+    // ("4040", "4040-A"; a sub-invoice suffix is always one letter). The
+    // intake matches emails on this plus the PO.
     bkInvoiceNumber: text("bk_invoice_number").unique(),
     // A sub-invoice (4040-A) points at its parent invoice's order (4040).
     parentOrderId: uuid("parent_order_id").references((): AnyPgColumn => ordersTable.id, {
@@ -46,7 +47,7 @@ export const ordersTable = pgTable(
     index("bk_orders_parent_order_id_idx").on(t.parentOrderId),
     check(
       "bk_orders_bk_invoice_number_format",
-      sql`${t.bkInvoiceNumber} IS NULL OR ${t.bkInvoiceNumber} ~ '^[0-9]{4}(-[A-Z0-9]{1,3})?$'`,
+      sql`${t.bkInvoiceNumber} IS NULL OR ${t.bkInvoiceNumber} ~ '^[0-9]{4}(-[A-Z])?$'`,
     ),
   ],
 );
