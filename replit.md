@@ -10,6 +10,7 @@ A new B.K. Textile-owned web system for coordinating garment orders, department 
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run migrate` — apply SQL migrations from `lib/db/migrations` (runs automatically in `scripts/post-merge.sh`)
 - `pnpm --filter @workspace/db run generate -- --name <change>` — generate a new migration after a schema change (backend only)
+- Database changes belong to the backend developer and arrive as reviewed migrations. Replit Agent must not run `push`, `push-force` or `generate`.
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
@@ -31,9 +32,16 @@ A new B.K. Textile-owned web system for coordinating garment orders, department 
 
 ## Ownership: who edits what
 
-- **Backend is owned outside Replit** (Claude Code, via pull requests on GitHub). This covers `artifacts/api-server`, `lib/db`, `lib/api-spec`, and the generated packages `lib/api-zod` and `lib/api-client-react`.
-- **Replit Agent is frontend-only.** It may edit `artifacts/bk-textile` and `artifacts/mockup-sandbox`. It must not edit backend files, the DB schema, or the OpenAPI spec, and must not run `pnpm --filter @workspace/db run push`.
-- If the frontend needs a new field or endpoint, write the request down (in this file under "Frontend requests" or in a GitHub issue) instead of changing the backend. Consume the API only through the generated `@workspace/api-client-react` hooks.
+The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Claude Code, via GitHub pull requests) owns the backend, database, email intake, and document generation. Separate ownership stops the two from overwriting each other's work.
+
+- **UI-owned (Replit Agent):** `artifacts/bk-textile/**` and `artifacts/mockup-sandbox/**`, including UI-only dependencies in the web app's package file.
+- **Backend-owned (Claude):** `artifacts/api-server/**`, `lib/db/**` (schema and migrations), `lib/api-spec/openapi.yaml`, the generated `lib/api-zod/**` and `lib/api-client-react/**`, `artifacts/email-intake/**`, `scripts/post-merge.sh`, and document generation. Do not edit these to unblock a UI feature.
+- Request missing fields or operations in `docs/ui-api-requests.md` with the screen, the data needed, and an example. Use the generated API client hooks, never handwritten backend requests, and never hand-edit generated files.
+- Backend changes arrive as pull requests that the owner merges on GitHub. They already include regenerated client code; running `pnpm --filter @workspace/api-spec run codegen` after a pull should change nothing.
+- Until an endpoint exists, keep clearly labelled fictional mocks inside `artifacts/bk-textile/**` only and list them in `docs/ui-api-requests.md`. Mocks never use real data, including PO 36572 (see Data rules).
+- **Git workflow for Replit:** run `git pull origin main` before starting work, and commit and `git push origin main` as soon as a task is done, so work never sits only in Replit. Never force push. If a pull conflicts in backend-owned files, keep the backend version and tell the owner; do not discard unrelated local work.
+- Change shared root package/config files and `replit.md` only when necessary, and name such changes in the commit message.
+- UI plan: `docs/frontend-plan.md`. A plan existing does not mean email extraction, review endpoints, or document generation is delivered.
 
 ## Architecture decisions
 
@@ -75,7 +83,7 @@ The business coordinates merchandising, sampling, outsourced yarn/knitting/dyein
 
 ## Frontend requests
 
-_Replit Agent: list backend fields/endpoints the UI needs here._
+UI requests for backend fields and endpoints live in `docs/ui-api-requests.md`.
 
 ## Pointers
 
