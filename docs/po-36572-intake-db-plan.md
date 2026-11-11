@@ -162,17 +162,42 @@ Messages that match nothing are not stored. To find missed emails:
 - `0001_po_36572_intake.sql` adds the new tables and columns. It only adds things, so existing rows and routes keep working.
 - `0002` restricted sub-invoice suffixes; `0003` removes sub-invoices entirely (`bk_invoice_number`, `parent_order_id`).
 - `0004` adds buyers, the invoice counter, order lines, PO terms on orders, and links colourways to lines. It seeds the four buyers and sets the counter to 4039.
+- `0005` relabels pre-invoice synthetic orders `TEST-…`; `0006` adds `bk_intake_cursor`, trim `source_label` / `required`, and `bk_orders.header_source_email_id`.
 - `scripts/post-merge.sh` now runs `migrate` instead of `push`.
 - Both migrations were tested on Postgres 16 in two cases:
   - a database built with `push` from the previous schema, with sample rows: the rows were kept and a second migrate run did nothing
   - an empty database
 - Constraint checks were also tested: invoice format, duplicate invoice, negative quantity, a duplicate `Message-ID`, and one email linked to two orders. Migration `0004` was tested on a database at the `0002` state with data in it: existing orders and colourways were kept.
 
+## Mailbox reader (implemented)
+
+Code: `artifacts/api-server/src/intake/`. Triggered by an admin (`POST /api/admin/intake/run`, with a dry-run option) or on a schedule when `INTAKE_POLL_MINUTES` is set.
+
+1. **Screen envelopes only.** The folder is opened read-only and only envelopes (subject, Message-ID, In-Reply-To, References) are fetched. A message is a candidate when its subject names an allow-listed PO (`INTAKE_PO_ALLOWLIST`) or a known BK invoice, or it replies to a stored or candidate email. Nothing else is downloaded or stored; skipped messages are logged by UID only.
+2. **Download and parse candidates**, then process them **oldest first** (by the original sender's date; for manual "Fwd:" copies, the date inside the forwarded block).
+3. **Match** per "Email matching" above, using the subject, forwarded subjects and thread headers.
+4. **Create the order** when an allow-listed PO is new and the email carries its PO sheet: the buyer is found by sender domain or by the PO sheet's buyer name (e.g. "…SOURCE, LLC" matches "…Sourcing"), and the BK invoice is assigned.
+5. **Store** the raw `.eml` and every attachment in private object storage, with text extracted from spreadsheets (PDFs/images are stored as-is).
+6. **Apply** PO sheets and trims sheets to orders the email is *matched* to (not `needs_review`), with later-email-wins on every row, and write one change-log entry per attachment listing each old → new value.
+7. **Move the cursor** to the last UID scanned (per mailbox folder and UIDVALIDITY) and log the run.
+
+Readers:
+
+- **PO sheet:** recognised by a PO number label plus a colour × size grid. Reads buyer, PO number, PO issue date, ship date, price/payment terms, ship via, country of origin, over-shipment %, the priced table (Style# / Description / Price / Qty / Amount), the colour × size grid (line headings are the rows without numbers), the fabric row (the one stating GSM), and trims named on the PO ("Hang Tag: Not Required"). Tables are found by their headings, never by fixed rows.
+- **Trims sheet:** recognised by a description column and a supplier column. Each row becomes a trim keyed by its label ("Size label - Printed Canvas" → `size label`), so a later trims sheet updates the PO's entry for the same item.
+
+Tested on the four sample PO 36572 emails (kept outside git) plus two fictional ones: order created as 4040/BK-SAS/2026; revised prices replaced the original ones and the change log shows both; the later trims sheet turned the PO's "Hang Tag: Not Required" into a required hang tag with its supplier; an unrelated PO email was never downloaded; a short thread reply was matched; re-runs and rescans stored nothing twice; an older PO arriving in a later run changed nothing.
+
+Known limits:
+
+- A PO mentioned only in an email **body** is not detected (bodies are not downloaded for screening). Use a rescan or, later, manual import.
+- PDF attachments are stored but not read (in the samples they are artwork).
+- The measurement spec sheet is stored and its text extracted, but not read into tables.
+
 ## Next
 
-1. ~~API endpoints and codegen~~ — delivered in API 0.3.0 (breakdown, fabrics, trims, order emails and attachments, richer change log, buyers, invoice admin). `POST /source-emails/import` comes with the IMAP worker.
-2. **IMAP worker:** the matching above, storing `.eml` files and attachments, extracting attachment text (XLS / XLSX / PDF).
-3. **PO-sheet and trims-sheet readers:** fill the tables per "Applying extracted data", tested on the four sample PO 36572 emails (kept outside git).
+1. Manual import of a missed email by IMAP UID or Message-ID.
+2. Buffer / wastage on top of buyer quantities, once the parameters are supplied.
 
 ## Not in scope
 

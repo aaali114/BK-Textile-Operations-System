@@ -21,6 +21,7 @@ export * from "./activity";
 export * from "./buyers";
 export * from "./colourways";
 export * from "./fabrics";
+export * from "./intake";
 export * from "./materials";
 export * from "./orderLines";
 export * from "./orders";

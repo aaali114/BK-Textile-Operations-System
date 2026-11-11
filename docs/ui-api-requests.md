@@ -37,8 +37,13 @@ requests to seed a database. Real data is approved only for PO 36572 (BK Inv.
   - `useGetCurrentUser` → `isAdmin`; admin-only `useGetInvoiceCounter`,
     `useSetInvoiceCounter`, `useSetOrderInvoiceNumber` (each needs a reason).
     Show these controls only when `isAdmin` is true; the server enforces it anyway.
-- Not yet: the mailbox reader (emails appear once it runs), manual import of a
-  missed email, staff editing of lines/grid/fabrics/trims.
+- **API 0.4.0:** `OrderTrim` gains `required` (show "Not required" rows
+    greyed out) and `sourceLabel`. Admin-only `useRunEmailIntake` runs the
+    mailbox reader: offer "Preview (dry run)" and "Read mailbox now" buttons
+    in the admin panel and show the returned summary (per email: outcome,
+    orders, and per attachment: kind, number of changes, warnings).
+- Not yet: manual import of a missed email, staff editing of
+  lines/grid/fabrics/trims.
 - Owner decisions that change these requests:
   - The buyer's **PO number is the key**. One PO = one order = one BK invoice,
     shown as e.g. `4040/BK-SAS/2026`. No sub-invoices.

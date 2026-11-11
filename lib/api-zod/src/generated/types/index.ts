@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.3.0
+ * OpenAPI spec version: 0.4.0
  */
 
 export * from './activity';
@@ -28,6 +28,12 @@ export * from './inspection';
 export * from './inspectionInput';
 export * from './inspectionResult';
 export * from './inspectionType';
+export * from './intakeEmailReport';
+export * from './intakeEmailReportAttachmentsItem';
+export * from './intakeEmailReportOrdersItem';
+export * from './intakeEmailReportOutcome';
+export * from './intakeRunRequest';
+export * from './intakeRunSummary';
 export * from './invoiceCounter';
 export * from './invoiceCounterUpdate';
 export * from './materialLot';

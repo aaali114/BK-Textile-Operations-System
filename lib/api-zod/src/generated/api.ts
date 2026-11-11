@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.3.0
+ * OpenAPI spec version: 0.4.0
  */
 import * as zod from 'zod';
 
@@ -498,6 +498,8 @@ export const GetOrderTrimsParams = zod.object({
 
 export const GetOrderTrimsResponseItem = zod.object({
   "id": zod.string().uuid(),
+  "sourceLabel": zod.string().nullable().describe('The item as named in the source, e.g. hang tag'),
+  "required": zod.boolean().describe('False when the source says the item is not required'),
   "colourwayId": zod.string().uuid().nullable().describe('Null means all colours'),
   "sizeLabel": zod.string().nullable(),
   "trimType": zod.enum(['main_label', 'care_label', 'size_label', 'hangtag', 'button', 'zip', 'thread', 'polybag', 'carton', 'other']),
@@ -713,6 +715,54 @@ export const SetOrderInvoiceNumberResponse = zod.object({
   "priority": zod.enum(['low', 'normal', 'high', 'urgent']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * Reads the mailbox read-only, stores emails about allow-listed POs (INTAKE_PO_ALLOWLIST) with their attachments, creates the order for a new PO that arrives with its PO sheet, and applies PO and trims sheets to the order (later email wins). With dryRun nothing is written.
+ * @summary Read new mail from the orders mailbox now (admins only)
+ */
+
+
+
+export const RunEmailIntakeBody = zod.object({
+  "dryRun": zod.boolean().describe('True to see what would happen without writing anything'),
+  "rescanFromUid": zod.number().int().min(1).optional().describe('Re-read from this mailbox UID instead of where the last run stopped')
+})
+
+export const RunEmailIntakeResponse = zod.object({
+  "dryRun": zod.boolean(),
+  "mailbox": zod.string(),
+  "folder": zod.string(),
+  "fromUid": zod.number().int(),
+  "scanned": zod.number().int(),
+  "candidates": zod.number().int(),
+  "stored": zod.number().int(),
+  "duplicates": zod.number().int(),
+  "skipped": zod.number().int().describe('Messages not about an allow-listed PO; never downloaded or stored'),
+  "ordersCreated": zod.array(zod.string()),
+  "emails": zod.array(zod.object({
+  "uid": zod.number().int(),
+  "subject": zod.string(),
+  "date": zod.coerce.date().nullable(),
+  "outcome": zod.enum(['stored', 'would_store', 'duplicate', 'not_matched', 'error']),
+  "orders": zod.array(zod.object({
+  "invoiceRef": zod.string().nullable(),
+  "poNumber": zod.string().nullable(),
+  "matchStatus": zod.string(),
+  "matchMethod": zod.string(),
+  "created": zod.boolean()
+})),
+  "attachments": zod.array(zod.object({
+  "filename": zod.string(),
+  "kind": zod.string().describe('po_sheet, trims_sheet, spreadsheet, other or note'),
+  "changes": zod.number().int(),
+  "warnings": zod.array(zod.string()),
+  "skipped": zod.string().nullable()
+})),
+  "error": zod.string().nullable()
+})),
+  "errors": zod.array(zod.string())
 })
 
 

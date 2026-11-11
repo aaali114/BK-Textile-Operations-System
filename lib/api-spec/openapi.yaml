@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.3.0
+  version: 0.4.0
   description: B.K. Textile operations API
 servers:
   - url: /api
@@ -422,6 +422,30 @@ paths:
         "403": { description: Not an admin }
         "404": { description: Order not found }
         "409": { description: "Invoice number already used by another order, or order has no buyer" }
+  /admin/intake/run:
+    post:
+      operationId: runEmailIntake
+      tags: [admin]
+      summary: Read new mail from the orders mailbox now (admins only)
+      description: >-
+        Reads the mailbox read-only, stores emails about allow-listed POs
+        (INTAKE_PO_ALLOWLIST) with their attachments, creates the order for a
+        new PO that arrives with its PO sheet, and applies PO and trims sheets
+        to the order (later email wins). With dryRun nothing is written.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IntakeRunRequest" }
+      responses:
+        "200":
+          description: What the run did (or would do)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IntakeRunSummary" }
+        "403": { description: Not an admin }
+        "409": { description: Another run is in progress }
+        "503": { description: Mailbox secrets or INTAKE_PO_ALLOWLIST not set }
   /work-items:
     get:
       operationId: getWorkItems
@@ -786,9 +810,11 @@ components:
       enum: [main_label, care_label, size_label, hangtag, button, zip, thread, polybag, carton, other]
     OrderTrim:
       type: object
-      required: [id, colourwayId, sizeLabel, trimType, description, supplier, quantityPerPiece, unit, buyerSupplied, notes, sourceEmailId, updatedAt]
+      required: [id, colourwayId, sizeLabel, trimType, sourceLabel, required, description, supplier, quantityPerPiece, unit, buyerSupplied, notes, sourceEmailId, updatedAt]
       properties:
         id: { type: string, format: uuid }
+        sourceLabel: { type: ["string", "null"], description: "The item as named in the source, e.g. hang tag" }
+        required: { type: boolean, description: False when the source says the item is not required }
         colourwayId: { type: ["string", "null"], format: uuid, description: Null means all colours }
         sizeLabel: { type: ["string", "null"] }
         trimType: { $ref: "#/components/schemas/TrimType" }
@@ -875,6 +901,61 @@ components:
       properties:
         invoiceNumber: { type: integer, minimum: 1 }
         reason: { type: string, minLength: 3, maxLength: 500 }
+    IntakeRunRequest:
+      type: object
+      required: [dryRun]
+      properties:
+        dryRun: { type: boolean, description: True to see what would happen without writing anything }
+        rescanFromUid: { type: integer, minimum: 1, description: Re-read from this mailbox UID instead of where the last run stopped }
+    IntakeEmailReport:
+      type: object
+      required: [uid, subject, date, outcome, orders, attachments, error]
+      properties:
+        uid: { type: integer }
+        subject: { type: string }
+        date: { type: ["string", "null"], format: date-time }
+        outcome: { type: string, enum: [stored, would_store, duplicate, not_matched, error] }
+        orders:
+          type: array
+          items:
+            type: object
+            required: [invoiceRef, poNumber, matchStatus, matchMethod, created]
+            properties:
+              invoiceRef: { type: ["string", "null"] }
+              poNumber: { type: ["string", "null"] }
+              matchStatus: { type: string }
+              matchMethod: { type: string }
+              created: { type: boolean }
+        attachments:
+          type: array
+          items:
+            type: object
+            required: [filename, kind, changes, warnings, skipped]
+            properties:
+              filename: { type: string }
+              kind: { type: string, description: "po_sheet, trims_sheet, spreadsheet, other or note" }
+              changes: { type: integer }
+              warnings: { type: array, items: { type: string } }
+              skipped: { type: ["string", "null"] }
+        error: { type: ["string", "null"] }
+    IntakeRunSummary:
+      type: object
+      required: [dryRun, mailbox, folder, fromUid, scanned, candidates, stored, duplicates, skipped, ordersCreated, emails, errors]
+      properties:
+        dryRun: { type: boolean }
+        mailbox: { type: string }
+        folder: { type: string }
+        fromUid: { type: integer }
+        scanned: { type: integer }
+        candidates: { type: integer }
+        stored: { type: integer }
+        duplicates: { type: integer }
+        skipped: { type: integer, description: Messages not about an allow-listed PO; never downloaded or stored }
+        ordersCreated: { type: array, items: { type: string } }
+        emails:
+          type: array
+          items: { $ref: "#/components/schemas/IntakeEmailReport" }
+        errors: { type: array, items: { type: string } }
     WorkItem:
       type: object
       required: [id, orderId, orderReference, title, department, dueDate, status, priority, updatedAt]

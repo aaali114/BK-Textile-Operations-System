@@ -3,12 +3,19 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.3.0
+ * OpenAPI spec version: 0.4.0
  */
 import type { TrimType } from './trimType';
 
 export interface OrderTrim {
   id: string;
+  /**
+     * The item as named in the source, e.g. hang tag
+     * @nullable
+     */
+  sourceLabel: string | null;
+  /** False when the source says the item is not required */
+  required: boolean;
   /**
      * Null means all colours
      * @nullable

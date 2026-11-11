@@ -43,6 +43,13 @@
       "when": 1794437512305,
       "tag": "0005_relabel_test_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794440571044,
+      "tag": "0006_intake_cursor_trim_labels",
+      "breakpoints": true
     }
   ]
 }
