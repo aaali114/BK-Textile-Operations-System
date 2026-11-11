@@ -3,10 +3,10 @@ name: Order intake requirements
 description: The requested mailbox-based intake workflow for B.K. Textile buyer orders.
 ---
 
-Buyer orders should be extracted from email through POP mail rather than IMAP, then shown under their respective orders in the register. The user is unsure whether cPanel filtering will still work.
+Buyer orders are extracted from email in the `orders@bktextile.com` mailbox over IMAP, then shown under their respective orders in the register. The first real order is PO 36572 (BK Inv. 4040); real data is allowed for that order only.
 
-Use the existing shared mailbox, not a dedicated order-import mailbox.
+The backend (API, DB schema, OpenAPI spec) is owned outside Replit and changed through GitHub pull requests. Replit Agent works on the frontend only.
 
-**Why:** The user explicitly changed the intended mail protocol from IMAP to POP and chose the existing shared mailbox.
+**Why:** On 2026-11-11 the user switched the protocol back from POP to IMAP, named `orders@bktextile.com` as the mailbox, approved real data for PO 36572, and moved backend ownership out of Replit. This supersedes the earlier POP / shared-mailbox note.
 
-**How to apply:** Scope email intake around POP and the existing shared mailbox. Confirm mailbox settings and obtain representative redacted order emails before defining extraction rules. Do not assume IMAP folders, a different mail provider, or approval to create a dedicated mailbox.
+**How to apply:** Follow the "Ownership", "Data rules" and "Email intake" sections of `replit.md`. Read IMAP read-only (`BODY.PEEK`, no moves or deletes). Store only PO 36572 messages for now. Keep real data out of git. See `docs/po-36572-intake-db-plan.md` for the planned tables.

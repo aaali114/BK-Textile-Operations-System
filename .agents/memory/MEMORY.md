@@ -1,1 +1,1 @@
-- [Order intake requirements](order-intake.md) — use POP with the existing shared mailbox, not IMAP or a dedicated import mailbox.
+- [Order intake requirements](order-intake.md) — IMAP on orders@bktextile.com; real data only for PO 36572 (BK Inv. 4040); backend changes via GitHub PRs, Replit frontend-only.
