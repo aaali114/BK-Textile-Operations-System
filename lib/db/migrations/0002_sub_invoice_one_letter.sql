@@ -1,0 +1,2 @@
+ALTER TABLE "bk_orders" DROP CONSTRAINT "bk_orders_bk_invoice_number_format";--> statement-breakpoint
+ALTER TABLE "bk_orders" ADD CONSTRAINT "bk_orders_bk_invoice_number_format" CHECK ("bk_orders"."bk_invoice_number" IS NULL OR "bk_orders"."bk_invoice_number" ~ '^[0-9]{4}(-[A-Z])?$');

@@ -41,7 +41,7 @@ bk_orders (existing; + bk_invoice_number, parent_order_id)
 
 | column | type | notes |
 |---|---|---|
-| `bk_invoice_number` | text, **unique**, nullable | `4040`, `4040-A`. Check constraint: `^[0-9]{4}(-[A-Z0-9]{1,3})?$` |
+| `bk_invoice_number` | text, **unique**, nullable | `4040`, `4040-A`. Check constraint: `^[0-9]{4}(-[A-Z])?$`. A sub-invoice suffix is always one letter. |
 | `parent_order_id` | uuid → bk_orders, `set null` | a sub-invoice points at its parent invoice's order |
 
 - `po_number` stays **not unique**, because sub-invoices can share a PO. It gets an index for matching.
@@ -115,7 +115,7 @@ Links emails to orders. An email can concern more than one order, such as 4040 a
 
 The worker loads the known orders' `(bk_invoice_number, po_number)` pairs. During this phase that means 4040 and its sub-invoices. It then scans the subject and plain-text body of each new message.
 
-**Invoice references.** These count: `BK Inv XXXX`, `Inv XXXX`, and close variants such as `BK Inv. XXXX`, `BK-Inv XXXX`, `Inv# XXXX`, `Inv No. XXXX`, `Invoice XXXX`. Matching is case-insensitive, and each can have a sub-invoice suffix: `4040-A`, `4040 A`, `4040A`, all normalised to `4040-A`. A bare 4-digit number is not enough, because quantities, prices and years are 4 digits too.
+**Invoice references.** These count: `BK Inv XXXX`, `Inv XXXX`, and close variants such as `BK Inv. XXXX`, `BK-Inv XXXX`, `Inv# XXXX`, `Inv No. XXXX`, `Invoice XXXX`. Matching is case-insensitive, and each can have a sub-invoice suffix of exactly one letter: `4040-A`, `4040 A`, `4040A`, all normalised to `4040-A`. A bare 4-digit number is not enough, because quantities, prices and years are 4 digits too.
 
 **PO references.** A known PO number appears as a whole number, with or without a `PO` / `P.O.` / `PO#` prefix.
 
