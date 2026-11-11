@@ -49,8 +49,8 @@ bk_buyers ── bk_orders (existing; + buyer_id, invoice, PO terms)      bk_inv
 | `invoice_ref` | text, unique | `4040/BK-SAS/2026`; format check `^[0-9]+/BK-[A-Z]{2,5}/[0-9]{4}$`; set together with `invoice_number` |
 | `po_received_at` | timestamptz | when the PO first reached BK; its year (Pakistan time) goes into `invoice_ref` |
 | `po_issue_date` | date | from the PO sheet |
-| `end_customer` | text | brand behind the buyer, e.g. "CB" |
-| `price_terms`, `payment_terms`, `ship_via`, `country_of_origin` | text | e.g. FOB PAKISTAN, D/P, OCEAN, PAKISTAN |
+| `end_customer` | text | the brand behind a sourcing agent, when the PO names one |
+| `price_terms`, `payment_terms`, `ship_via`, `country_of_origin` | text | as written on the PO, e.g. FOB, D/P, sea freight |
 | `over_ship_tolerance_pct` | numeric(5,2) | e.g. 3.00 for "3% over PO quantity allowed" |
 
 - `delivery_date` holds the PO ship date. `quantity` stays as the header total; the API reports a mismatch when it differs from the size grid. It is not overwritten automatically.
@@ -80,7 +80,7 @@ Index: `(order_id, occurred_at desc)`.
 
 ### `bk_order_lines`
 
-`order_id`, `style_number`, `description` (the process as written, e.g. `SALT WASH CORDED CREW`), `unit_price` numeric(12,4), `quantity` (check `>= 0`), `sort_order`, provenance, timestamps. Unique `(order_id, style_number, description)`.
+`order_id`, `style_number`, `description` (the process/finish as written on the PO, e.g. `GARMENT DYED CREW`), `unit_price` numeric(12,4), `quantity` (check `>= 0`), `sort_order`, provenance, timestamps. Unique `(order_id, style_number, description)`.
 
 ### `bk_order_colourways`
 
@@ -142,7 +142,7 @@ The worker loads the known orders' `(buyer, po_number, invoice_ref)` values. Dur
 
 - PO numbers are whole numbers; `36572` inside a longer number does not count.
 - When two buyers could share a PO number, the sender's email domain (`bk_buyers.email_domains`) picks the buyer. Until domains are filled in, an ambiguous PO goes to `needs_review`.
-- **Never** take the PO number from artwork or label attachments: a reused care-label layout for PO 36572 shows `PO # 33655` from 2024.
+- **Never** take the PO number from artwork or label attachments: label layouts are often reused from earlier orders and still show the old PO number.
 
 Messages that match nothing are not stored. To find missed emails:
 
@@ -152,7 +152,7 @@ Messages that match nothing are not stored. To find missed emails:
 ## Applying extracted data
 
 - **The PO sheet** (buyer's purchase-order spreadsheet) sets the starting values: header terms and dates, priced lines, colours and the size grid, fabric description and processes, packing and quality notes. A revised PO for the same number updates these in place; tables are found by their headings (`Style#`, `COLORS`, size labels), never by fixed rows, because revisions shift rows.
-- **Later emails win.** Trims sheets, accessory details and hang-tag artwork sent after the PO override the PO's values. The PO's placeholders (`TBA`, blank) never overwrite a real value. Example: PO 36572 says "Hang Tag: Not Required", and the later trims email adds a hang tag from Tariq Jamil, so the hang tag is recorded.
+- **Later emails win.** Trims sheets, accessory details and hang-tag artwork sent after the PO override the PO's values. The PO's placeholders (`TBA`, blank) never overwrite a real value. Example: a PO says "Hang Tag: Not Required" and a later trims email lists a hang tag and its supplier, so the hang tag is recorded.
 - Size labels are normalised: `2X` = `2XL` = `XXL`, `3X` = `3XL` = `XXXL`.
 - Every write is logged in `bk_activity` with old value, new value and source email, so a wrong reading can be seen and reversed.
 

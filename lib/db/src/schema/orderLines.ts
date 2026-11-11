@@ -3,8 +3,8 @@ import { check, integer, numeric, pgTable, text, timestamp, unique, uuid } from 
 import { ordersTable } from "./orders";
 import { provenanceColumns } from "./provenance";
 
-// Priced lines on a PO: a style in a given process/finish. PO 36572 has two
-// lines for style BB405 (salt wash and pigment dye) at different prices.
+// Priced lines on a PO: a style in a given process/finish. One PO can carry
+// the same style in two finishes at different prices.
 export const orderLinesTable = pgTable(
   "bk_order_lines",
   {
@@ -13,7 +13,7 @@ export const orderLinesTable = pgTable(
       .notNull()
       .references(() => ordersTable.id, { onDelete: "cascade" }),
     styleNumber: text("style_number").notNull(),
-    // As written on the PO, e.g. "SALT WASH CORDED CREW".
+    // As written on the PO, e.g. "GARMENT DYED CREW".
     description: text("description").notNull(),
     unitPrice: numeric("unit_price", { precision: 12, scale: 4, mode: "number" }),
     quantity: integer("quantity").notNull(),

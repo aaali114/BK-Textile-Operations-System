@@ -73,7 +73,7 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 - One order = one buyer PO = one BK invoice. PO numbers are unique per buyer. A revised PO with the same number updates the existing order; a new PO number is always a new order, whatever its style or delivery date. No sub-invoices.
 - The BK invoice is assigned automatically when an order is first created: `{number}/BK-{buyer abbreviation}/{year PO received}`, e.g. `4040/BK-SAS/2026`. One sequence across all buyers and years (4051 on 31 Dec → 4052 on 1 Jan). Always use `assignInvoiceNumber()` from `@workspace/db` inside the order-creating transaction; it guarantees no gaps or duplicates.
 - Buyers and abbreviations: Spartan Apparel Sourcing (SAS), Rainbow Sourcing (RS), Metropolitan Manufacturing INC (MMI), God's Love Overcomes (LIF). Email domains to be added.
-- A PO can have several priced lines (style + process), e.g. salt wash and pigment dye at different prices; colours sit under their line.
+- A PO can have several priced lines (style + process), e.g. one style in two finishes at different prices; colours sit under their line.
 - Fetches are idempotent: each message is keyed by mailbox + UIDVALIDITY + UID, plus `Message-ID`.
 
 ## Product

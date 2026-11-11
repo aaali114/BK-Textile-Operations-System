@@ -25,7 +25,7 @@ export const ordersTable = pgTable(
     // Null only on synthetic preview orders created before buyers existed.
     buyerId: uuid("buyer_id").references(() => buyersTable.id, { onDelete: "restrict" }),
     agencyName: text("agency_name"),
-    // The brand / end customer behind the buyer, e.g. "CB" on a Spartan PO.
+    // The brand / end customer behind a sourcing agent, when the PO names one.
     endCustomer: text("end_customer"),
     previousOrderReference: text("previous_order_reference"),
     orderValue: numeric("order_value", { precision: 14, scale: 2, mode: "number" }),
