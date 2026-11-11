@@ -3,8 +3,10 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
+import type { ActivitySource } from './activitySource';
+import type { OrderActivityDetails } from './orderActivityDetails';
 
 export interface OrderActivity {
   id: string;
@@ -12,5 +14,21 @@ export interface OrderActivity {
   /** @nullable */
   actorId: string | null;
   description: string;
+  source: ActivitySource;
+  /**
+     * Machine-readable verb, e.g. size_qty.updated
+     * @nullable
+     */
+  action: string | null;
+  /**
+     * Structured change data. For field changes: { changes: [{ field, from, to }] }
+     * @nullable
+     */
+  details: OrderActivityDetails;
+  /**
+     * Email the change was read from, when source is email_intake
+     * @nullable
+     */
+  sourceEmailId: string | null;
   occurredAt: Date;
 }

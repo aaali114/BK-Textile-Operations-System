@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import * as zod from 'zod';
 
@@ -62,6 +62,17 @@ export const GetOrdersResponseItem = zod.object({
   "id": zod.string().uuid(),
   "reference": zod.string(),
   "buyer": zod.string(),
+  "buyerId": zod.string().uuid().nullable(),
+  "invoiceNumber": zod.number().int().nullable().describe('BK invoice number, e.g. 4040'),
+  "invoiceRef": zod.string().nullable().describe('BK invoice reference, e.g. 4040/BK-SAS/2026'),
+  "poReceivedAt": zod.coerce.date().nullable(),
+  "poIssueDate": zod.coerce.date().nullable(),
+  "endCustomer": zod.string().nullable(),
+  "priceTerms": zod.string().nullable(),
+  "paymentTerms": zod.string().nullable(),
+  "shipVia": zod.string().nullable(),
+  "countryOfOrigin": zod.string().nullable(),
+  "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
   "agencyName": zod.string().nullable(),
   "previousOrderReference": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
@@ -83,6 +94,9 @@ export const GetOrdersResponse = zod.array(GetOrdersResponseItem)
  * @summary Create an order
  */
 
+export const createOrderBodyOverShipTolerancePctMin = 0;
+export const createOrderBodyOverShipTolerancePctMax = 100;
+
 export const createOrderBodyOrderValueMin = 0;
 
 export const createOrderBodyCurrencyCodeMin = 3;
@@ -94,6 +108,15 @@ export const createOrderBodyCurrencyCodeMax = 3;
 
 export const CreateOrderBody = zod.object({
   "buyer": zod.string().min(1),
+  "buyerId": zod.string().uuid().optional(),
+  "poReceivedAt": zod.coerce.date().optional().describe('Defaults to now; its year goes into the invoice reference'),
+  "poIssueDate": zod.coerce.date().optional(),
+  "endCustomer": zod.string().optional(),
+  "priceTerms": zod.string().optional(),
+  "paymentTerms": zod.string().optional(),
+  "shipVia": zod.string().optional(),
+  "countryOfOrigin": zod.string().optional(),
+  "overShipTolerancePct": zod.number().min(createOrderBodyOverShipTolerancePctMin).max(createOrderBodyOverShipTolerancePctMax).optional(),
   "agencyName": zod.string().optional(),
   "previousOrderReference": zod.string().optional(),
   "orderValue": zod.number().min(createOrderBodyOrderValueMin).optional(),
@@ -104,12 +127,23 @@ export const CreateOrderBody = zod.object({
   "quantity": zod.number().int().min(1),
   "deliveryDate": zod.coerce.date(),
   "priority": zod.enum(['low', 'normal', 'high', 'urgent']).optional()
-})
+}).describe('Creating an order assigns the next BK invoice number. A PO number is required. Give buyerId, or a buyer name/abbreviation that matches a known buyer.')
 
 export const CreateOrderResponse = zod.object({
   "id": zod.string().uuid(),
   "reference": zod.string(),
   "buyer": zod.string(),
+  "buyerId": zod.string().uuid().nullable(),
+  "invoiceNumber": zod.number().int().nullable().describe('BK invoice number, e.g. 4040'),
+  "invoiceRef": zod.string().nullable().describe('BK invoice reference, e.g. 4040/BK-SAS/2026'),
+  "poReceivedAt": zod.coerce.date().nullable(),
+  "poIssueDate": zod.coerce.date().nullable(),
+  "endCustomer": zod.string().nullable(),
+  "priceTerms": zod.string().nullable(),
+  "paymentTerms": zod.string().nullable(),
+  "shipVia": zod.string().nullable(),
+  "countryOfOrigin": zod.string().nullable(),
+  "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
   "agencyName": zod.string().nullable(),
   "previousOrderReference": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
@@ -137,6 +171,17 @@ export const GetOrderResponse = zod.object({
   "id": zod.string().uuid(),
   "reference": zod.string(),
   "buyer": zod.string(),
+  "buyerId": zod.string().uuid().nullable(),
+  "invoiceNumber": zod.number().int().nullable().describe('BK invoice number, e.g. 4040'),
+  "invoiceRef": zod.string().nullable().describe('BK invoice reference, e.g. 4040/BK-SAS/2026'),
+  "poReceivedAt": zod.coerce.date().nullable(),
+  "poIssueDate": zod.coerce.date().nullable(),
+  "endCustomer": zod.string().nullable(),
+  "priceTerms": zod.string().nullable(),
+  "paymentTerms": zod.string().nullable(),
+  "shipVia": zod.string().nullable(),
+  "countryOfOrigin": zod.string().nullable(),
+  "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
   "agencyName": zod.string().nullable(),
   "previousOrderReference": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
@@ -160,6 +205,9 @@ export const UpdateOrderParams = zod.object({
   "orderId": zod.coerce.string().uuid()
 })
 
+export const updateOrderBodyOverShipTolerancePctMin = 0;
+export const updateOrderBodyOverShipTolerancePctMax = 100;
+
 
 export const updateOrderBodyOrderValueMin = 0;
 
@@ -171,6 +219,13 @@ export const updateOrderBodyCurrencyCodeMax = 3;
 
 
 export const UpdateOrderBody = zod.object({
+  "poIssueDate": zod.coerce.date().nullish(),
+  "endCustomer": zod.string().nullish(),
+  "priceTerms": zod.string().nullish(),
+  "paymentTerms": zod.string().nullish(),
+  "shipVia": zod.string().nullish(),
+  "countryOfOrigin": zod.string().nullish(),
+  "overShipTolerancePct": zod.number().min(updateOrderBodyOverShipTolerancePctMin).max(updateOrderBodyOverShipTolerancePctMax).nullish(),
   "buyer": zod.string().min(1).optional(),
   "agencyName": zod.string().nullish(),
   "previousOrderReference": zod.string().nullish(),
@@ -183,12 +238,23 @@ export const UpdateOrderBody = zod.object({
   "deliveryDate": zod.coerce.date().optional(),
   "status": zod.enum(['draft', 'development', 'in_production', 'ready_to_ship', 'shipped']).optional(),
   "priority": zod.enum(['low', 'normal', 'high', 'urgent']).optional()
-})
+}).describe('The buyer and BK invoice cannot be changed here (invoice changes go through the admin endpoint).')
 
 export const UpdateOrderResponse = zod.object({
   "id": zod.string().uuid(),
   "reference": zod.string(),
   "buyer": zod.string(),
+  "buyerId": zod.string().uuid().nullable(),
+  "invoiceNumber": zod.number().int().nullable().describe('BK invoice number, e.g. 4040'),
+  "invoiceRef": zod.string().nullable().describe('BK invoice reference, e.g. 4040/BK-SAS/2026'),
+  "poReceivedAt": zod.coerce.date().nullable(),
+  "poIssueDate": zod.coerce.date().nullable(),
+  "endCustomer": zod.string().nullable(),
+  "priceTerms": zod.string().nullable(),
+  "paymentTerms": zod.string().nullable(),
+  "shipVia": zod.string().nullable(),
+  "countryOfOrigin": zod.string().nullable(),
+  "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
   "agencyName": zod.string().nullable(),
   "previousOrderReference": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
@@ -217,6 +283,10 @@ export const GetOrderActivityResponseItem = zod.object({
   "actor": zod.string(),
   "actorId": zod.string().nullable(),
   "description": zod.string(),
+  "source": zod.enum(['staff', 'email_intake', 'system']),
+  "action": zod.string().nullable().describe('Machine-readable verb, e.g. size_qty.updated'),
+  "details": zod.record(zod.string(), zod.unknown()).nullable().describe('Structured change data. For field changes: { changes: [{ field, from, to }] }'),
+  "sourceEmailId": zod.string().uuid().nullable().describe('Email the change was read from, when source is email_intake'),
   "occurredAt": zod.coerce.date()
 })
 export const GetOrderActivityResponse = zod.array(GetOrderActivityResponseItem)
@@ -312,6 +382,338 @@ export const PreviewOrderFileParams = zod.object({
 })
 
 export const PreviewOrderFileResponse = zod.unknown()
+
+
+/**
+ * @summary The signed-in user's ID and whether they are an admin
+ */
+export const GetCurrentUserResponse = zod.object({
+  "userId": zod.string(),
+  "isAdmin": zod.boolean()
+})
+
+
+/**
+ * @summary List buyers and their invoice abbreviations
+ */
+export const GetBuyersResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "abbreviation": zod.string(),
+  "emailDomains": zod.array(zod.string())
+})
+export const GetBuyersResponse = zod.array(GetBuyersResponseItem)
+
+
+/**
+ * @summary Priced lines, colours and the colour x size grid for an order
+ */
+export const GetOrderBreakdownParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const GetOrderBreakdownResponse = zod.object({
+  "orderId": zod.string().uuid(),
+  "currencyCode": zod.string().nullable(),
+  "sizeLabels": zod.array(zod.string()).describe('Grid columns in PO order'),
+  "lines": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "styleNumber": zod.string(),
+  "description": zod.string(),
+  "unitPrice": zod.number().nullable(),
+  "quantity": zod.number().int().describe('Quantity stated on the PO line'),
+  "sortOrder": zod.number().int(),
+  "sourceEmailId": zod.string().uuid().nullable(),
+  "colourways": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "lineId": zod.string().uuid().nullable(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "buyerReference": zod.string().nullable(),
+  "sortOrder": zod.number().int(),
+  "sourceEmailId": zod.string().uuid().nullable(),
+  "sizes": zod.array(zod.object({
+  "sizeLabel": zod.string(),
+  "sizeSort": zod.number().int(),
+  "quantity": zod.number().int()
+})).describe('Only sizes that have a row; missing sizes mean "not on the PO", not zero.'),
+  "total": zod.number().int()
+})),
+  "gridTotal": zod.number().int().describe('Sum of the size grid under this line')
+})),
+  "unassignedColourways": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "lineId": zod.string().uuid().nullable(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "buyerReference": zod.string().nullable(),
+  "sortOrder": zod.number().int(),
+  "sourceEmailId": zod.string().uuid().nullable(),
+  "sizes": zod.array(zod.object({
+  "sizeLabel": zod.string(),
+  "sizeSort": zod.number().int(),
+  "quantity": zod.number().int()
+})).describe('Only sizes that have a row; missing sizes mean "not on the PO", not zero.'),
+  "total": zod.number().int()
+})).describe('Colours not yet placed under a line'),
+  "gridTotal": zod.number().int(),
+  "orderQuantity": zod.number().int(),
+  "quantityMismatch": zod.boolean().describe('True when the grid total differs from the order quantity')
+})
+
+
+/**
+ * @summary Fabrics for an order
+ */
+export const GetOrderFabricsParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const GetOrderFabricsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "colourwayId": zod.string().uuid().nullable().describe('Null means all colours'),
+  "placement": zod.string(),
+  "description": zod.string(),
+  "composition": zod.string().nullable(),
+  "construction": zod.string().nullable(),
+  "gsm": zod.number().int().nullable(),
+  "widthCm": zod.number().nullable(),
+  "colour": zod.string().nullable(),
+  "supplier": zod.string().nullable(),
+  "consumptionPerPiece": zod.number().nullable(),
+  "consumptionUnit": zod.string().nullable(),
+  "notes": zod.string(),
+  "sourceEmailId": zod.string().uuid().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+export const GetOrderFabricsResponse = zod.array(GetOrderFabricsResponseItem)
+
+
+/**
+ * @summary Trims and accessories for an order
+ */
+export const GetOrderTrimsParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const GetOrderTrimsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "colourwayId": zod.string().uuid().nullable().describe('Null means all colours'),
+  "sizeLabel": zod.string().nullable(),
+  "trimType": zod.enum(['main_label', 'care_label', 'size_label', 'hangtag', 'button', 'zip', 'thread', 'polybag', 'carton', 'other']),
+  "description": zod.string(),
+  "supplier": zod.string().nullable(),
+  "quantityPerPiece": zod.number().nullable(),
+  "unit": zod.string().nullable(),
+  "buyerSupplied": zod.boolean(),
+  "notes": zod.string(),
+  "sourceEmailId": zod.string().uuid().nullable(),
+  "updatedAt": zod.coerce.date()
+})
+export const GetOrderTrimsResponse = zod.array(GetOrderTrimsResponseItem)
+
+
+/**
+ * @summary Emails linked to an order, newest first, with attachment metadata
+ */
+export const GetOrderEmailsParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const GetOrderEmailsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "subject": zod.string(),
+  "fromAddress": zod.string(),
+  "fromName": zod.string().nullable(),
+  "sentAt": zod.coerce.date().nullable(),
+  "receivedAt": zod.coerce.date(),
+  "category": zod.enum(['order_details', 'tech_pack', 'trims_accessories', 'sample_requirements', 'packaging', 'amendment', 'other', 'unclassified']),
+  "parseStatus": zod.enum(['pending', 'parsed', 'partial', 'failed']),
+  "matchStatus": zod.enum(['matched', 'needs_review', 'ignored']),
+  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual']),
+  "matchReason": zod.string().nullable(),
+  "matchedAt": zod.coerce.date(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "isInline": zod.boolean(),
+  "extractStatus": zod.enum(['pending', 'extracted', 'failed', 'not_applicable']),
+  "orderFileId": zod.string().uuid().nullable().describe('Set when the attachment was promoted into the order\'s files')
+}))
+})
+export const GetOrderEmailsResponse = zod.array(GetOrderEmailsResponseItem)
+
+
+/**
+ * @summary One linked email with its plain-text body
+ */
+export const GetOrderEmailParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "emailId": zod.coerce.string().uuid()
+})
+
+export const GetOrderEmailResponse = zod.object({
+  "id": zod.string().uuid(),
+  "subject": zod.string(),
+  "fromAddress": zod.string(),
+  "fromName": zod.string().nullable(),
+  "sentAt": zod.coerce.date().nullable(),
+  "receivedAt": zod.coerce.date(),
+  "category": zod.enum(['order_details', 'tech_pack', 'trims_accessories', 'sample_requirements', 'packaging', 'amendment', 'other', 'unclassified']),
+  "parseStatus": zod.enum(['pending', 'parsed', 'partial', 'failed']),
+  "matchStatus": zod.enum(['matched', 'needs_review', 'ignored']),
+  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual']),
+  "matchReason": zod.string().nullable(),
+  "matchedAt": zod.coerce.date(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "isInline": zod.boolean(),
+  "extractStatus": zod.enum(['pending', 'extracted', 'failed', 'not_applicable']),
+  "orderFileId": zod.string().uuid().nullable().describe('Set when the attachment was promoted into the order\'s files')
+}))
+}).and(zod.object({
+  "toAddresses": zod.array(zod.string()),
+  "ccAddresses": zod.array(zod.string()),
+  "bodyText": zod.string().nullable().describe('Plain text only. Render as text, never as HTML.'),
+  "parseError": zod.string().nullable()
+}))
+
+
+/**
+ * @summary Confirm or ignore an email link, or correct its category
+ */
+export const UpdateOrderEmailParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "emailId": zod.coerce.string().uuid()
+})
+
+export const UpdateOrderEmailBody = zod.object({
+  "matchStatus": zod.enum(['matched', 'ignored']).optional(),
+  "category": zod.enum(['order_details', 'tech_pack', 'trims_accessories', 'sample_requirements', 'packaging', 'amendment', 'other', 'unclassified']).optional()
+})
+
+export const UpdateOrderEmailResponse = zod.object({
+  "id": zod.string().uuid(),
+  "subject": zod.string(),
+  "fromAddress": zod.string(),
+  "fromName": zod.string().nullable(),
+  "sentAt": zod.coerce.date().nullable(),
+  "receivedAt": zod.coerce.date(),
+  "category": zod.enum(['order_details', 'tech_pack', 'trims_accessories', 'sample_requirements', 'packaging', 'amendment', 'other', 'unclassified']),
+  "parseStatus": zod.enum(['pending', 'parsed', 'partial', 'failed']),
+  "matchStatus": zod.enum(['matched', 'needs_review', 'ignored']),
+  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual']),
+  "matchReason": zod.string().nullable(),
+  "matchedAt": zod.coerce.date(),
+  "attachments": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "filename": zod.string(),
+  "contentType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "isInline": zod.boolean(),
+  "extractStatus": zod.enum(['pending', 'extracted', 'failed', 'not_applicable']),
+  "orderFileId": zod.string().uuid().nullable().describe('Set when the attachment was promoted into the order\'s files')
+}))
+})
+
+
+/**
+ * @summary Download an attachment of a linked email
+ */
+export const DownloadOrderEmailAttachmentParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "emailId": zod.coerce.string().uuid(),
+  "attachmentId": zod.coerce.string().uuid()
+})
+
+export const DownloadOrderEmailAttachmentResponse = zod.unknown()
+
+
+/**
+ * @summary Current BK invoice counter (admins only)
+ */
+export const GetInvoiceCounterResponse = zod.object({
+  "lastNumber": zod.number().int(),
+  "nextNumber": zod.number().int(),
+  "highestUsed": zod.number().int().nullable().describe('Highest invoice number on any order')
+})
+
+
+/**
+ * The next new order gets lastNumber + 1. Cannot go below the highest invoice number already on an order.
+ * @summary Set the last-used BK invoice number (admins only)
+ */
+
+export const setInvoiceCounterBodyReasonMin = 3;
+export const setInvoiceCounterBodyReasonMax = 500;
+
+
+
+export const SetInvoiceCounterBody = zod.object({
+  "lastNumber": zod.number().int().min(1),
+  "reason": zod.string().min(setInvoiceCounterBodyReasonMin).max(setInvoiceCounterBodyReasonMax)
+})
+
+export const SetInvoiceCounterResponse = zod.object({
+  "lastNumber": zod.number().int(),
+  "nextNumber": zod.number().int(),
+  "highestUsed": zod.number().int().nullable().describe('Highest invoice number on any order')
+})
+
+
+/**
+ * Rebuilds the reference with the buyer's abbreviation and the year the PO was received. Does not move the counter.
+ * @summary Overwrite one order's BK invoice number (admins only)
+ */
+export const SetOrderInvoiceNumberParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+
+export const setOrderInvoiceNumberBodyReasonMin = 3;
+export const setOrderInvoiceNumberBodyReasonMax = 500;
+
+
+
+export const SetOrderInvoiceNumberBody = zod.object({
+  "invoiceNumber": zod.number().int().min(1),
+  "reason": zod.string().min(setOrderInvoiceNumberBodyReasonMin).max(setOrderInvoiceNumberBodyReasonMax)
+})
+
+export const SetOrderInvoiceNumberResponse = zod.object({
+  "id": zod.string().uuid(),
+  "reference": zod.string(),
+  "buyer": zod.string(),
+  "buyerId": zod.string().uuid().nullable(),
+  "invoiceNumber": zod.number().int().nullable().describe('BK invoice number, e.g. 4040'),
+  "invoiceRef": zod.string().nullable().describe('BK invoice reference, e.g. 4040/BK-SAS/2026'),
+  "poReceivedAt": zod.coerce.date().nullable(),
+  "poIssueDate": zod.coerce.date().nullable(),
+  "endCustomer": zod.string().nullable(),
+  "priceTerms": zod.string().nullable(),
+  "paymentTerms": zod.string().nullable(),
+  "shipVia": zod.string().nullable(),
+  "countryOfOrigin": zod.string().nullable(),
+  "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
+  "agencyName": zod.string().nullable(),
+  "previousOrderReference": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "currencyCode": zod.string().nullable(),
+  "poNumber": zod.string().nullish(),
+  "style": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number().int(),
+  "deliveryDate": zod.coerce.date(),
+  "status": zod.enum(['draft', 'development', 'in_production', 'ready_to_ship', 'shipped']),
+  "priority": zod.enum(['low', 'normal', 'high', 'urgent']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
 
 
 /**

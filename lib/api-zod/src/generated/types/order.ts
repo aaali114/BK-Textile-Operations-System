@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import type { OrderStatus } from './orderStatus';
 import type { Priority } from './priority';
@@ -12,6 +12,37 @@ export interface Order {
   id: string;
   reference: string;
   buyer: string;
+  /** @nullable */
+  buyerId: string | null;
+  /**
+     * BK invoice number, e.g. 4040
+     * @nullable
+     */
+  invoiceNumber: number | null;
+  /**
+     * BK invoice reference, e.g. 4040/BK-SAS/2026
+     * @nullable
+     */
+  invoiceRef: string | null;
+  /** @nullable */
+  poReceivedAt: Date | null;
+  /** @nullable */
+  poIssueDate: Date | null;
+  /** @nullable */
+  endCustomer: string | null;
+  /** @nullable */
+  priceTerms: string | null;
+  /** @nullable */
+  paymentTerms: string | null;
+  /** @nullable */
+  shipVia: string | null;
+  /** @nullable */
+  countryOfOrigin: string | null;
+  /**
+     * e.g. 3 for 3% over PO quantity allowed
+     * @nullable
+     */
+  overShipTolerancePct: number | null;
   /** @nullable */
   agencyName: string | null;
   /** @nullable */

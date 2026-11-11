@@ -3,13 +3,30 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import type { Priority } from './priority';
 
+/**
+ * Creating an order assigns the next BK invoice number. A PO number is required. Give buyerId, or a buyer name/abbreviation that matches a known buyer.
+ */
 export interface OrderInput {
   /** @minLength 1 */
   buyer: string;
+  buyerId?: string;
+  /** Defaults to now; its year goes into the invoice reference */
+  poReceivedAt?: Date;
+  poIssueDate?: Date;
+  endCustomer?: string;
+  priceTerms?: string;
+  paymentTerms?: string;
+  shipVia?: string;
+  countryOfOrigin?: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  overShipTolerancePct?: number;
   agencyName?: string;
   previousOrderReference?: string;
   /** @minimum 0 */

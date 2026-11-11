@@ -15,8 +15,30 @@ requests to seed a database. Real data is approved only for PO 36572 (BK Inv.
 
 - Database tables exist for buyers, order lines (style + process + price),
   colourways, size × colour quantities, fabrics, trims, source emails, email ↔
-  order links, and attachments (`docs/po-36572-intake-db-plan.md`). No API
-  operations expose them yet; they come in the next backend PR.
+  order links, and attachments (`docs/po-36572-intake-db-plan.md`).
+- **Delivered (API 0.3.0, generated hooks available):**
+  - `useGetBuyers` — buyers with abbreviations (for the order form's buyer picker).
+  - `Order` now carries `buyerId`, `invoiceNumber`, `invoiceRef` (show this as
+    the BK invoice), `poReceivedAt`, `poIssueDate`, `endCustomer`, price/payment
+    terms, `shipVia`, `countryOfOrigin`, `overShipTolerancePct`.
+  - `useCreateOrder` assigns the BK invoice automatically and **requires a PO**;
+    send `buyerId` from the buyer picker (a typed name/abbreviation also works).
+    Errors: 400 (missing PO / unknown buyer), 409 (PO already exists for that buyer).
+  - `useGetOrderBreakdown` — priced lines, colours under each line, the size
+    grid (`sizeLabels` gives column order; a missing size means "not on the PO",
+    not zero), per-colour/line/order totals and `quantityMismatch`.
+  - `useGetOrderFabrics`, `useGetOrderTrims`.
+  - `useGetOrderEmails` / `useGetOrderEmail` (plain-text body: render as text),
+    `useUpdateOrderEmail` (confirm/ignore a `needs_review` link, fix category),
+    `downloadOrderEmailAttachment` (always a download).
+  - `useGetOrderActivity` rows now include `source` (staff / email_intake /
+    system), `action`, `details.changes[{field, from, to}]` and `sourceEmailId`
+    for the change log.
+  - `useGetCurrentUser` → `isAdmin`; admin-only `useGetInvoiceCounter`,
+    `useSetInvoiceCounter`, `useSetOrderInvoiceNumber` (each needs a reason).
+    Show these controls only when `isAdmin` is true; the server enforces it anyway.
+- Not yet: the mailbox reader (emails appear once it runs), manual import of a
+  missed email, staff editing of lines/grid/fabrics/trims.
 - Owner decisions that change these requests:
   - The buyer's **PO number is the key**. One PO = one order = one BK invoice,
     shown as e.g. `4040/BK-SAS/2026`. No sub-invoices.
