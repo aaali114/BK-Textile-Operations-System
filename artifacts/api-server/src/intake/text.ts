@@ -1,3 +1,12 @@
+/**
+ * PO numbers come in any format per buyer (all digits, letters and digits,
+ * dashes, 9+ characters). Two POs are the same when they match ignoring case,
+ * spaces and punctuation: "AC-PO-9812" = "ac po 9812" = "ACPO9812".
+ */
+export function poKey(po: string): string {
+  return po.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
 /** Normalises a heading/label for comparison: lower case, letters/digits/spaces only. */
 export function norm(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9%]+/g, " ").trim();

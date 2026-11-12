@@ -13,7 +13,7 @@ import {
 } from "@workspace/db";
 import type { PoSheetData } from "./poSheet";
 import { trimLabel, trimType, type TrimRow } from "./trimsSheet";
-import { norm } from "./text";
+import { norm, poKey } from "./text";
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type Change = { field: string; from: unknown; to: unknown };
@@ -51,7 +51,7 @@ export async function applyPoSheet(tx: Tx, ctx: ApplyContext, po: PoSheetData): 
   const cache = new Map<string, Date | null>();
   const [order] = await tx.select().from(ordersTable).where(eq(ordersTable.id, ctx.orderId)).for("update");
   if (!order) return { changes, warnings, skipped: "order not found" };
-  if (order.poNumber !== po.poNumber) {
+  if (!order.poNumber || poKey(order.poNumber) !== poKey(po.poNumber)) {
     return { changes, warnings, skipped: `PO sheet is for PO ${po.poNumber}, not this order's PO ${order.poNumber}; not applied` };
   }
 
