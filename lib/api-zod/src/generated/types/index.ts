@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.4.0
+ * OpenAPI spec version: 0.5.0
  */
 
 export * from './activity';
@@ -62,6 +62,9 @@ export * from './orderStatus';
 export * from './orderTrim';
 export * from './orderUpdate';
 export * from './priority';
+export * from './reapplyReport';
+export * from './reapplyReportEmailsItem';
+export * from './reapplyReportEmailsItemAttachmentsItem';
 export * from './sizeQuantity';
 export * from './trimType';
 export * from './workItem';

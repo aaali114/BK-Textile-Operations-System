@@ -146,6 +146,12 @@ export class ObjectStorageService {
     return `/objects/${entityId}`;
   }
 
+  /** Reads a private object's bytes by its "/objects/..." path. */
+  async readObjectEntity(objectPath: string): Promise<Buffer> {
+    const [content] = await (await this.getObjectEntityFile(objectPath)).download();
+    return content;
+  }
+
   async getObjectEntityFile(objectPath: string): Promise<File> {
     if (!objectPath.startsWith('/objects/')) {
       throw new ObjectNotFoundError();

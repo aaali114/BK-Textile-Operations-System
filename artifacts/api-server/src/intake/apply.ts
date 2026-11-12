@@ -212,13 +212,14 @@ async function upsertTrim(
 }
 
 /** One change-log row per applied attachment, listing every old -> new value. */
-export async function logApplied(tx: Tx, ctx: ApplyContext, kind: string, filename: string, subject: string, result: ApplyResult) {
+export async function logApplied(tx: Tx, ctx: ApplyContext, kind: string, filename: string, subject: string, result: ApplyResult, reapplied = false) {
   if (!result.changes.length && !result.warnings.length && !result.skipped) return;
+  const verb = reapplied ? "Re-applied" : "Applied";
   await tx.insert(activityTable).values({
     actor: "Email intake",
     description: result.skipped
       ? `Did not apply ${kind} "${filename}" from "${subject}": ${result.skipped}`
-      : `Applied ${kind} "${filename}" from "${subject}": ${result.changes.length} change(s)${result.warnings.length ? `, ${result.warnings.length} warning(s)` : ""}`,
+      : `${verb} ${kind} "${filename}" from "${subject}": ${result.changes.length} change(s)${result.warnings.length ? `, ${result.warnings.length} warning(s)` : ""}`,
     entityType: "order",
     entityId: ctx.orderId,
     orderId: ctx.orderId,

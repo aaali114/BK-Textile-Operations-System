@@ -40,6 +40,9 @@ export interface MailSource {
 export interface BlobStore {
   put(content: Buffer, contentType: string): Promise<string>;
 }
+export interface BlobReader {
+  get(objectPath: string): Promise<Buffer>;
+}
 
 type AttachmentPlan = {
   filename: string;
@@ -267,6 +270,11 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
   }
 }
 
+export function currencyHintOf(email: ParsedEmail, attachments: AttachmentPlan[]): string | null {
+  const usd = /\bUSD\b|\bUS\s?\$/i;
+  return usd.test(email.bodyText) || attachments.some((a) => usd.test(a.extractedText ?? "")) ? "USD" : null;
+}
+
 function dateOf(email: ParsedEmail | null, env: Envelope): Date {
   return email?.effectiveDate ?? email?.sentAt ?? env.internalDate ?? new Date();
 }
@@ -284,7 +292,7 @@ async function knownOrders(): Promise<(KnownOrder & { invoiceRef: string | null 
   return rows.map((r) => ({ id: r.id, poNumber: r.poNumber, invoiceNumber: r.invoiceNumber, invoiceRef: r.invoiceRef, buyerDomains: r.domains ?? [] }));
 }
 
-function planAttachment(a: ParsedEmail["attachments"][number]): AttachmentPlan {
+export function planAttachment(a: ParsedEmail["attachments"][number]): AttachmentPlan {
   const base = { ...a, sha256: createHash("sha256").update(a.content).digest("hex"), po: null, trims: null, extractedText: null, extractError: null };
   if (!isSpreadsheet(a.filename, a.contentType)) return { ...base, kind: "other", extractStatus: "not_applicable" };
   try {
@@ -334,7 +342,7 @@ async function storeAndApply(
   // Upload first (outside the transaction), then record everything atomically.
   const rawPath = await blobs.put(await source.fetchRaw(env.uid), "message/rfc822");
   const attachmentPaths = await Promise.all(attachments.map((a) => blobs.put(a.content, a.contentType)));
-  const currencyHint = /\bUSD\b|\bUS\s?\$/i.test(email.bodyText) || attachments.some((a) => /\bUSD\b|\bUS\s?\$/i.test(a.extractedText ?? "")) ? "USD" : null;
+  const currencyHint = currencyHintOf(email, attachments);
   const date = dateOf(email, env);
   const hasPo = attachments.some((a) => a.po);
   const hasTrims = attachments.some((a) => a.trims);
