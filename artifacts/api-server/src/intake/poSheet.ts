@@ -72,9 +72,10 @@ const textOrNull = (c: Cell) => {
 export function extractPoSheet(sheets: Sheet[]): PoSheetData | null {
   for (const { grid } of sheets) {
     const poCell = labelValue(grid, "PO#", "PO #", "PO No", "PO Number", "Purchase Order #");
-    const poNumber = poCell === null ? null : cellText(typeof poCell === "number" ? Math.round(poCell) : poCell).replace(/\s/g, "");
+    // Any format: digits, letters and digits, dashes; it must contain a digit.
+    const poNumber = poCell === null ? null : cellText(typeof poCell === "number" ? Math.round(poCell) : poCell).trim();
     const gridHeader = findCell(grid, (t) => ["colors", "colours", "color", "colour"].includes(t));
-    if (!poNumber || !/^\d{3,}$/.test(poNumber) || !gridHeader) continue;
+    if (!poNumber || !/\d/.test(poNumber) || poNumber.length > 40 || !gridHeader) continue;
     return parse(grid, poNumber, gridHeader);
   }
   return null;

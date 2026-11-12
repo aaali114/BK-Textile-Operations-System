@@ -74,7 +74,8 @@ export async function createOrderWithInvoice(input: NewOrder, actor: Actor, sour
       const [existing] = await tx
         .select({ invoiceRef: ordersTable.invoiceRef, reference: ordersTable.reference })
         .from(ordersTable)
-        .where(sql`${ordersTable.buyerId} = ${buyer.id} AND ${ordersTable.poNumber} = ${poNumber}`);
+        // Same PO ignoring case, spaces and punctuation ("AC-PO-9812" = "acpo9812").
+        .where(sql`${ordersTable.buyerId} = ${buyer.id} AND upper(regexp_replace(${ordersTable.poNumber}, '[^A-Za-z0-9]', '', 'g')) = ${poNumber.toUpperCase().replace(/[^A-Z0-9]/g, "")}`);
       if (existing) {
         throw new OrderInputError(409, `PO ${poNumber} for ${buyer.name} already exists as ${existing.invoiceRef ?? existing.reference}.`);
       }

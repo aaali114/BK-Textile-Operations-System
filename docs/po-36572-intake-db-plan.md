@@ -134,13 +134,15 @@ The worker loads the known orders' `(buyer, po_number, invoice_ref)` values. Dur
 
 | evidence | result |
 |---|---|
-| a known PO number in the **subject** (`PO# 36572`, `PO 36572`, `PO#36572`, `purchase order # 36572`) | `matched` (`po_subject`) |
+| a known PO number in the **subject** (`PO# 36572`, `PO: AC-PO-9812`, `P.O. #SR0912ABC`, `purchase order # 36572`) | `matched` (`po_subject`) |
 | BK's invoice reference (`4040/BK-SAS/2026`, or `Inv 4040` / `BK Inv 4040` written by BK) in the subject or body | `matched` (`invoice_ref`) |
 | a reply in a thread already matched to the order (`In-Reply-To` / `References`) | `matched` (`thread`) |
 | a known PO number **only in the body** | `needs_review` (`po_body_only`): customers often cite older POs for repeat specs, so this never decides the order on its own |
 | the subject names two different known POs | `needs_review` on both |
 
-- PO numbers are whole numbers; `36572` inside a longer number does not count.
+- **PO numbers have no fixed format** (digits only, letters and digits, dashes, 9+ characters, per buyer). After a PO marker (`PO`, `PO#`, `P.O.`, `PO No.`, `Purchase Order #`) any value containing a digit counts, so "PO Box" or "PO for style" never do. `1234/1235` also yields each part.
+- **POs are compared ignoring case, spaces and punctuation**: `AC-PO-9812` = `ac po 9812` = `ACPO9812`. The order keeps the PO exactly as written on the PO sheet.
+- **A known or allow-listed PO is also found without a marker** ("AC-PO-9812 trims update"), but only if it contains letters or has at least 7 digits; a short all-digit PO needs a marker so quantities and prices are not mistaken for it. A PO is never matched inside a longer code (`ACPO98123` is not `ACPO9812`).
 - When two buyers could share a PO number, the sender's email domain (`bk_buyers.email_domains`) picks the buyer. Until domains are filled in, an ambiguous PO goes to `needs_review`.
 - **Never** take the PO number from artwork or label attachments: label layouts are often reused from earlier orders and still show the old PO number.
 

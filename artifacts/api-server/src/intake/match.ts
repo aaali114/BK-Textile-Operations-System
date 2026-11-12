@@ -1,3 +1,5 @@
+import { poKey } from "./text";
+
 /**
  * Matching rules (docs/po-36572-intake-db-plan.md -> Email matching):
  *  - a known PO number in the subject                 -> matched   (po_subject)
@@ -16,15 +18,51 @@ export type MatchInput = {
   fromAddress: string;
   /** Order IDs already linked to any message this one replies to or references. */
   threadOrderIds: string[];
+  /** Extra PO keys to look for without a "PO" marker (e.g. the allowlist). Known orders' POs are always included. */
+  watchPoKeys?: string[];
 };
 export type OrderLink = { orderId: string; matchStatus: "matched" | "needs_review"; matchMethod: "po_subject" | "invoice_ref" | "thread"; matchReason: string };
 export type MatchResult = { links: OrderLink[]; poNumbersInSubject: string[] };
 
-/** PO numbers written as "PO# 36572", "PO 36572", "P.O. #36572", "purchase order # 36572". */
+/**
+ * PO numbers after a PO marker ("PO", "PO#", "P.O.", "PO No.", "Purchase Order #"),
+ * in any format: "36572", "SR0912ABC", "AC-PO-9812", "4500123456789". The value
+ * must contain a digit, so "PO for style" or "PO Box" never count. Returns
+ * comparison keys (see poKey); "1234/1235" also yields each part.
+ */
 export function poNumbersIn(text: string): string[] {
   const found = new Set<string>();
-  for (const m of text.matchAll(/\b(?:p\.?\s?o\.?|purchase\s+order)\s*(?:no\.?|number|#)?\s*[:#]?\s*(\d{4,8})\b/gi)) found.add(m[1]!);
+  const re = /(?:^|[^A-Za-z0-9])(?:p\.?\s?o\.?|purchase\s+order)\s*(?:no\.?|num(?:ber)?\.?|#)?\s*[:#.\-]?\s*([A-Za-z0-9][A-Za-z0-9\-\/_.]{1,39})/gi;
+  for (const m of text.matchAll(re)) {
+    const token = m[1]!.replace(/[.\-_/]+$/, "");
+    if (!/\d/.test(token)) continue;
+    const key = poKey(token);
+    if (key.length < 3) continue;
+    found.add(key);
+    if (token.includes("/")) for (const part of token.split("/")) if (/\d/.test(part) && poKey(part).length >= 3) found.add(poKey(part));
+  }
   return [...found];
+}
+
+/**
+ * A known PO written anywhere, with any spacing or punctuation and no "PO"
+ * marker needed ("AC-PO-9812 trims", "ac po 9812"). Only for POs with letters
+ * or at least 7 digits: a short all-digit PO without a marker could be a
+ * quantity or a price.
+ */
+export function mentionsPo(text: string, key: string): boolean {
+  if (key.length < 3 || (!/[A-Z]/.test(key) && key.length < 7)) return false;
+  const pattern = key.split("").map((ch) => ch.replace(/[^A-Z0-9]/g, "\\$&")).join("[\\s\\-_./]*");
+  return new RegExp(`(?<![A-Za-z0-9])${pattern}(?![A-Za-z0-9])`, "i").test(text);
+}
+
+/** PO keys in the text: marked ones in any format, plus watched POs mentioned without a marker. */
+export function findPoKeys(text: string, watchKeys: Iterable<string> = []): string[] {
+  const found = new Set(poNumbersIn(text));
+  const watched = [...watchKeys].filter((key) => mentionsPo(text, key) || found.has(key));
+  for (const key of watched) found.add(key);
+  // Drop fragments of a watched PO ("-PO-9812" inside "AC-PO-9812" is not its own PO).
+  return [...found].filter((k) => !watched.some((w) => w !== k && w.includes(k)));
 }
 
 /** BK invoice references: "4040/BK-SAS/2026", "BK Inv 4040", "Inv# 4040", "Invoice 4040". */
@@ -37,13 +75,14 @@ export function invoiceNumbersIn(text: string): number[] {
 
 export function matchEmail(input: MatchInput, orders: KnownOrder[]): MatchResult {
   const subjects = [input.subject, ...input.forwardedSubjects].join(" \n ");
-  const pos = poNumbersIn(subjects);
+  const watch = [...orders.map((o) => (o.poNumber ? poKey(o.poNumber) : "")).filter(Boolean), ...(input.watchPoKeys ?? [])];
+  const pos = findPoKeys(subjects, watch);
   const invoices = invoiceNumbersIn(subjects);
   const senderDomain = input.fromAddress.split("@")[1] ?? "";
   const links = new Map<string, OrderLink>();
 
   for (const po of pos) {
-    const candidates = orders.filter((o) => o.poNumber === po);
+    const candidates = orders.filter((o) => o.poNumber !== null && poKey(o.poNumber) === po);
     const byDomain = candidates.filter((o) => o.buyerDomains.some((d) => senderDomain === d || senderDomain.endsWith(`.${d}`)));
     const chosen = candidates.length > 1 && byDomain.length === 1 ? byDomain : candidates;
     for (const o of chosen) {

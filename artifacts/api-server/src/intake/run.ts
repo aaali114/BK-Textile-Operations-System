@@ -13,11 +13,11 @@ import {
 } from "@workspace/db";
 import { createOrderWithInvoice, OrderInputError } from "../lib/orderCreation";
 import { applyPoSheet, applyTrimsSheet, linkedOrderIdsForMessages, logApplied, type ApplyContext } from "./apply";
-import { invoiceNumbersIn, matchEmail, poNumbersIn, type KnownOrder, type OrderLink } from "./match";
+import { findPoKeys, invoiceNumbersIn, matchEmail, type KnownOrder, type OrderLink } from "./match";
 import { parseEml, type ParsedEmail } from "./mime";
 import { extractPoSheet, type PoSheetData } from "./poSheet";
 import { isSpreadsheet, readWorkbook, sheetsToText } from "./spreadsheet";
-import { sameCompany } from "./text";
+import { poKey, sameCompany } from "./text";
 import { extractTrimsSheet, type TrimRow } from "./trimsSheet";
 
 export type Envelope = {
@@ -123,11 +123,12 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
 
     // ---- screen on envelopes only: nothing else is downloaded
     const known = await knownOrders();
-    const knownPos = new Set(known.map((o) => o.poNumber).filter((p): p is string => !!p));
+    const knownPos = new Set(known.map((o) => o.poNumber).filter((p): p is string => !!p).map(poKey));
     const knownInvoices = new Set(known.map((o) => o.invoiceNumber).filter((n): n is number => n !== null));
     let candidates: Envelope[] = [];
+    const watchKeys = [...new Set([...knownPos, ...poAllowlist])];
     for (const env of envelopes) {
-      const pos = poNumbersIn(env.subject);
+      const pos = findPoKeys(env.subject, watchKeys);
       const inThread = (await linkedOrderIdsForMessages([env.inReplyTo, ...env.references].filter((x): x is string => !!x))).length > 0;
       const relevant =
         pos.some((p) => poAllowlist.has(p)) ||
@@ -140,7 +141,7 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
       grew = false;
       const ids = new Set(candidates.map((c) => c.messageId).filter(Boolean));
       for (const env of envelopes) {
-        if (candidates.includes(env) || poNumbersIn(env.subject).some((p) => !poAllowlist.has(p) && !knownPos.has(p))) continue;
+        if (candidates.includes(env) || findPoKeys(env.subject, watchKeys).some((p) => !poAllowlist.has(p) && !knownPos.has(p))) continue;
         if ([env.inReplyTo, ...env.references].some((id) => id && ids.has(id))) {
           candidates.push(env);
           grew = true;
@@ -181,7 +182,7 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
         const parentIds = [email.inReplyTo, ...email.references].filter((x): x is string => !!x);
         const threadOrderIds = [...new Set([...(await linkedOrderIdsForMessages(parentIds)), ...parentIds.flatMap((id) => simulatedByMessage.get(id) ?? [])])];
         let { links, poNumbersInSubject } = matchEmail(
-          { subject: email.subject, forwardedSubjects: email.forwardedSubjects, fromAddress: email.fromAddress, threadOrderIds },
+          { subject: email.subject, forwardedSubjects: email.forwardedSubjects, fromAddress: email.fromAddress, threadOrderIds, watchPoKeys: [...poAllowlist] },
           orders,
         );
         // ---- a new allow-listed PO with its PO sheet attached becomes a new order
@@ -194,8 +195,8 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
           const sim = [...simulated.values()].find((v) => v.id === id)!;
           rep.orders.push({ invoiceRef: sim.invoiceRef, poNumber: id.slice(8), matchStatus: "matched", matchMethod: "thread", created: false });
         }
-        for (const po of poNumbersInSubject.filter((p) => poAllowlist.has(p) && !simulated.has(p) && !orders.some((o) => o.poNumber === p))) {
-          const sheet = attachments.find((a) => a.po?.poNumber === po)?.po;
+        for (const po of poNumbersInSubject.filter((p) => poAllowlist.has(p) && !simulated.has(p) && !orders.some((o) => o.poNumber && poKey(o.poNumber) === p))) {
+          const sheet = attachments.find((a) => a.po && poKey(a.po.poNumber) === po)?.po;
           if (!sheet) {
             rep.attachments.push({ filename: "-", kind: "note", changes: 0, warnings: [`PO ${po} is not in the system yet and this email has no PO sheet for it, so no order was created.`], skipped: null });
             continue;
@@ -206,13 +207,13 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
             continue;
           }
           createdOrderIds.add(created.id);
-          if (dryRun) simulated.set(po, { id: created.id, invoiceRef: created.invoiceRef ?? po });
-          rep.orders.push({ invoiceRef: created.invoiceRef, poNumber: po, matchStatus: "matched", matchMethod: "po_subject", created: true });
-          summary.ordersCreated.push(created.invoiceRef ?? `PO ${po}`);
+          if (dryRun) simulated.set(po, { id: created.id, invoiceRef: created.invoiceRef ?? sheet.poNumber });
+          rep.orders.push({ invoiceRef: created.invoiceRef, poNumber: sheet.poNumber, matchStatus: "matched", matchMethod: "po_subject", created: true });
+          summary.ordersCreated.push(created.invoiceRef ?? `PO ${sheet.poNumber}`);
           if (!dryRun) links = [...links.filter((l) => l.orderId !== created.id), { orderId: created.id, matchStatus: "matched", matchMethod: "po_subject", matchReason: `subject: PO ${po}; order created from its PO sheet` }];
         }
         // ---- the trial only stores emails about allow-listed POs
-        const allowedIds = new Set((await knownOrders()).filter((o) => o.poNumber && poAllowlist.has(o.poNumber)).map((o) => o.id));
+        const allowedIds = new Set((await knownOrders()).filter((o) => o.poNumber && poAllowlist.has(poKey(o.poNumber))).map((o) => o.id));
         links = links.filter((l) => allowedIds.has(l.orderId));
         for (const l of links) {
           const o = (await knownOrders()).find((x) => x.id === l.orderId)!;
