@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.4.0
+ * OpenAPI spec version: 0.5.0
  */
 import * as zod from 'zod';
 
@@ -715,6 +715,32 @@ export const SetOrderInvoiceNumberResponse = zod.object({
   "priority": zod.enum(['low', 'normal', 'high', 'urgent']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * Re-reads each email matched to the order, corrects its original date (e.g. the buyer's date inside a manual forward) and applies its PO and trims sheets again from oldest to newest, so the latest email wins. Staff edits to the same fields are overwritten; everything is logged.
+ * @summary Re-apply an order's stored emails in their original date order (admins only)
+ */
+export const ReapplyOrderEmailsParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const ReapplyOrderEmailsResponse = zod.object({
+  "orderId": zod.string().uuid(),
+  "emails": zod.array(zod.object({
+  "emailId": zod.string().uuid(),
+  "subject": zod.string(),
+  "previousDate": zod.coerce.date().nullable(),
+  "originalDate": zod.coerce.date().nullable(),
+  "attachments": zod.array(zod.object({
+  "filename": zod.string(),
+  "kind": zod.string(),
+  "changes": zod.number().int(),
+  "warnings": zod.array(zod.string()),
+  "skipped": zod.string().nullable()
+}))
+}))
 })
 
 

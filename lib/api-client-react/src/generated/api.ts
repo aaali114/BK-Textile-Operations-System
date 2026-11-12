@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.4.0
+ * OpenAPI spec version: 0.5.0
  */
 import {
   useMutation,
@@ -53,6 +53,7 @@ import type {
   OrderInvoiceUpdate,
   OrderTrim,
   OrderUpdate,
+  ReapplyReport,
   WorkItem,
   WorkItemUpdate
 } from './api.schemas';
@@ -2459,6 +2460,81 @@ export const useSetOrderInvoiceNumber = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getSetOrderInvoiceNumberMutationOptions(options), queryClient);
+    }
+
+export const getReapplyOrderEmailsUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/admin/orders/${orderId}/reapply-emails`
+}
+
+/**
+ * Re-reads each email matched to the order, corrects its original date (e.g. the buyer's date inside a manual forward) and applies its PO and trims sheets again from oldest to newest, so the latest email wins. Staff edits to the same fields are overwritten; everything is logged.
+ * @summary Re-apply an order's stored emails in their original date order (admins only)
+ */
+export const reapplyOrderEmails = async (orderId: string, options?: Parameters<typeof customFetch>[1]): Promise<ReapplyReport> => {
+
+  return customFetch<ReapplyReport>(getReapplyOrderEmailsUrl(orderId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReapplyOrderEmailsMutationKey = () => ['reapplyOrderEmails'] as const;
+
+export const getReapplyOrderEmailsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reapplyOrderEmails>>, TError,ReapplyOrderEmailsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reapplyOrderEmails>>, TError,ReapplyOrderEmailsMutationVariables, TContext> => {
+
+const mutationKey = getReapplyOrderEmailsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reapplyOrderEmails>>, ReapplyOrderEmailsMutationVariables> = (props) => {
+          const {orderId} = props ?? {};
+
+          return  reapplyOrderEmails(orderId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReapplyOrderEmailsMutationResult = NonNullable<Awaited<ReturnType<typeof reapplyOrderEmails>>>
+
+    export type ReapplyOrderEmailsMutationError = ErrorType<void>
+    export type ReapplyOrderEmailsMutationVariables = {orderId: string}
+
+    /**
+ * @summary Re-apply an order's stored emails in their original date order (admins only)
+ */
+export const useReapplyOrderEmails = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reapplyOrderEmails>>, TError,ReapplyOrderEmailsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reapplyOrderEmails>>,
+        TError,
+        ReapplyOrderEmailsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReapplyOrderEmailsMutationOptions(options), queryClient);
     }
 
 export const getRunEmailIntakeUrl = () => {

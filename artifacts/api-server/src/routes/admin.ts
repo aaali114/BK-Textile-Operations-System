@@ -5,6 +5,8 @@ import {
   GetBuyersResponse,
   GetCurrentUserResponse,
   GetInvoiceCounterResponse,
+  ReapplyOrderEmailsParams,
+  ReapplyOrderEmailsResponse,
   RunEmailIntakeBody,
   RunEmailIntakeResponse,
   SetInvoiceCounterBody,
@@ -18,7 +20,8 @@ import { isAdmin, requireAdmin } from "../lib/admin";
 import { getAuditActor } from "../lib/auditActor";
 import { getInvoiceCounter, InvoiceAdminError, setInvoiceCounter, setOrderInvoiceNumber } from "../lib/invoiceAdmin";
 import { IntakeConfigError } from "../intake/config";
-import { runMailboxIntake } from "../intake/service";
+import { reapplyOrder, runMailboxIntake } from "../intake/service";
+import { orderExists } from "../lib/orderDetail";
 
 const router: IRouter = Router();
 
@@ -95,6 +98,26 @@ router.post("/admin/intake/run", requireAdmin, async (req, res): Promise<void> =
     }
     req.log.error({ err: (error as Error).message }, "Email intake run failed");
     res.status(502).json({ error: `Mailbox run failed: ${(error as Error).message}` });
+  }
+});
+
+router.post("/admin/orders/:orderId/reapply-emails", requireAdmin, async (req, res): Promise<void> => {
+  const params = ReapplyOrderEmailsParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  if (!(await orderExists(params.data.orderId))) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+  try {
+    const report = await reapplyOrder(params.data.orderId, getAuditActor(req));
+    req.log.info({ orderId: params.data.orderId, emails: report.emails.length }, "Order emails re-applied");
+    res.json(ReapplyOrderEmailsResponse.parse(report));
+  } catch (error) {
+    req.log.error({ err: (error as Error).message }, "Re-apply failed");
+    res.status(502).json({ error: `Re-apply failed: ${(error as Error).message}` });
   }
 });
 

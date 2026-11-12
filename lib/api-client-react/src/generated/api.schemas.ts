@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.4.0
+ * OpenAPI spec version: 0.5.0
  */
 export interface HealthStatus {
   status: string;
@@ -621,6 +621,30 @@ export interface OrderInvoiceUpdate {
      * @maxLength 500
      */
   reason: string;
+}
+
+export type ReapplyReportEmailsItemAttachmentsItem = {
+  filename: string;
+  kind: string;
+  changes: number;
+  warnings: string[];
+  /** @nullable */
+  skipped: string | null;
+};
+
+export type ReapplyReportEmailsItem = {
+  emailId: string;
+  subject: string;
+  /** @nullable */
+  previousDate: string | null;
+  /** @nullable */
+  originalDate: string | null;
+  attachments: ReapplyReportEmailsItemAttachmentsItem[];
+};
+
+export interface ReapplyReport {
+  orderId: string;
+  emails: ReapplyReportEmailsItem[];
 }
 
 export interface IntakeRunRequest {

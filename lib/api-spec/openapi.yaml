@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.4.0
+  version: 0.5.0
   description: B.K. Textile operations API
 servers:
   - url: /api
@@ -422,6 +422,26 @@ paths:
         "403": { description: Not an admin }
         "404": { description: Order not found }
         "409": { description: "Invoice number already used by another order, or order has no buyer" }
+  /admin/orders/{orderId}/reapply-emails:
+    post:
+      operationId: reapplyOrderEmails
+      tags: [admin]
+      summary: Re-apply an order's stored emails in their original date order (admins only)
+      description: >-
+        Re-reads each email matched to the order, corrects its original date
+        (e.g. the buyer's date inside a manual forward) and applies its PO and
+        trims sheets again from oldest to newest, so the latest email wins.
+        Staff edits to the same fields are overwritten; everything is logged.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: What was re-applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReapplyReport" }
+        "403": { description: Not an admin }
+        "404": { description: Order not found }
   /admin/intake/run:
     post:
       operationId: runEmailIntake
@@ -901,6 +921,32 @@ components:
       properties:
         invoiceNumber: { type: integer, minimum: 1 }
         reason: { type: string, minLength: 3, maxLength: 500 }
+    ReapplyReport:
+      type: object
+      required: [orderId, emails]
+      properties:
+        orderId: { type: string, format: uuid }
+        emails:
+          type: array
+          items:
+            type: object
+            required: [emailId, subject, previousDate, originalDate, attachments]
+            properties:
+              emailId: { type: string, format: uuid }
+              subject: { type: string }
+              previousDate: { type: ["string", "null"], format: date-time }
+              originalDate: { type: ["string", "null"], format: date-time }
+              attachments:
+                type: array
+                items:
+                  type: object
+                  required: [filename, kind, changes, warnings, skipped]
+                  properties:
+                    filename: { type: string }
+                    kind: { type: string }
+                    changes: { type: integer }
+                    warnings: { type: array, items: { type: string } }
+                    skipped: { type: ["string", "null"] }
     IntakeRunRequest:
       type: object
       required: [dryRun]

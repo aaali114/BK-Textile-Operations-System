@@ -42,6 +42,7 @@ requests to seed a database. Real data is approved only for PO 36572 (BK Inv.
     mailbox reader: offer "Preview (dry run)" and "Read mailbox now" buttons
     in the admin panel and show the returned summary (per email: outcome,
     orders, and per attachment: kind, number of changes, warnings).
+- **API 0.5.0:** admin-only `useReapplyOrderEmails(orderId)`: add a "Re-apply emails" action next to "Override invoice number" on the order page, with a confirmation that staff edits to the same fields will be overwritten, then show the report (per email: original date, and per attachment: kind and number of changes) and refresh the order.
 - Not yet: manual import of a missed email, staff editing of
   lines/grid/fabrics/trims.
 - Owner decisions that change these requests:

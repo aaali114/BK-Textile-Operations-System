@@ -1,11 +1,19 @@
 import { readIntakeConfig } from "./config";
 import { ImapMailSource } from "./imap";
-import { runIntake, type BlobStore } from "./run";
+import { runIntake, type BlobReader, type BlobStore } from "./run";
+import { reapplyOrderEmails } from "./reapply";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 
 const storage = new ObjectStorageService();
-export const objectStorageBlobs: BlobStore = { put: (content, contentType) => storage.saveObjectEntity(content, contentType, "intake") };
+export const objectStorageBlobs: BlobStore & BlobReader = {
+  put: (content, contentType) => storage.saveObjectEntity(content, contentType, "intake"),
+  get: (objectPath) => storage.readObjectEntity(objectPath),
+};
+
+export function reapplyOrder(orderId: string, actor: { id: string; label: string }) {
+  return reapplyOrderEmails(orderId, objectStorageBlobs, actor);
+}
 
 /** One run against the real mailbox using the Replit secrets. */
 export async function runMailboxIntake(opts: { dryRun: boolean; rescanFromUid?: number }) {
