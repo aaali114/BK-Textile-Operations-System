@@ -1,4 +1,4 @@
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
@@ -7,23 +7,20 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { Link, Redirect, Route, Switch, Router as WouterRouter, useLocation, useParams } from 'wouter';
+import { Link, Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import {
-  Activity, AlertCircle, ArrowLeft, ArrowRight, Boxes, Check, CircleHelp,
-  ClipboardCheck, Clock3, Download, Factory, FilePlus2, LayoutDashboard, LogIn, LogOut, Menu, PackageCheck,
-  Plus, Search, Shirt, Upload, X,
+  Activity, AlertCircle, ArrowLeft, ArrowRight, Boxes, Check, ClipboardCheck, Clock3, Factory, LayoutDashboard, LogIn, LogOut, Menu, PackageCheck,
+  Plus, Shirt, X,
 } from 'lucide-react';
 import {
   getGetDashboardSummaryQueryKey, getGetInspectionsQueryKey, getGetMaterialsQueryKey,
-  getGetOrderActivityQueryKey, getGetOrderFilesQueryKey, getGetOrderQueryKey, getGetOrdersQueryKey, getGetWorkItemsQueryKey, getHealthCheckQueryKey,
-  useCompleteOrderFileUpload, useGetOrderFiles, useRequestOrderFileUpload,
-  useCreateInspection, useCreateMaterialLot, useCreateOrder, useGetDashboardSummary,
-  useGetInspections, useGetMaterials, useGetOrder, useGetOrderActivity, useGetOrders, useGetWorkItems,
-  useHealthCheck, useUpdateOrder, useUpdateWorkItem,
+  getGetWorkItemsQueryKey, useCreateInspection, useCreateMaterialLot, useGetDashboardSummary,
+  useGetInspections, useGetMaterials, useGetOrders, useGetWorkItems,
+  useHealthCheck, useUpdateWorkItem,
 } from '@workspace/api-client-react';
 import type {
   DashboardSummary, Department, Inspection, InspectionInput, MaterialLot, MaterialLotInput,
-  Order, OrderActivity, OrderFile, OrderInput, OrderStatus, Priority, WorkItem, WorkItemStatus,
+  Order, WorkItem, WorkItemStatus,
 } from '@workspace/api-client-react';
 
 const queryClient = new QueryClient();
@@ -143,30 +140,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
   </div>;
 }
 
-function PageHeading({ eyebrow, title, subtitle, action }: { eyebrow: string; title: string; subtitle?: string; action?: React.ReactNode }) {
-  return <div className="page-title-row"><div><div className="eyebrow">{eyebrow}</div><h1 className="page-title">{title}</h1>{subtitle && <p className="page-subtitle">{subtitle}</p>}</div>{action}</div>;
-}
-function PageFrame({ children }: { children: React.ReactNode }) { return <main className="page-wrap">{children}</main>; }
-function Notice({ message, error = false, onClose }: { message: string; error?: boolean; onClose?: () => void }) {
-  return <div role={error ? 'alert' : 'status'} className={`feedback ${error ? 'error' : 'success'}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>{message}</span>{onClose && <button onClick={onClose} aria-label="Dismiss message" className="icon-btn" style={{ width: 26, height: 26, border: 0, background: 'transparent' }}><X size={15} /></button>}</div>;
-}
-function QueryError({ onRetry }: { onRetry: () => void }) {
-  return <div className="blank-state"><div className="blank-icon"><AlertCircle size={18} /></div><p className="blank-title">Could not load this view</p><p style={{ fontSize: 12, margin: '0 0 16px' }}>Check the service connection, then try again.</p><button className="btn btn-quiet" onClick={onRetry}>Retry</button></div>;
-}
-function SkeletonRows({ count = 5 }: { count?: number }) { return <div aria-label="Loading records">{Array.from({ length: count }).map((_, i) => <div key={i} style={{ height: 46, margin: '9px 15px', borderRadius: 4, background: 'linear-gradient(90deg,#efede6,#f7f5ef,#efede6)', backgroundSize: '200% 100%', animation: 'skeleton 1.3s infinite' }} />)}</div>; }
-function EmptyState({ title, text, action }: { title: string; text: string; action?: React.ReactNode }) { return <div className="blank-state"><div className="blank-icon"><CircleHelp size={18} /></div><p className="blank-title">{title}</p><p style={{ fontSize: 12, margin: '0 0 16px' }}>{text}</p>{action}</div>; }
-function statusLabel(value: string) { return value.replaceAll('_', ' '); }
-function StatusPill({ status }: { status: string }) {
-  const warn = ['pending_qc', 'development', 'blocked', 'high', 'urgent'].includes(status);
-  const danger = ['hold', 'rejected', 'overdue'].includes(status);
-  const blue = ['in_production', 'in_progress', 'ready_to_ship', 'accepted', 'available'].includes(status);
-  return <span className={`status-pill ${danger ? 'danger' : warn ? 'warn' : blue ? 'blue' : 'neutral'}`}><span className={`severity-dot ${danger ? 'critical' : blue ? 'info' : ''}`} style={{ width: 5, height: 5, margin: 0 }} />{statusLabel(status)}</span>;
-}
-function DataDisclaimer() { return <div style={{ fontSize: 10, color: '#87918a', marginTop: 12, display: 'flex', gap: 7, alignItems: 'center' }}><AlertCircle size={13} />All records shown are synthetic demonstration data supplied by the backend.</div>; }
-function dateText(date?: string | null) { if (!date) return '—'; const parsed = new Date(date); return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
-function numberText(value?: number) { return typeof value === 'number' ? value.toLocaleString() : '—'; }
-function toInputDate(value?: string) { return value ? value.slice(0, 10) : ''; }
-function errorMessage(error: unknown) { return error instanceof Error ? error.message : 'Something went wrong. Please try again.'; }
+import { EmptyState, Notice, PageFrame, PageHeading, QueryError, SkeletonRows, StatusPill, dateText, errorMessage, numberText, statusLabel } from '@/components/orders/ui';
+import { Orders } from '@/components/orders/OrdersPage';
+import { OrderDetails } from '@/components/orders/OrderDetailPage';
 
 function PublicHome() {
   return <main className="public-hero">
@@ -175,7 +151,7 @@ function PublicHome() {
       <div><div className="hero-kicker">B.K. Textile · Internal operations</div><h1 className="hero-title">Every order.<br />Every handoff.<br /><span style={{ color: '#dfb760' }}>In view.</span></h1>
         <p className="hero-desc">A shared work system for the daily movement of garment orders—from buyer requirements and department workload to incoming lots and inspection results.</p>
         <div className="hero-ctas"><Link href="/sign-in" className="btn btn-gold">Sign in to operations <ArrowRight size={15} /></Link><Link href="/sign-up" className="btn btn-quiet" style={{ background: 'transparent', color: '#d4dfd9', borderColor: '#ffffff45' }}>Request access</Link></div>
-        <p style={{ color: '#93a6a2', fontSize: 11, marginTop: 18 }}>Initial system slice · synthetic demonstration records only</p>
+        <p style={{ color: '#93a6a2', fontSize: 11, marginTop: 18 }}>Authorized B.K. Textile staff only</p>
       </div>
       <div className="hero-visual" aria-label="Abstract woven textile swatch illustration"><div className="fabric-lines" /><div className="swatch" /><div className="hero-index">01 / 04 — MATERIAL FLOW</div><div className="visual-label">FROM RECEIPT TO READY-TO-CUT</div></div>
     </section>
@@ -212,217 +188,6 @@ function Dashboard() {
           </section>
         </div>
       </div>
-      <DataDisclaimer />
-    </>}
-  </PageFrame>;
-}
-
-type OrderFormData = Omit<OrderInput, 'orderValue' | 'currencyCode'> & { orderValue: number | null; currencyCode: string | null };
-function OrderForm({ onSubmit, busy, initial, onCancel }: { onSubmit: (data: OrderFormData) => void; busy: boolean; initial?: Order; onCancel?: () => void }) {
-  const [form, setForm] = useState({ buyer: initial?.buyer ?? '', agencyName: initial?.agencyName ?? '', previousOrderReference: initial?.previousOrderReference ?? '', orderValue: initial?.orderValue?.toString() ?? '', currencyCode: initial?.currencyCode ?? '', poNumber: initial?.poNumber ?? '', style: initial?.style ?? '', description: initial?.description ?? '', quantity: initial?.quantity?.toString() ?? '', deliveryDate: toInputDate(initial?.deliveryDate), priority: initial?.priority ?? 'normal' as Priority });
-  const set = (key: keyof typeof form, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
-    const currencyCode = form.currencyCode.trim().toUpperCase();
-    onSubmit({
-      buyer: form.buyer.trim(),
-      agencyName: form.agencyName.trim(),
-      previousOrderReference: form.previousOrderReference.trim(),
-      orderValue: form.orderValue.trim() ? Number(form.orderValue) : null,
-      currencyCode: currencyCode || null,
-      poNumber: form.poNumber.trim(),
-      style: form.style.trim(),
-      description: form.description.trim(),
-      quantity: Number(form.quantity),
-      deliveryDate: form.deliveryDate,
-      priority: form.priority as Priority,
-    });
-  };
-  return <form onSubmit={submit}><div className="form-grid">
-    <div className="form-field"><label htmlFor="order-buyer">Buyer name *</label><input id="order-buyer" className="field" required value={form.buyer} onChange={(e) => set('buyer', e.target.value)} data-testid="input-order-buyer" /></div>
-    <div className="form-field"><label htmlFor="order-agency">Agency <span className="optional-label">Optional</span></label><input id="order-agency" className="field" value={form.agencyName} onChange={(e) => set('agencyName', e.target.value)} /></div>
-    <div className="form-field"><label htmlFor="order-previous">Previous order reference <span className="optional-label">Optional</span></label><input id="order-previous" className="field" value={form.previousOrderReference} onChange={(e) => set('previousOrderReference', e.target.value)} /></div>
-    <div className="form-field"><label htmlFor="order-value">Order value <span className="optional-label">Optional</span></label><div className="currency-input"><input id="order-value" className="field" type="number" min="0" step="0.01" required={!!form.currencyCode} value={form.orderValue} onChange={(e) => set('orderValue', e.target.value)} placeholder="0.00" /><input aria-label="3-letter currency code" className="field currency-code" maxLength={3} minLength={3} pattern="[A-Za-z]{3}" required={!!form.orderValue} value={form.currencyCode} onChange={(e) => set('currencyCode', e.target.value.toUpperCase())} placeholder="USD" /></div></div>
-    <div className="form-field"><label htmlFor="order-po">Buyer PO reference</label><input id="order-po" className="field" value={form.poNumber} onChange={(e) => set('poNumber', e.target.value)} /></div>
-    <div className="form-field"><label htmlFor="order-style">Style *</label><input id="order-style" className="field" required value={form.style} onChange={(e) => set('style', e.target.value)} /></div>
-    <div className="form-field"><label htmlFor="order-qty">Quantity *</label><input id="order-qty" className="field" type="number" min="1" required value={form.quantity} onChange={(e) => set('quantity', e.target.value)} /></div>
-    <div className="form-field"><label htmlFor="order-delivery">Delivery date *</label><input id="order-delivery" className="field" type="date" required value={form.deliveryDate} onChange={(e) => set('deliveryDate', e.target.value)} /></div>
-    <div className="form-field"><label htmlFor="order-priority">Priority</label><select id="order-priority" className="select" value={form.priority} onChange={(e) => set('priority', e.target.value)}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
-    <div className="form-field full"><label htmlFor="order-description">Order notes</label><textarea id="order-description" className="textarea" rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} /></div>
-  </div><div className="modal-actions">{onCancel && <button type="button" className="btn btn-quiet" onClick={onCancel}>Cancel</button>}<button className="btn btn-primary" disabled={busy} type="submit">{busy ? 'Saving…' : initial ? 'Save order changes' : 'Create order'}</button></div></form>;
-}
-function Orders() {
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
-  const [modal, setModal] = useState(false);
-  const [notice, setNotice] = useState<{ message: string; error?: boolean } | null>(null);
-  const params = useMemo(() => ({ search: search || undefined, status: status ? status as OrderStatus : undefined }), [search, status]);
-  const query = useGetOrders(params);
-  const create = useCreateOrder();
-  const client = useQueryClient();
-  const save = (formData: OrderFormData) => {
-    const data: OrderInput = {
-      ...formData,
-      orderValue: formData.orderValue ?? undefined,
-      currencyCode: formData.currencyCode ?? undefined,
-    };
-    return create.mutate({ data }, {
-    onSuccess: () => { void client.invalidateQueries({ queryKey: getGetOrdersQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); setNotice({ message: 'Order created and added to the register.' }); setModal(false); },
-    onError: (err) => setNotice({ message: errorMessage(err), error: true }),
-    });
-  };
-  const orders = query.data as Order[] | undefined;
-  return <PageFrame><PageHeading eyebrow="Production office · Register" title="Order register" subtitle="Buyer commitments, delivery dates and production status in one place." action={<button className="btn btn-primary" onClick={() => { setModal(true); setNotice(null); }} data-testid="button-create-order"><Plus size={16} />Create order</button>} />
-    {notice && <Notice message={notice.message} error={notice.error} onClose={() => setNotice(null)} />}
-    <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Order book</p><h2 className="panel-title">Orders <span className="mono" style={{ fontSize: 11, color: '#82908a', fontWeight: 400 }}>{orders ? `· ${orders.length}` : ''}</span></h2></div><div className="table-tools">
-      <div className="search-field"><Search size={15} /><input className="field" placeholder="Search buyer, style, reference…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search orders" data-testid="input-search-orders" /></div>
-      <select className="select" aria-label="Filter by order status" value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: 160 }}><option value="">All statuses</option>{['draft', 'development', 'in_production', 'ready_to_ship', 'shipped'].map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}</select>
-    </div></div>
-      {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <SkeletonRows /> : !orders?.length ? <EmptyState title={search || status ? 'No matching orders' : 'The order register is clear'} text={search || status ? 'Adjust the search or status filter to see other orders.' : 'Create the first order to begin tracking buyer commitments.'} action={!search && !status ? <button className="btn btn-primary" onClick={() => setModal(true)}><Plus size={15} />Create order</button> : undefined} /> :
-       <div className="table-scroll"><table className="data-table"><thead><tr><th>Reference / buyer</th><th>Style</th><th>Order value</th><th>Qty</th><th>Delivery</th><th>Priority</th><th>Status</th><th aria-label="Details" /></tr></thead><tbody>{orders.map((order) => <tr key={order.id} data-testid={`row-order-${order.id}`}><td><Link href={`/orders/${order.id}`} className="ref-link">{order.reference}</Link><div style={{ fontSize: 11, color: '#7d8984', marginTop: 4 }}>{order.buyer}{order.poNumber && <span> · PO {order.poNumber}</span>}</div>{(order.agencyName || order.previousOrderReference) && <div className="register-context">{order.agencyName && <span>{order.agencyName}</span>}{order.previousOrderReference && <span>Prev. {order.previousOrderReference}</span>}</div>}</td><td><strong>{order.style}</strong></td><td className="mono">{order.orderValue != null ? `${order.currencyCode || ''} ${Number(order.orderValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim() : '—'}</td><td className="mono">{numberText(order.quantity)}</td><td>{dateText(order.deliveryDate)}</td><td><span className={`priority-marker ${order.priority}`}>{order.priority}</span></td><td><StatusPill status={order.status} /></td><td><Link href={`/orders/${order.id}`} className="ref-link" aria-label={`View ${order.reference}`}><ArrowRight size={16} /></Link></td></tr>)}</tbody></table></div>}
-     </section>
-    {modal && <div className="modal-scrim" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setModal(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="create-order-title"><div className="modal-head"><div><div className="eyebrow">New buyer commitment</div><h2 id="create-order-title" className="panel-title" style={{ fontSize: 20 }}>Create order</h2></div><button className="icon-btn" aria-label="Close" onClick={() => setModal(false)}><X size={17} /></button></div><div className="modal-content"><OrderForm onSubmit={save} busy={create.isPending} onCancel={() => setModal(false)} /></div></section></div>}
-  </PageFrame>;
-}
-
-function OrderFilesPanel({ orderId }: { orderId: string }) {
-  const client = useQueryClient();
-  const filesQuery = useGetOrderFiles(orderId, { query: { queryKey: getGetOrderFilesQueryKey(orderId), enabled: !!orderId } });
-  const requestUpload = useRequestOrderFileUpload();
-  const completeUpload = useCompleteOrderFileUpload();
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<{ message: string; error?: boolean } | null>(null);
-  const documentsInput = useRef<HTMLInputElement>(null);
-  const imagesInput = useRef<HTMLInputElement>(null);
-  const files = filesQuery.data as OrderFile[] | undefined;
-  const documents = files?.filter((file) => file.fileType === 'document') ?? [];
-  const images = files?.filter((file) => file.fileType === 'garment_image') ?? [];
-
-  const uploadFile = async (file: File, fileType: 'document' | 'garment_image') => {
-    setBusy(true);
-    setNotice(null);
-    try {
-      const requested = await requestUpload.mutateAsync({
-        orderId,
-        data: { fileType, name: file.name, contentType: file.type, sizeBytes: file.size },
-      });
-      const put = await fetch(requested.uploadURL, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type },
-        body: file,
-      });
-      if (!put.ok) throw new Error(`Private storage rejected the upload (${put.status}).`);
-      await completeUpload.mutateAsync({ orderId, fileId: requested.fileId });
-      await client.invalidateQueries({ queryKey: getGetOrderFilesQueryKey(orderId) });
-      setNotice({ message: `${file.name} uploaded to this order.` });
-    } catch (error) {
-      setNotice({ message: errorMessage(error), error: true });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const selectFile = (fileType: 'document' | 'garment_image') => (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = '';
-    if (file) void uploadFile(file, fileType);
-  };
-
-  const uploadButton = (label: string, onClick: () => void) => (
-    <button className="btn btn-quiet" type="button" onClick={onClick} disabled={busy}>
-      <Upload size={14} />{busy ? 'Uploading…' : label}
-    </button>
-  );
-
-  const fileDetails = (file: OrderFile) => (
-    <span>
-      {file.uploadedByName} · {new Date(file.uploadedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-    </span>
-  );
-
-  return <>
-    {notice && <Notice message={notice.message} error={notice.error} onClose={() => setNotice(null)} />}
-    <div className="order-support-grid">
-      <section className="panel">
-        <div className="panel-head">
-          <div><p className="panel-kicker">Reference material</p><h2 className="panel-title">Documents</h2></div>
-          {uploadButton('Add document', () => documentsInput.current?.click())}
-          <input ref={documentsInput} hidden type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain" onChange={selectFile('document')} />
-        </div>
-        {filesQuery.isError ? <div className="document-list"><QueryError onRetry={() => filesQuery.refetch()} /></div> : filesQuery.isLoading ? <div className="document-list"><SkeletonRows count={2} /></div> : <div className="document-list">
-          {documents.length ? documents.map((file) => <div className="document-row" key={file.id}>
-            <span className="document-icon"><FilePlus2 size={16} /></span>
-            <div className="document-copy"><strong>{file.originalName}</strong>{fileDetails(file)}</div>
-            <a className="btn btn-quiet file-download" href={`/api/orders/${orderId}/files/${file.id}/content`} aria-label={`Download ${file.originalName}`}><Download size={14} />Download</a>
-          </div>) : <p className="support-note">No order documents uploaded. Files are stored privately on this order.</p>}
-        </div>}
-      </section>
-      <section className="panel">
-        <div className="panel-head">
-          <div><p className="panel-kicker">Style reference</p><h2 className="panel-title">Garment pictures</h2></div>
-          {uploadButton('Add picture', () => imagesInput.current?.click())}
-          <input ref={imagesInput} hidden type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={selectFile('garment_image')} />
-        </div>
-        {filesQuery.isError ? <div className="document-list"><QueryError onRetry={() => filesQuery.refetch()} /></div> : filesQuery.isLoading ? <div className="document-list"><SkeletonRows count={2} /></div> : images.length ? <div className="garment-image-list">
-          {images.map((file) => <article className="garment-image-card" key={file.id}>
-            <a href={`/api/orders/${orderId}/files/${file.id}/preview`} target="_blank" rel="noreferrer" aria-label={`View ${file.originalName}`}>
-              <img src={`/api/orders/${orderId}/files/${file.id}/preview`} alt={file.originalName} loading="lazy" />
-            </a>
-            <div className="document-copy"><strong>{file.originalName}</strong>{fileDetails(file)}</div>
-            <a className="icon-btn" href={`/api/orders/${orderId}/files/${file.id}/content`} aria-label={`Download ${file.originalName}`}><Download size={15} /></a>
-          </article>)}
-        </div> : <div className="image-unavailable"><Shirt size={24} strokeWidth={1.5} /><strong>No garment pictures uploaded</strong><span>Upload a JPEG, PNG, or WebP image (up to 25 MB) for this order.</span></div>}
-      </section>
-    </div>
-  </>;
-}
-
-function OrderDetails() {
-  const { orderId = '' } = useParams<{ orderId: string }>();
-  const query = useGetOrder(orderId, { query: { queryKey: getGetOrderQueryKey(orderId), enabled: !!orderId } });
-  const activityQuery = useGetOrderActivity(orderId, { query: { queryKey: getGetOrderActivityQueryKey(orderId), enabled: !!orderId } });
-  const update = useUpdateOrder();
-  const client = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const [notice, setNotice] = useState<{ message: string; error?: boolean } | null>(null);
-  const order = query.data as Order | undefined;
-  const save = (input: OrderFormData) => update.mutate({ orderId, data: input }, {
-     onSuccess: (saved) => { client.setQueryData(getGetOrderQueryKey(orderId), saved); void client.invalidateQueries({ queryKey: getGetOrdersQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); void client.invalidateQueries({ queryKey: getGetOrderActivityQueryKey(orderId) }); setEditing(false); setNotice({ message: 'Order details saved.' }); },
-    onError: (err) => setNotice({ message: errorMessage(err), error: true }),
-  });
-  const changeStatus = (next: string) => update.mutate({ orderId, data: { status: next as OrderStatus } }, {
-     onSuccess: (saved) => { client.setQueryData(getGetOrderQueryKey(orderId), saved); void client.invalidateQueries({ queryKey: getGetOrdersQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); void client.invalidateQueries({ queryKey: getGetOrderActivityQueryKey(orderId) }); setNotice({ message: 'Order status updated.' }); },
-    onError: (err) => setNotice({ message: errorMessage(err), error: true }),
-  });
-  return <PageFrame><div style={{ marginBottom: 22 }}><Link href="/orders" className="ref-link"><ArrowLeft size={14} style={{ verticalAlign: 'middle', marginRight: 5 }} />Back to order register</Link></div>
-    {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <div className="panel"><SkeletonRows /></div> : order && <>
-      <PageHeading eyebrow={`Order record · ${order.reference}`} title={order.buyer} subtitle={`${order.style}${order.poNumber ? ` · Buyer PO ${order.poNumber}` : ''}`} action={<button className="btn btn-quiet" onClick={() => { setEditing(!editing); setNotice(null); }}><FilePlus2 size={15} />{editing ? 'Cancel edit' : 'Edit order'}</button>} />
-      {notice && <Notice message={notice.message} error={notice.error} onClose={() => setNotice(null)} />}
-       <section className="panel commercial-record" aria-label="Commercial order record">
-         <div className="record-banner"><div><div className="eyebrow">Commercial record</div><div className="record-ref mono">{order.reference}</div></div><div className="record-amount"><span className="detail-label">Order value</span><strong>{order.orderValue != null ? `${order.currencyCode || ''} ${Number(order.orderValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim() : 'Not provided'}</strong></div></div>
-         <div className="detail-grid">
-           {[
-             ['Buyer', order.buyer],
-             ['Agency', order.agencyName || 'Not provided'],
-             ['Previous order', order.previousOrderReference || 'Not provided'],
-             ['Buyer PO', order.poNumber || 'Not provided'],
-             ['Style', order.style],
-             ['Quantity', numberText(order.quantity)],
-             ['Delivery date', dateText(order.deliveryDate)],
-             ['Currency', order.currencyCode || 'Not provided'],
-             ['Last updated', dateText(order.updatedAt)],
-           ].map(([label, value]) => <div className="detail-cell" key={label}><div className="detail-label">{label}</div><div className="detail-value">{value}</div></div>)}
-         </div>
-       </section>
-      <section className="panel" style={{ marginBottom: 18 }}><div className="panel-head"><div><p className="panel-kicker">Production control</p><h2 className="panel-title">Order status & priority</h2></div><StatusPill status={order.status} /></div>
-        <div style={{ padding: 20, display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'end' }}><div className="form-field"><label htmlFor="detail-status">Status</label><select id="detail-status" className="select status-select" value={order.status} disabled={update.isPending} onChange={(e) => changeStatus(e.target.value)}>{['draft', 'development', 'in_production', 'ready_to_ship', 'shipped'].map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}</select></div><div className="form-field"><label>Priority</label><div className={`priority-marker ${order.priority}`}>{order.priority}</div></div><div className="form-field"><label>Created</label><div style={{ fontSize: 12, color: '#5d706c' }}>{dateText(order.createdAt)}</div></div></div>
-      </section>
-      {editing && <section className="panel" style={{ marginBottom: 18 }}><div className="panel-head"><div><p className="panel-kicker">Editable fields</p><h2 className="panel-title">Update order information</h2></div></div><div style={{ padding: 22 }}><OrderForm initial={order} onSubmit={save} busy={update.isPending} onCancel={() => setEditing(false)} /></div></section>}
-        <OrderFilesPanel orderId={orderId} />
-       <section className="panel order-description"><div className="panel-head"><div><p className="panel-kicker">Production notes</p><h2 className="panel-title">Description</h2></div></div><div className="description-body">{order.description || <span className="muted-copy">No order notes have been added.</span>}</div></section>
-       <section className="panel order-activity"><div className="panel-head"><div><p className="panel-kicker">Record history</p><h2 className="panel-title">Order activity</h2></div><Activity size={16} color="#66807e" /></div>
-         {activityQuery.isError ? <QueryError onRetry={() => activityQuery.refetch()} /> : activityQuery.isLoading ? <SkeletonRows count={3} /> : (activityQuery.data as OrderActivity[] | undefined)?.length ? <div className="order-timeline">{(activityQuery.data as OrderActivity[]).map((item) => <article className="timeline-entry" key={item.id} data-testid={`activity-${item.id}`}><span className="timeline-node" aria-hidden="true" /><div className="timeline-content"><div className="timeline-top"><strong>{item.actor}</strong><time dateTime={item.occurredAt}>{new Date(item.occurredAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time></div><p>{item.description}</p></div></article>)}</div> : <EmptyState title="No activity recorded" text="Updates to this order will appear here with the staff member and time." />}
-       </section>
     </>}
   </PageFrame>;
 }
@@ -446,7 +211,7 @@ function Workflows() {
     <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Work items</p><h2 className="panel-title">Current department queue {items ? <span className="mono" style={{ fontSize: 11, color: '#82908a', fontWeight: 400 }}>· {items.length}</span> : null}</h2></div><div className="table-tools"><select className="select" value={department} aria-label="Filter department" onChange={(e) => setDepartment(e.target.value)}><option value="">All departments</option>{departments.map((d) => <option value={d} key={d}>{statusLabel(d)}</option>)}</select><select className="select" value={status} aria-label="Filter work status" onChange={(e) => setStatus(e.target.value)}><option value="">All work states</option>{['not_started', 'in_progress', 'blocked', 'completed'].map((s) => <option value={s} key={s}>{statusLabel(s)}</option>)}</select></div></div>
       {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <SkeletonRows /> : !items?.length ? <EmptyState title="No work items in this view" text="Try another department or status filter. The queue is populated by operational work items." /> :
         <div className="table-scroll"><table className="data-table"><thead><tr><th>Work item</th><th>Department</th><th>Assignee</th><th>Due date</th><th>Priority</th><th>State</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} data-testid={`row-work-item-${item.id}`}><td><strong>{item.title}</strong><div style={{ marginTop: 4 }}><Link href={`/orders/${item.orderId}`} className="ref-link">{item.orderReference}</Link></div></td><td>{statusLabel(item.department)}</td><td><input className="field" aria-label={`Assignee for ${item.title}`} defaultValue={item.assignee ?? ''} placeholder="Assign owner" style={{ maxWidth: 150, padding: '7px 8px' }} onBlur={(e) => { const next = e.target.value.trim() || null; if (next !== (item.assignee ?? null)) updateField(item, { assignee: next }); }} /></td><td>{dateText(item.dueDate)}</td><td><span className={`priority-marker ${item.priority}`}>{item.priority}</span></td><td><select aria-label={`Status for ${item.title}`} className="select status-select" value={item.status} disabled={update.isPending} onChange={(e) => updateField(item, { status: e.target.value as WorkItemStatus })}>{['not_started', 'in_progress', 'blocked', 'completed'].map((s) => <option value={s} key={s}>{statusLabel(s)}</option>)}</select></td></tr>)}</tbody></table></div>}
-    </section><DataDisclaimer />
+    </section>
   </PageFrame>;
 }
 
@@ -485,7 +250,7 @@ function Materials() {
     <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Receiving register</p><h2 className="panel-title">Material lots {materials ? <span className="mono" style={{ fontSize: 11, color: '#82908a', fontWeight: 400 }}>· {materials.length}</span> : null}</h2></div><select className="select" style={{ width: 170 }} aria-label="Filter lots by status" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="">All lot statuses</option>{['pending_qc', 'available', 'hold', 'rejected'].map((s) => <option value={s} key={s}>{statusLabel(s)}</option>)}</select></div>
       {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <SkeletonRows /> : !filtered?.length ? <EmptyState title="No material lots in this view" text={filter ? 'Try another disposition filter.' : 'Record a receipt to begin tracking material lots.'} action={!filter ? <button className="btn btn-primary" onClick={() => setModal(true)}><Plus size={15} />Record receipt</button> : undefined} /> :
         <div className="table-scroll"><table className="data-table"><thead><tr><th>Material / lot</th><th>Order</th><th>Type</th><th>Supplier</th><th>Quantity</th><th>Received</th><th>Disposition</th></tr></thead><tbody>{filtered.map((lot) => <tr key={lot.id} data-testid={`row-material-${lot.id}`}><td><strong>{lot.material}</strong><div className="mono" style={{ fontSize: 10, marginTop: 4, color: '#75847e' }}>{lot.lotReference}</div></td><td>{lot.orderReference ? <Link className="ref-link" href={`/orders/${lot.orderId}`}>{lot.orderReference}</Link> : '—'}</td><td>{statusLabel(lot.type)}</td><td>{lot.supplier}</td><td className="mono">{numberText(lot.quantity)} {lot.unit}</td><td>{dateText(lot.receivedAt)}</td><td><StatusPill status={lot.status} /></td></tr>)}</tbody></table></div>}
-    </section><DataDisclaimer />
+    </section>
     {modal && <div className="modal-scrim" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setModal(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="receipt-title"><div className="modal-head"><div><div className="eyebrow">Incoming goods</div><h2 id="receipt-title" className="panel-title" style={{ fontSize: 20 }}>Record material receipt</h2></div><button className="icon-btn" aria-label="Close" onClick={() => setModal(false)}><X size={17} /></button></div><div className="modal-content">{ordersQuery.isError ? <QueryError onRetry={() => ordersQuery.refetch()} /> : <MaterialForm orders={orders ?? []} onSubmit={save} busy={create.isPending} onCancel={() => setModal(false)} />}</div></section></div>}
   </PageFrame>;
 }
@@ -523,7 +288,7 @@ function Quality() {
     <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Inspection log</p><h2 className="panel-title">Recorded checks {inspections ? <span className="mono" style={{ fontSize: 11, color: '#82908a', fontWeight: 400 }}>· {inspections.length}</span> : null}</h2></div><select className="select" style={{ width: 170 }} aria-label="Filter inspections by result" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="">All results</option>{['accepted', 'hold', 'rejected'].map((s) => <option value={s} key={s}>{statusLabel(s)}</option>)}</select></div>
       {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <SkeletonRows /> : !filtered?.length ? <EmptyState title="No inspections in this view" text={filter ? 'There are no inspections with this result yet.' : 'Log a material check to begin the quality record.'} action={!filter ? <button className="btn btn-primary" onClick={() => setModal(true)}><Plus size={15} />New inspection</button> : undefined} /> :
         <div className="table-scroll"><table className="data-table"><thead><tr><th>Lot reference</th><th>Material</th><th>Type</th><th>Result</th><th>Defects</th><th>Notes</th><th>Inspected</th></tr></thead><tbody>{filtered.map((inspection) => <tr key={inspection.id} data-testid={`row-inspection-${inspection.id}`}><td className="mono">{inspection.lotReference}</td><td>{materialById.get(inspection.materialId)?.material ?? 'Material record'}</td><td>{statusLabel(inspection.inspectionType)}</td><td><StatusPill status={inspection.result} /></td><td className="mono">{numberText(inspection.defectCount)}</td><td style={{ maxWidth: 240 }}>{inspection.notes || '—'}</td><td>{dateText(inspection.inspectedAt)}</td></tr>)}</tbody></table></div>}
-    </section><DataDisclaimer />
+    </section>
     {modal && <div className="modal-scrim" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setModal(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="inspection-title"><div className="modal-head"><div><div className="eyebrow">Incoming material quality</div><h2 id="inspection-title" className="panel-title" style={{ fontSize: 20 }}>Record inspection</h2></div><button className="icon-btn" aria-label="Close" onClick={() => setModal(false)}><X size={17} /></button></div><div className="modal-content">{materialsQuery.isError ? <QueryError onRetry={() => materialsQuery.refetch()} /> : materialsQuery.isLoading ? <SkeletonRows count={3} /> : !materials?.length ? <EmptyState title="No lots available to inspect" text="Record a material receipt first, then return to quality inspections." action={<Link className="btn btn-quiet" href="/materials">Go to materials</Link>} /> : <InspectionForm materials={materials} onSubmit={save} busy={create.isPending} onCancel={() => setModal(false)} />}</div></section></div>}
   </PageFrame>;
 }
@@ -565,7 +330,7 @@ function AuthPage({ signup = false }: { signup?: boolean }) {
         </div>
         <div style={{ marginTop: 20, paddingTop: 15, borderTop: '1px solid #dfd9cd', color: '#84908a', fontSize: 10 }}>
           <span className="mono">B.K. TEXTILE OPERATIONS</span><br />
-          <span style={{ display: 'inline-block', marginTop: 7 }}>Authorized team access · Synthetic demonstration records</span>
+          <span style={{ display: 'inline-block', marginTop: 7 }}>Authorized B.K. Textile staff only</span>
         </div>
       </div>
     </section>
