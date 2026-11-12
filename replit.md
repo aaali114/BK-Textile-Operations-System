@@ -91,6 +91,7 @@ The business coordinates merchandising, sampling, outsourced yarn/knitting/dyein
 
 ## Gotchas
 
+- `artifacts/api-server/build.mjs` has an `external` list of packages left out of the server bundle. A package listed there must be a direct dependency of `@workspace/api-server`, or the server crashes on start (502 everywhere). After adding a library, build and start `dist/index.mjs` once to check.
 - Never run `push` / `push-force` against the database: it holds real PO 36572 data. Schema changes go through `lib/db/migrations`, reviewed in a PR and applied by `migrate` after merge.
 - `lib/db/migrations/0000_baseline.sql` is hand-edited to be idempotent (it matches the tables that `push` created before migrations existed). Do not regenerate or edit it.
 - DB design for PO 36572 intake: `docs/po-36572-intake-db-plan.md`.
