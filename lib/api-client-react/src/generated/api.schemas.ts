@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.3.0
+ * OpenAPI spec version: 0.4.0
  */
 export interface HealthStatus {
   status: string;
@@ -453,6 +453,13 @@ export const TrimType = {
 export interface OrderTrim {
   id: string;
   /**
+     * The item as named in the source, e.g. hang tag
+     * @nullable
+     */
+  sourceLabel: string | null;
+  /** False when the source says the item is not required */
+  required: boolean;
+  /**
      * Null means all colours
      * @nullable
      */
@@ -614,6 +621,75 @@ export interface OrderInvoiceUpdate {
      * @maxLength 500
      */
   reason: string;
+}
+
+export interface IntakeRunRequest {
+  /** True to see what would happen without writing anything */
+  dryRun: boolean;
+  /**
+     * Re-read from this mailbox UID instead of where the last run stopped
+     * @minimum 1
+     */
+  rescanFromUid?: number;
+}
+
+export type IntakeEmailReportOutcome = typeof IntakeEmailReportOutcome[keyof typeof IntakeEmailReportOutcome];
+
+
+export const IntakeEmailReportOutcome = {
+  stored: 'stored',
+  would_store: 'would_store',
+  duplicate: 'duplicate',
+  not_matched: 'not_matched',
+  error: 'error',
+} as const;
+
+export type IntakeEmailReportOrdersItem = {
+  /** @nullable */
+  invoiceRef: string | null;
+  /** @nullable */
+  poNumber: string | null;
+  matchStatus: string;
+  matchMethod: string;
+  created: boolean;
+};
+
+export type IntakeEmailReportAttachmentsItem = {
+  filename: string;
+  /** po_sheet, trims_sheet, spreadsheet, other or note */
+  kind: string;
+  changes: number;
+  warnings: string[];
+  /** @nullable */
+  skipped: string | null;
+};
+
+export interface IntakeEmailReport {
+  uid: number;
+  subject: string;
+  /** @nullable */
+  date: string | null;
+  outcome: IntakeEmailReportOutcome;
+  orders: IntakeEmailReportOrdersItem[];
+  attachments: IntakeEmailReportAttachmentsItem[];
+  /** @nullable */
+  error: string | null;
+}
+
+export interface IntakeRunSummary {
+  dryRun: boolean;
+  mailbox: string;
+  folder: string;
+  fromUid: number;
+  scanned: number;
+  candidates: number;
+  stored: number;
+  duplicates: number;
+  /** Messages not about an allow-listed PO; never downloaded or stored */
+  skipped: number;
+  ordersCreated: string[];
+  emails: IntakeEmailReport[];
+  errors: string[];
 }
 
 export interface WorkItem {

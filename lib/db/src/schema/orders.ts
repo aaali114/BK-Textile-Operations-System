@@ -48,6 +48,10 @@ export const ordersTable = pgTable(
     style: text("style").notNull(),
     description: text("description"),
     quantity: integer("quantity").notNull(),
+    // The email whose PO sheet last set the header fields above. A PO sheet
+    // from an older email never overwrites a newer one. Plain uuid (no FK) to
+    // avoid an import cycle with sourceEmails; cleared by the intake if gone.
+    headerSourceEmailId: uuid("header_source_email_id"),
     // Ship date on the PO.
     deliveryDate: date("delivery_date", { mode: "string" }).notNull(),
     status: text("status").notNull().default("development"),

@@ -5,6 +5,8 @@ import {
   GetBuyersResponse,
   GetCurrentUserResponse,
   GetInvoiceCounterResponse,
+  RunEmailIntakeBody,
+  RunEmailIntakeResponse,
   SetInvoiceCounterBody,
   SetInvoiceCounterResponse,
   SetOrderInvoiceNumberBody,
@@ -15,6 +17,8 @@ import { buyersTable, db } from "@workspace/db";
 import { isAdmin, requireAdmin } from "../lib/admin";
 import { getAuditActor } from "../lib/auditActor";
 import { getInvoiceCounter, InvoiceAdminError, setInvoiceCounter, setOrderInvoiceNumber } from "../lib/invoiceAdmin";
+import { IntakeConfigError } from "../intake/config";
+import { runMailboxIntake } from "../intake/service";
 
 const router: IRouter = Router();
 
@@ -67,6 +71,30 @@ router.put("/admin/orders/:orderId/invoice", requireAdmin, async (req, res): Pro
       return;
     }
     throw error;
+  }
+});
+
+router.post("/admin/intake/run", requireAdmin, async (req, res): Promise<void> => {
+  const body = RunEmailIntakeBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  try {
+    const summary = await runMailboxIntake(body.data);
+    req.log.info({ dryRun: summary.dryRun, scanned: summary.scanned, stored: summary.stored, errors: summary.errors.length }, "Email intake run");
+    res.json(RunEmailIntakeResponse.parse(summary));
+  } catch (error) {
+    if (error instanceof IntakeConfigError) {
+      res.status(503).json({ error: error.message });
+      return;
+    }
+    if ((error as Error).message.startsWith("Another intake run")) {
+      res.status(409).json({ error: (error as Error).message });
+      return;
+    }
+    req.log.error({ err: (error as Error).message }, "Email intake run failed");
+    res.status(502).json({ error: `Mailbox run failed: ${(error as Error).message}` });
   }
 });
 

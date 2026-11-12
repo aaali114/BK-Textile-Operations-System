@@ -133,6 +133,19 @@ export class ObjectStorageService {
     });
   }
 
+  /** Saves bytes from the server itself into the private directory; returns the "/objects/..." path. */
+  async saveObjectEntity(content: Buffer, contentType: string, folder = 'intake'): Promise<string> {
+    let privateObjectDir = this.getPrivateObjectDir();
+    if (!privateObjectDir.endsWith('/')) privateObjectDir = `${privateObjectDir}/`;
+    const entityId = `${folder}/${randomUUID()}`;
+    const { bucketName, objectName } = parseObjectPath(`${privateObjectDir}${entityId}`);
+    await objectStorageClient
+      .bucket(bucketName)
+      .file(objectName)
+      .save(content, { contentType, resumable: false, metadata: { cacheControl: 'private, no-store' } });
+    return `/objects/${entityId}`;
+  }
+
   async getObjectEntityFile(objectPath: string): Promise<File> {
     if (!objectPath.startsWith('/objects/')) {
       throw new ObjectNotFoundError();

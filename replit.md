@@ -12,6 +12,7 @@ A new B.K. Textile-owned web system for coordinating garment orders, department 
 - `pnpm --filter @workspace/db run generate -- --name <change>` — generate a new migration after a schema change (backend only)
 - Database changes belong to the backend developer and arrive as reviewed migrations. Replit Agent must not run `push`, `push-force` or `generate`.
 - Required env: `DATABASE_URL` — Postgres connection string
+- Email intake env: `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASSWORD` (secrets) and `INTAKE_PO_ALLOWLIST` (required, comma-separated PO numbers the intake may store, e.g. `36572`). Optional: `INTAKE_FOLDER` (default `INBOX`), `INTAKE_POLL_MINUTES` (automatic runs; unset = only manual runs).
 - Optional env: `ADMIN_USER_IDS` — comma-separated Clerk user IDs allowed to use `/api/admin/*` (invoice overrides). A signed-in user sees their own ID at `/api/me`. Unset = nobody is an admin.
 
 ## Stack
@@ -67,6 +68,7 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 - During the PO 36572 phase, only messages that match PO 36572 are stored. Other messages are skipped and not persisted.
 - **The buyer's PO number is the key** for matching, sorting and communication. A PO number in the subject decides the order. BK's own invoice reference (e.g. `4040/BK-SAS/2026`) in a reply also matches, and so does a reply in an already-matched thread. A different PO mentioned only in the body (customers often reference older POs for repeat specs) is flagged for review, never auto-linked. Full rules: `docs/po-36572-intake-db-plan.md` → Email matching.
 - Many order details sit in attachments (PO sheets, tech packs, trim lists), so attachments are stored and their text extracted for parsing.
+- **Running it:** an admin calls `POST /api/admin/intake/run` with `{"dryRun": true}` to preview, then `{"dryRun": false}` to store and apply. Only envelopes are read for screening; a full message is downloaded only when its subject names an allow-listed PO, a known BK invoice, or it replies to a stored/candidate email. A new allow-listed PO that arrives with its PO sheet creates the order (and its BK invoice) automatically. Code: `artifacts/api-server/src/intake/`.
 - Extracted data goes **straight into the order** during the trial (no approval step). Every change is logged in `bk_activity` with old value, new value and source email. **The later email wins**: the PO sheet sets the starting values, and later emails (trims, accessories, hang tags) override them; PO placeholders like "TBA" never overwrite real details.
 
 ## Orders and BK invoices
