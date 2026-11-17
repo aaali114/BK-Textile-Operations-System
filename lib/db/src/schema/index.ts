@@ -29,4 +29,5 @@ export * from "./orderFiles";
 export * from "./provenance";
 export * from "./sourceEmails";
 export * from "./trims";
+export * from "./users";
 export * from "./work";

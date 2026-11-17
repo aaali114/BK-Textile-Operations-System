@@ -2,10 +2,12 @@ import { and, desc, eq, lt, ne } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import { GetDashboardSummaryResponse } from "@workspace/api-zod";
 import { activityTable, db, materialLotsTable, ordersTable, workItemsTable } from "@workspace/db";
+import { accessFrom, canSeeActivity } from "../lib/access";
 
 const router: IRouter = Router();
 
 router.get("/dashboard/summary", async (_req, res): Promise<void> => {
+  const access = accessFrom(res)!;
   const [orders, workItems, materials, activity] = await Promise.all([
     db.select().from(ordersTable),
     db
@@ -20,7 +22,7 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
       })
       .from(workItemsTable),
     db.select().from(materialLotsTable),
-    db.select().from(activityTable).orderBy(desc(activityTable.occurredAt)).limit(6),
+    db.select().from(activityTable).orderBy(desc(activityTable.occurredAt)).limit(100),
   ]);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -71,14 +73,16 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
     readyToCut: readyOrderIds.size,
     departmentPulse,
     attentionItems,
-    recentActivity: activity,
+    // Only entries about areas this user may see (e.g. order changes need merchandising access).
+    recentActivity: activity.filter((row) => canSeeActivity(access, row.entityType)).slice(0, 6),
   };
   res.json(GetDashboardSummaryResponse.parse(summary));
 });
 
 router.get("/activity", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(activityTable).orderBy(desc(activityTable.occurredAt)).limit(30);
-  res.json(rows);
+  const access = accessFrom(res)!;
+  const rows = await db.select().from(activityTable).orderBy(desc(activityTable.occurredAt)).limit(300);
+  res.json(rows.filter((row) => canSeeActivity(access, row.entityType)).slice(0, 30));
 });
 
 export default router;
