@@ -13,7 +13,7 @@ A new B.K. Textile-owned web system for coordinating garment orders, department 
 - Database changes belong to the backend developer and arrive as reviewed migrations. Replit Agent must not run `push`, `push-force` or `generate`.
 - Required env: `DATABASE_URL` — Postgres connection string
 - Email intake env: `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASSWORD` (secrets) and `INTAKE_PO_ALLOWLIST` (required, comma-separated PO numbers the intake may store, e.g. `36572`). Optional: `INTAKE_FOLDER` (default `INBOX`), `INTAKE_POLL_MINUTES` (automatic runs; unset = only manual runs).
-- Optional env: `ADMIN_USER_IDS` — comma-separated Clerk user IDs allowed to use `/api/admin/*` (invoice overrides). A signed-in user sees their own ID at `/api/me`. Unset = nobody is an admin.
+- `ADMIN_USER_IDS` — **one-time setup only**: while no administrator exists in the database, the first listed user to sign in becomes the administrator. After that the database decides and this setting is ignored.
 
 ## Stack
 
@@ -49,6 +49,17 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 
 - Build this as an independent implementation; do not port or replace the existing installation until its source/backend are available and reviewed.
 - Use the existing API contract and PostgreSQL database for the new app; authenticate staff through Replit-managed Clerk.
+
+## Users and access
+
+- Sign-in and passwords stay with Clerk. `bk_users` records everyone who signs in (name, email, department, status, role, last sign-in); passwords are never stored by the app.
+- New users are **pending** with no access until the administrator or deputy approves them (`PUT /api/admin/users/:id/access`).
+- **Roles:** exactly one `admin` and at most one `deputy` (enforced in the database). Both approve users and grant access and have full access themselves. Only the administrator appoints/removes the deputy or transfers the administrator role. Nobody can change their own access; the deputy cannot change the administrator.
+- **Areas** (`dashboard`, `merchandising`, `department_work`, `materials`, `quality`): `none` / `read` / `write` per user. No grant = the area is hidden and its API refuses.
+- **Special permissions:** `invoice_override` (invoice counter and per-order override), `commercial_edit` (create orders; edit buyer, PO, value, terms, quantity, dates), `intake_run` (read the mailbox, re-apply emails).
+- Department templates (`GET /api/admin/access-templates`) are suggestions only; the administrator applies and adjusts them per person.
+- **Enforced on the server:** every API route has a rule in `artifacts/api-server/src/lib/access.ts` (`RULES`); anything without a rule is refused. When adding a route, add its rule. Activity feeds are filtered by what the user may see.
+- Every access change is logged in `bk_activity` (entity `user`).
 
 ## Data rules
 

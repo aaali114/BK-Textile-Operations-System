@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.5.0
+ * OpenAPI spec version: 0.6.0
  */
 export interface HealthStatus {
   status: string;
@@ -338,9 +338,135 @@ export interface OrderFileUploadResponse {
   uploadURL: string;
 }
 
+/**
+ * pending = signed in, waiting for approval (no access); disabled = access removed
+ */
+export type UserStatus = typeof UserStatus[keyof typeof UserStatus];
+
+
+export const UserStatus = {
+  pending: 'pending',
+  active: 'active',
+  disabled: 'disabled',
+} as const;
+
+/**
+ * One administrator; at most one deputy; both approve users and grant access
+ */
+export type UserRole = typeof UserRole[keyof typeof UserRole];
+
+
+export const UserRole = {
+  admin: 'admin',
+  deputy: 'deputy',
+  user: 'user',
+} as const;
+
+export type AccessLevel = typeof AccessLevel[keyof typeof AccessLevel];
+
+
+export const AccessLevel = {
+  none: 'none',
+  read: 'read',
+  write: 'write',
+} as const;
+
+export interface AreaAccess {
+  dashboard: AccessLevel;
+  merchandising: AccessLevel;
+  department_work: AccessLevel;
+  materials: AccessLevel;
+  quality: AccessLevel;
+}
+
+/**
+ * invoice_override = change the invoice counter or an order's BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails
+ */
+export type Permission = typeof Permission[keyof typeof Permission];
+
+
+export const Permission = {
+  invoice_override: 'invoice_override',
+  commercial_edit: 'commercial_edit',
+  intake_run: 'intake_run',
+} as const;
+
 export interface CurrentUser {
   userId: string;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  name: string | null;
+  status: UserStatus;
+  role: UserRole;
+  /** @nullable */
+  department: string | null;
+  /** Same as canManageUsers (kept for older screens). Use permissions for invoice/intake actions. */
   isAdmin: boolean;
+  /** Active administrator or deputy */
+  canManageUsers: boolean;
+  areas: AreaAccess;
+  permissions: Permission[];
+}
+
+export interface AreaAccessUpdate {
+  dashboard?: AccessLevel;
+  merchandising?: AccessLevel;
+  department_work?: AccessLevel;
+  materials?: AccessLevel;
+  quality?: AccessLevel;
+}
+
+export interface UserAccount {
+  id: string;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  name: string | null;
+  status: UserStatus;
+  role: UserRole;
+  /** @nullable */
+  department: string | null;
+  areas: AreaAccess;
+  permissions: Permission[];
+  /** @nullable */
+  approvedBy: string | null;
+  /** @nullable */
+  approvedAt: string | null;
+  /** @nullable */
+  lastSeenAt: string | null;
+  createdAt: string;
+}
+
+export interface UserAccessUpdate {
+  status?: UserStatus;
+  /** @nullable */
+  department?: string | null;
+  areas?: AreaAccessUpdate;
+  permissions?: Permission[];
+}
+
+export type UserRoleUpdateRole = typeof UserRoleUpdateRole[keyof typeof UserRoleUpdateRole];
+
+
+export const UserRoleUpdateRole = {
+  deputy: 'deputy',
+  user: 'user',
+} as const;
+
+export interface UserRoleUpdate {
+  role: UserRoleUpdateRole;
+}
+
+export interface TransferAdminRequest {
+  /** Must be true */
+  confirm: boolean;
+}
+
+export interface AccessTemplate {
+  department: string;
+  areas: AreaAccessUpdate;
+  permissions: Permission[];
 }
 
 export interface Buyer {

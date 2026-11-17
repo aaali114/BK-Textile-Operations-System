@@ -43,6 +43,35 @@ requests to seed a database. Real data is approved only for PO 36572 (BK Inv.
     in the admin panel and show the returned summary (per email: outcome,
     orders, and per attachment: kind, number of changes, warnings).
 - **API 0.5.0:** admin-only `useReapplyOrderEmails(orderId)`: add a "Re-apply emails" action next to "Override invoice number" on the order page, with a confirmation that staff edits to the same fields will be overwritten, then show the report (per email: original date, and per attachment: kind and number of changes) and refresh the order.
+- **API 0.6.0 — users and access (must be reflected in the UI):**
+  - `useGetCurrentUser` now returns `status`, `role`, `department`, `areas`
+    (`dashboard`, `merchandising`, `department_work`, `materials`, `quality` →
+    `none`/`read`/`write`), `permissions` and `canManageUsers`.
+  - **Pending/disabled users:** when `status` is `pending`, show only a
+    "Waiting for administrator approval" screen (with the user's email and Sign
+    out); `disabled` → "Your access has been removed". Every other API call
+    returns 403 with `code: "pending_approval"` / `"disabled"` for them.
+  - **Navigation:** show a section only if its area is not `none`
+    (Operations desk → dashboard, Order register → merchandising, Department
+    work → department_work, Materials & lots → materials, Quality → quality).
+    With `read`, hide create/edit/save controls.
+  - **Special actions:** invoice panel and "Override invoice number" need
+    `invoice_override`; "Read mailbox" and "Re-apply emails" need
+    `intake_run`; "Create order" needs merchandising `write` +
+    `commercial_edit`; in "Edit order", buyer, PO, value/currency, terms,
+    ship via, country, over-shipment %, quantity and dates are editable only
+    with `commercial_edit` (style, notes, status and priority need only
+    merchandising `write`). Don't use `isAdmin` for these any more.
+  - **New "Users & access" page** (only when `canManageUsers`):
+    `useListUsers` (pending first, with a count badge in the navigation);
+    per user: approve / disable, department (Department enum), a None/Read/
+    Write selector per area, checkboxes for the three special permissions,
+    and an "Apply department template" helper from `useGetAccessTemplates`;
+    save with `useUpdateUserAccess`. For the administrator only:
+    "Make deputy" / "Remove deputy" (`useSetUserRole`) and "Transfer
+    administrator role" (`useTransferAdmin`, body `{confirm: true}`, behind a
+    typed confirmation). Show server error messages as returned (e.g. you
+    cannot change your own access).
 - Not yet: manual import of a missed email, staff editing of
   lines/grid/fabrics/trims.
 - Owner decisions that change these requests:

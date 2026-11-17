@@ -3,10 +3,27 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.5.0
+ * OpenAPI spec version: 0.6.0
  */
+import type { AreaAccess } from './areaAccess';
+import type { Permission } from './permission';
+import type { UserRole } from './userRole';
+import type { UserStatus } from './userStatus';
 
 export interface CurrentUser {
   userId: string;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  name: string | null;
+  status: UserStatus;
+  role: UserRole;
+  /** @nullable */
+  department: string | null;
+  /** Same as canManageUsers (kept for older screens). Use permissions for invoice/intake actions. */
   isAdmin: boolean;
+  /** Active administrator or deputy */
+  canManageUsers: boolean;
+  areas: AreaAccess;
+  permissions: Permission[];
 }

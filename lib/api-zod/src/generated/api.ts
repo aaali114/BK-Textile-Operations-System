@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.5.0
+ * OpenAPI spec version: 0.6.0
  */
 import * as zod from 'zod';
 
@@ -385,11 +385,26 @@ export const PreviewOrderFileResponse = zod.unknown()
 
 
 /**
- * @summary The signed-in user's ID and whether they are an admin
+ * Works for every signed-in user, including those waiting for approval. Hide pages and actions the user has no access to; the server enforces it anyway.
+ * @summary The signed-in user, their approval status and what they may access
  */
 export const GetCurrentUserResponse = zod.object({
   "userId": zod.string(),
-  "isAdmin": zod.boolean()
+  "email": zod.string().nullable(),
+  "name": zod.string().nullable(),
+  "status": zod.enum(['pending', 'active', 'disabled']).describe('pending = signed in, waiting for approval (no access); disabled = access removed'),
+  "role": zod.enum(['admin', 'deputy', 'user']).describe('One administrator; at most one deputy; both approve users and grant access'),
+  "department": zod.string().nullable(),
+  "isAdmin": zod.boolean().describe('Same as canManageUsers (kept for older screens). Use permissions for invoice/intake actions.'),
+  "canManageUsers": zod.boolean().describe('Active administrator or deputy'),
+  "areas": zod.object({
+  "dashboard": zod.enum(['none', 'read', 'write']),
+  "merchandising": zod.enum(['none', 'read', 'write']),
+  "department_work": zod.enum(['none', 'read', 'write']),
+  "materials": zod.enum(['none', 'read', 'write']),
+  "quality": zod.enum(['none', 'read', 'write'])
+}),
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails'))
 })
 
 
@@ -715,6 +730,168 @@ export const SetOrderInvoiceNumberResponse = zod.object({
   "priority": zod.enum(['low', 'normal', 'high', 'urgent']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Everyone who has signed in, pending first (administrator and deputy only)
+ */
+export const ListUsersResponseItem = zod.object({
+  "id": zod.string(),
+  "email": zod.string().nullable(),
+  "name": zod.string().nullable(),
+  "status": zod.enum(['pending', 'active', 'disabled']).describe('pending = signed in, waiting for approval (no access); disabled = access removed'),
+  "role": zod.enum(['admin', 'deputy', 'user']).describe('One administrator; at most one deputy; both approve users and grant access'),
+  "department": zod.string().nullable(),
+  "areas": zod.object({
+  "dashboard": zod.enum(['none', 'read', 'write']),
+  "merchandising": zod.enum(['none', 'read', 'write']),
+  "department_work": zod.enum(['none', 'read', 'write']),
+  "materials": zod.enum(['none', 'read', 'write']),
+  "quality": zod.enum(['none', 'read', 'write'])
+}),
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails')),
+  "approvedBy": zod.string().nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "lastSeenAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const ListUsersResponse = zod.array(ListUsersResponseItem)
+
+
+/**
+ * @summary Suggested access per department (starting points; never applied automatically)
+ */
+export const GetAccessTemplatesResponseItem = zod.object({
+  "department": zod.string(),
+  "areas": zod.object({
+  "dashboard": zod.enum(['none', 'read', 'write']).optional(),
+  "merchandising": zod.enum(['none', 'read', 'write']).optional(),
+  "department_work": zod.enum(['none', 'read', 'write']).optional(),
+  "materials": zod.enum(['none', 'read', 'write']).optional(),
+  "quality": zod.enum(['none', 'read', 'write']).optional()
+}),
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails'))
+})
+export const GetAccessTemplatesResponse = zod.array(GetAccessTemplatesResponseItem)
+
+
+/**
+ * Fields left out are unchanged. `areas` sets only the areas given; `permissions` replaces the whole list. You cannot change your own access or the administrator's; only the administrator can change the deputy. Every change is logged.
+ * @summary Approve or disable a user, set their department, area access and special permissions
+ */
+
+
+
+export const UpdateUserAccessParams = zod.object({
+  "userId": zod.coerce.string().min(1)
+})
+
+export const UpdateUserAccessBody = zod.object({
+  "status": zod.enum(['pending', 'active', 'disabled']).optional().describe('pending = signed in, waiting for approval (no access); disabled = access removed'),
+  "department": zod.string().nullish(),
+  "areas": zod.object({
+  "dashboard": zod.enum(['none', 'read', 'write']).optional(),
+  "merchandising": zod.enum(['none', 'read', 'write']).optional(),
+  "department_work": zod.enum(['none', 'read', 'write']).optional(),
+  "materials": zod.enum(['none', 'read', 'write']).optional(),
+  "quality": zod.enum(['none', 'read', 'write']).optional()
+}).optional(),
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails')).optional()
+})
+
+export const UpdateUserAccessResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().nullable(),
+  "name": zod.string().nullable(),
+  "status": zod.enum(['pending', 'active', 'disabled']).describe('pending = signed in, waiting for approval (no access); disabled = access removed'),
+  "role": zod.enum(['admin', 'deputy', 'user']).describe('One administrator; at most one deputy; both approve users and grant access'),
+  "department": zod.string().nullable(),
+  "areas": zod.object({
+  "dashboard": zod.enum(['none', 'read', 'write']),
+  "merchandising": zod.enum(['none', 'read', 'write']),
+  "department_work": zod.enum(['none', 'read', 'write']),
+  "materials": zod.enum(['none', 'read', 'write']),
+  "quality": zod.enum(['none', 'read', 'write'])
+}),
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails')),
+  "approvedBy": zod.string().nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "lastSeenAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Appoint or remove the deputy (administrator only; one deputy at a time)
+ */
+
+
+
+export const SetUserRoleParams = zod.object({
+  "userId": zod.coerce.string().min(1)
+})
+
+export const SetUserRoleBody = zod.object({
+  "role": zod.enum(['deputy', 'user'])
+})
+
+export const SetUserRoleResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().nullable(),
+  "name": zod.string().nullable(),
+  "status": zod.enum(['pending', 'active', 'disabled']).describe('pending = signed in, waiting for approval (no access); disabled = access removed'),
+  "role": zod.enum(['admin', 'deputy', 'user']).describe('One administrator; at most one deputy; both approve users and grant access'),
+  "department": zod.string().nullable(),
+  "areas": zod.object({
+  "dashboard": zod.enum(['none', 'read', 'write']),
+  "merchandising": zod.enum(['none', 'read', 'write']),
+  "department_work": zod.enum(['none', 'read', 'write']),
+  "materials": zod.enum(['none', 'read', 'write']),
+  "quality": zod.enum(['none', 'read', 'write'])
+}),
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails')),
+  "approvedBy": zod.string().nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "lastSeenAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * The previous administrator becomes deputy if the seat is free (or was held by the new administrator), otherwise a regular user.
+ * @summary Hand the administrator role to an approved user (administrator only)
+ */
+
+
+
+export const TransferAdminParams = zod.object({
+  "userId": zod.coerce.string().min(1)
+})
+
+export const TransferAdminBody = zod.object({
+  "confirm": zod.boolean().describe('Must be true')
+})
+
+export const TransferAdminResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().nullable(),
+  "name": zod.string().nullable(),
+  "status": zod.enum(['pending', 'active', 'disabled']).describe('pending = signed in, waiting for approval (no access); disabled = access removed'),
+  "role": zod.enum(['admin', 'deputy', 'user']).describe('One administrator; at most one deputy; both approve users and grant access'),
+  "department": zod.string().nullable(),
+  "areas": zod.object({
+  "dashboard": zod.enum(['none', 'read', 'write']),
+  "merchandising": zod.enum(['none', 'read', 'write']),
+  "department_work": zod.enum(['none', 'read', 'write']),
+  "materials": zod.enum(['none', 'read', 'write']),
+  "quality": zod.enum(['none', 'read', 'write'])
+}),
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails')),
+  "approvedBy": zod.string().nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "lastSeenAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
 })
 
 

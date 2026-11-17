@@ -16,11 +16,17 @@ import {
 import { activityTable, db, ordersTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { getAuditActor } from "../lib/auditActor";
+import { accessFrom, hasPermission } from "../lib/access";
 import { createOrderWithInvoice, OrderInputError } from "../lib/orderCreation";
 import { getOrderActivity, orderExists } from "../lib/orderDetail";
 import { isUniqueViolation } from "../lib/pgErrors";
 
 const router: IRouter = Router();
+
+const COMMERCIAL_FIELDS = new Set([
+  "buyer", "agencyName", "endCustomer", "previousOrderReference", "poNumber", "poIssueDate", "orderValue", "currencyCode",
+  "priceTerms", "paymentTerms", "shipVia", "countryOfOrigin", "overShipTolerancePct", "quantity", "deliveryDate",
+]);
 
 function asDateString(value: Date): string {
   return value.toISOString().slice(0, 10);
@@ -129,6 +135,13 @@ router.patch("/orders/:orderId", async (req, res): Promise<void> => {
     return;
   }
   const data = parsed.data;
+  // Commercial details (buyer, PO, value, terms, quantity, dates) need the commercial_edit permission;
+  // with merchandising write alone, staff can change style, notes, status and priority.
+  const commercial = (Object.keys(data) as string[]).filter((k) => COMMERCIAL_FIELDS.has(k));
+  if (commercial.length && !hasPermission(accessFrom(res)!, "commercial_edit")) {
+    res.status(403).json({ error: `Changing ${commercial.join(", ")} needs the "edit commercial details" permission.`, code: "forbidden" });
+    return;
+  }
   const update: Record<string, unknown> = { updatedAt: new Date() };
   const hasAmount = data.orderValue !== undefined;
   const hasCurrency = data.currencyCode !== undefined;

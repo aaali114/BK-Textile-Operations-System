@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.5.0
+ * OpenAPI spec version: 0.6.0
  */
 import type { EmailAttachmentExtractStatus } from './emailAttachmentExtractStatus';
 

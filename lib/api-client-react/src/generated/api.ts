@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.5.0
+ * OpenAPI spec version: 0.6.0
  */
 import {
   useMutation,
@@ -25,6 +25,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AccessTemplate,
   Buyer,
   CurrentUser,
   DashboardSummary,
@@ -54,6 +55,10 @@ import type {
   OrderTrim,
   OrderUpdate,
   ReapplyReport,
+  TransferAdminRequest,
+  UserAccessUpdate,
+  UserAccount,
+  UserRoleUpdate,
   WorkItem,
   WorkItemUpdate
 } from './api.schemas';
@@ -1268,7 +1273,8 @@ export const getGetCurrentUserUrl = () => {
 }
 
 /**
- * @summary The signed-in user's ID and whether they are an admin
+ * Works for every signed-in user, including those waiting for approval. Hide pages and actions the user has no access to; the server enforces it anyway.
+ * @summary The signed-in user, their approval status and what they may access
  */
 export const getCurrentUser = async ( options?: Parameters<typeof customFetch>[1]): Promise<CurrentUser> => {
 
@@ -1339,7 +1345,7 @@ export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUs
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary The signed-in user's ID and whether they are an admin
+ * @summary The signed-in user, their approval status and what they may access
  */
 
 export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<unknown>>(
@@ -2460,6 +2466,477 @@ export const useSetOrderInvoiceNumber = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getSetOrderInvoiceNumberMutationOptions(options), queryClient);
+    }
+
+export const getListUsersUrl = () => {
+
+
+
+
+  return `/api/admin/users`
+}
+
+/**
+ * @summary Everyone who has signed in, pending first (administrator and deputy only)
+ */
+export const listUsers = async ( options?: Parameters<typeof customFetch>[1]): Promise<UserAccount[]> => {
+
+  return customFetch<UserAccount[]>(getListUsersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListUsersQueryKey = () => {
+    return [
+    `/api/admin/users`
+    ] as const;
+    }
+
+
+export const getListUsersQueryOptions = <TData = Awaited<ReturnType<typeof listUsers>>, TError = ErrorType<void>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListUsersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUsers>>> = ({ signal }) => listUsers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListUsersQueryResult = NonNullable<Awaited<ReturnType<typeof listUsers>>>
+export type ListUsersQueryError = ErrorType<void>
+
+
+export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TError = ErrorType<void>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listUsers>>,
+          TError,
+          Awaited<ReturnType<typeof listUsers>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listUsers>>,
+          TError,
+          Awaited<ReturnType<typeof listUsers>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Everyone who has signed in, pending first (administrator and deputy only)
+ */
+
+export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListUsersQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAccessTemplatesUrl = () => {
+
+
+
+
+  return `/api/admin/access-templates`
+}
+
+/**
+ * @summary Suggested access per department (starting points; never applied automatically)
+ */
+export const getAccessTemplates = async ( options?: Parameters<typeof customFetch>[1]): Promise<AccessTemplate[]> => {
+
+  return customFetch<AccessTemplate[]>(getGetAccessTemplatesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAccessTemplatesQueryKey = () => {
+    return [
+    `/api/admin/access-templates`
+    ] as const;
+    }
+
+
+export const getGetAccessTemplatesQueryOptions = <TData = Awaited<ReturnType<typeof getAccessTemplates>>, TError = ErrorType<void>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAccessTemplates>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAccessTemplatesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAccessTemplates>>> = ({ signal }) => getAccessTemplates({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAccessTemplates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAccessTemplatesQueryResult = NonNullable<Awaited<ReturnType<typeof getAccessTemplates>>>
+export type GetAccessTemplatesQueryError = ErrorType<void>
+
+
+export function useGetAccessTemplates<TData = Awaited<ReturnType<typeof getAccessTemplates>>, TError = ErrorType<void>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAccessTemplates>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAccessTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof getAccessTemplates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAccessTemplates<TData = Awaited<ReturnType<typeof getAccessTemplates>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAccessTemplates>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAccessTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof getAccessTemplates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAccessTemplates<TData = Awaited<ReturnType<typeof getAccessTemplates>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAccessTemplates>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Suggested access per department (starting points; never applied automatically)
+ */
+
+export function useGetAccessTemplates<TData = Awaited<ReturnType<typeof getAccessTemplates>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAccessTemplates>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAccessTemplatesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateUserAccessUrl = (userId: string,) => {
+
+
+
+
+  return `/api/admin/users/${userId}/access`
+}
+
+/**
+ * Fields left out are unchanged. `areas` sets only the areas given; `permissions` replaces the whole list. You cannot change your own access or the administrator's; only the administrator can change the deputy. Every change is logged.
+ * @summary Approve or disable a user, set their department, area access and special permissions
+ */
+export const updateUserAccess = async (userId: string,
+    userAccessUpdate: UserAccessUpdate, options?: Parameters<typeof customFetch>[1]): Promise<UserAccount> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<UserAccount>(getUpdateUserAccessUrl(userId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(userAccessUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateUserAccessMutationKey = () => ['updateUserAccess'] as const;
+
+export const getUpdateUserAccessMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUserAccess>>, TError,UpdateUserAccessMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateUserAccess>>, TError,UpdateUserAccessMutationVariables, TContext> => {
+
+const mutationKey = getUpdateUserAccessMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateUserAccess>>, UpdateUserAccessMutationVariables> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  updateUserAccess(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateUserAccessMutationResult = NonNullable<Awaited<ReturnType<typeof updateUserAccess>>>
+    export type UpdateUserAccessMutationBody = BodyType<UserAccessUpdate>
+    export type UpdateUserAccessMutationError = ErrorType<void>
+    export type UpdateUserAccessMutationVariables = {userId: string;data: BodyType<UserAccessUpdate>}
+
+    /**
+ * @summary Approve or disable a user, set their department, area access and special permissions
+ */
+export const useUpdateUserAccess = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUserAccess>>, TError,UpdateUserAccessMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateUserAccess>>,
+        TError,
+        UpdateUserAccessMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateUserAccessMutationOptions(options), queryClient);
+    }
+
+export const getSetUserRoleUrl = (userId: string,) => {
+
+
+
+
+  return `/api/admin/users/${userId}/role`
+}
+
+/**
+ * @summary Appoint or remove the deputy (administrator only; one deputy at a time)
+ */
+export const setUserRole = async (userId: string,
+    userRoleUpdate: UserRoleUpdate, options?: Parameters<typeof customFetch>[1]): Promise<UserAccount> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<UserAccount>(getSetUserRoleUrl(userId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(userRoleUpdate)
+  }
+);}
+
+
+
+
+
+export const getSetUserRoleMutationKey = () => ['setUserRole'] as const;
+
+export const getSetUserRoleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setUserRole>>, TError,SetUserRoleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setUserRole>>, TError,SetUserRoleMutationVariables, TContext> => {
+
+const mutationKey = getSetUserRoleMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setUserRole>>, SetUserRoleMutationVariables> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  setUserRole(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetUserRoleMutationResult = NonNullable<Awaited<ReturnType<typeof setUserRole>>>
+    export type SetUserRoleMutationBody = BodyType<UserRoleUpdate>
+    export type SetUserRoleMutationError = ErrorType<void>
+    export type SetUserRoleMutationVariables = {userId: string;data: BodyType<UserRoleUpdate>}
+
+    /**
+ * @summary Appoint or remove the deputy (administrator only; one deputy at a time)
+ */
+export const useSetUserRole = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setUserRole>>, TError,SetUserRoleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setUserRole>>,
+        TError,
+        SetUserRoleMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetUserRoleMutationOptions(options), queryClient);
+    }
+
+export const getTransferAdminUrl = (userId: string,) => {
+
+
+
+
+  return `/api/admin/users/${userId}/make-admin`
+}
+
+/**
+ * The previous administrator becomes deputy if the seat is free (or was held by the new administrator), otherwise a regular user.
+ * @summary Hand the administrator role to an approved user (administrator only)
+ */
+export const transferAdmin = async (userId: string,
+    transferAdminRequest: TransferAdminRequest, options?: Parameters<typeof customFetch>[1]): Promise<UserAccount> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<UserAccount>(getTransferAdminUrl(userId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(transferAdminRequest)
+  }
+);}
+
+
+
+
+
+export const getTransferAdminMutationKey = () => ['transferAdmin'] as const;
+
+export const getTransferAdminMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferAdmin>>, TError,TransferAdminMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transferAdmin>>, TError,TransferAdminMutationVariables, TContext> => {
+
+const mutationKey = getTransferAdminMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transferAdmin>>, TransferAdminMutationVariables> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  transferAdmin(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransferAdminMutationResult = NonNullable<Awaited<ReturnType<typeof transferAdmin>>>
+    export type TransferAdminMutationBody = BodyType<TransferAdminRequest>
+    export type TransferAdminMutationError = ErrorType<void>
+    export type TransferAdminMutationVariables = {userId: string;data: BodyType<TransferAdminRequest>}
+
+    /**
+ * @summary Hand the administrator role to an approved user (administrator only)
+ */
+export const useTransferAdmin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferAdmin>>, TError,TransferAdminMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof transferAdmin>>,
+        TError,
+        TransferAdminMutationVariables,
+        TContext
+      > => {
+      return useMutation(getTransferAdminMutationOptions(options), queryClient);
     }
 
 export const getReapplyOrderEmailsUrl = (orderId: string,) => {

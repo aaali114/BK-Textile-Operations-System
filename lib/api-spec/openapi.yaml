@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.5.0
+  version: 0.6.0
   description: B.K. Textile operations API
 servers:
   - url: /api
@@ -235,7 +235,8 @@ paths:
     get:
       operationId: getCurrentUser
       tags: [admin]
-      summary: The signed-in user's ID and whether they are an admin
+      summary: The signed-in user, their approval status and what they may access
+      description: Works for every signed-in user, including those waiting for approval. Hide pages and actions the user has no access to; the server enforces it anyway.
       responses:
         "200":
           description: Current user
@@ -422,6 +423,100 @@ paths:
         "403": { description: Not an admin }
         "404": { description: Order not found }
         "409": { description: "Invoice number already used by another order, or order has no buyer" }
+  /admin/users:
+    get:
+      operationId: listUsers
+      tags: [admin]
+      summary: Everyone who has signed in, pending first (administrator and deputy only)
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UserAccount" }
+        "403": { description: Not the administrator or deputy }
+  /admin/access-templates:
+    get:
+      operationId: getAccessTemplates
+      tags: [admin]
+      summary: Suggested access per department (starting points; never applied automatically)
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AccessTemplate" }
+        "403": { description: Not the administrator or deputy }
+  /admin/users/{userId}/access:
+    put:
+      operationId: updateUserAccess
+      tags: [admin]
+      summary: Approve or disable a user, set their department, area access and special permissions
+      description: >-
+        Fields left out are unchanged. `areas` sets only the areas given;
+        `permissions` replaces the whole list. You cannot change your own
+        access or the administrator's; only the administrator can change the
+        deputy. Every change is logged.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserAccessUpdate" }
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserAccount" }
+        "403": { description: Not allowed to change this user }
+        "404": { description: User not found }
+  /admin/users/{userId}/role:
+    put:
+      operationId: setUserRole
+      tags: [admin]
+      summary: Appoint or remove the deputy (administrator only; one deputy at a time)
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserRoleUpdate" }
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserAccount" }
+        "403": { description: Not the administrator }
+        "409": { description: "Another deputy exists, or the user is not approved" }
+  /admin/users/{userId}/make-admin:
+    post:
+      operationId: transferAdmin
+      tags: [admin]
+      summary: Hand the administrator role to an approved user (administrator only)
+      description: The previous administrator becomes deputy if the seat is free (or was held by the new administrator), otherwise a regular user.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TransferAdminRequest" }
+      responses:
+        "200":
+          description: The new administrator
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserAccount" }
+        "403": { description: Not the administrator }
+        "409": { description: The user is not approved }
   /admin/orders/{orderId}/reapply-emails:
     post:
       operationId: reapplyOrderEmails
@@ -574,6 +669,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
     EmailId:
       name: emailId
       in: path
@@ -736,10 +836,101 @@ components:
         uploadURL: { type: string, format: uri }
     CurrentUser:
       type: object
-      required: [userId, isAdmin]
+      required: [userId, email, name, status, role, department, isAdmin, canManageUsers, areas, permissions]
       properties:
         userId: { type: string }
-        isAdmin: { type: boolean }
+        email: { type: ["string", "null"] }
+        name: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/UserStatus" }
+        role: { $ref: "#/components/schemas/UserRole" }
+        department: { type: ["string", "null"] }
+        isAdmin: { type: boolean, description: "Same as canManageUsers (kept for older screens). Use permissions for invoice/intake actions." }
+        canManageUsers: { type: boolean, description: Active administrator or deputy }
+        areas: { $ref: "#/components/schemas/AreaAccess" }
+        permissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
+    UserStatus:
+      type: string
+      description: pending = signed in, waiting for approval (no access); disabled = access removed
+      enum: [pending, active, disabled]
+    UserRole:
+      type: string
+      description: One administrator; at most one deputy; both approve users and grant access
+      enum: [admin, deputy, user]
+    AccessLevel:
+      type: string
+      enum: [none, read, write]
+    Permission:
+      type: string
+      description: >-
+        invoice_override = change the invoice counter or an order's BK invoice;
+        commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates;
+        intake_run = read the mailbox and re-apply emails
+      enum: [invoice_override, commercial_edit, intake_run]
+    AreaAccess:
+      type: object
+      required: [dashboard, merchandising, department_work, materials, quality]
+      properties:
+        dashboard: { $ref: "#/components/schemas/AccessLevel" }
+        merchandising: { $ref: "#/components/schemas/AccessLevel" }
+        department_work: { $ref: "#/components/schemas/AccessLevel" }
+        materials: { $ref: "#/components/schemas/AccessLevel" }
+        quality: { $ref: "#/components/schemas/AccessLevel" }
+    AreaAccessUpdate:
+      type: object
+      properties:
+        dashboard: { $ref: "#/components/schemas/AccessLevel" }
+        merchandising: { $ref: "#/components/schemas/AccessLevel" }
+        department_work: { $ref: "#/components/schemas/AccessLevel" }
+        materials: { $ref: "#/components/schemas/AccessLevel" }
+        quality: { $ref: "#/components/schemas/AccessLevel" }
+    UserAccount:
+      type: object
+      required: [id, email, name, status, role, department, areas, permissions, approvedBy, approvedAt, lastSeenAt, createdAt]
+      properties:
+        id: { type: string }
+        email: { type: ["string", "null"] }
+        name: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/UserStatus" }
+        role: { $ref: "#/components/schemas/UserRole" }
+        department: { type: ["string", "null"] }
+        areas: { $ref: "#/components/schemas/AreaAccess" }
+        permissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
+        approvedBy: { type: ["string", "null"] }
+        approvedAt: { type: ["string", "null"], format: date-time }
+        lastSeenAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    UserAccessUpdate:
+      type: object
+      properties:
+        status: { $ref: "#/components/schemas/UserStatus" }
+        department: { type: ["string", "null"] }
+        areas: { $ref: "#/components/schemas/AreaAccessUpdate" }
+        permissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
+    UserRoleUpdate:
+      type: object
+      required: [role]
+      properties:
+        role: { type: string, enum: [deputy, user] }
+    TransferAdminRequest:
+      type: object
+      required: [confirm]
+      properties:
+        confirm: { type: boolean, description: Must be true }
+    AccessTemplate:
+      type: object
+      required: [department, areas, permissions]
+      properties:
+        department: { type: string }
+        areas: { $ref: "#/components/schemas/AreaAccessUpdate" }
+        permissions:
+          type: array
+          items: { $ref: "#/components/schemas/Permission" }
     Buyer:
       type: object
       required: [id, name, abbreviation, emailDomains]
