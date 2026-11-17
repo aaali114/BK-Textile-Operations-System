@@ -80,9 +80,11 @@ const HEADER = /^[ \t>]*\*{0,2}(From|Sent|Date|Subject|To|Cc|CC)\*{0,2}\s*:\s*\*
  * Thunderbird, Gmail, Outlook, Apple Mail and cPanel webmail. Wrapped header
  * lines (a long subject) are joined. Returns the original subject and date.
  */
-export function forwardedBlocks(body: string): { subject: string; date: Date | null }[] {
+export type ForwardBlock = { subject: string; date: Date | null; marker: boolean };
+
+export function forwardedBlocks(body: string): ForwardBlock[] {
   const lines = body.replace(/\r\n/g, "\n").split("\n");
-  const out: { subject: string; date: Date | null }[] = [];
+  const out: ForwardBlock[] = [];
   for (let i = 0; i < lines.length; i++) {
     const startsBlock = MARKER.test(lines[i]!);
     // Outlook may forward with no marker line: a From: header followed closely by Sent:
@@ -104,7 +106,7 @@ export function forwardedBlocks(body: string): { subject: string; date: Date | n
       }
     }
     if (headers.subject || headers.date || headers.sent) {
-      out.push({ subject: (headers.subject ?? "").replace(/\s+/g, " ").trim(), date: parseLooseDate(headers.date ?? headers.sent ?? "") });
+      out.push({ subject: (headers.subject ?? "").replace(/\s+/g, " ").trim(), date: parseLooseDate(headers.date ?? headers.sent ?? ""), marker: startsBlock });
       i = j;
     }
   }
@@ -119,13 +121,32 @@ function originalDate(inner: Date | null, outer: Date | null): Date | null {
   return diff >= -36 * 3600_000 && diff <= 3 * 365 * 86400_000 ? inner : outer;
 }
 
+const FWD = /^\s*(fwd?|fw)\s*:/i;
+
+/**
+ * The forwarded original, following forwards of forwards: while the current
+ * forwarded header is itself a "Fwd:", step to the next forwarded header that
+ * has a marker line ("Forwarded message" etc.). Quoted reply headers further
+ * down (older history of the thread) are never chosen.
+ */
+export function originalBlock(subject: string, blocks: ForwardBlock[]): ForwardBlock | null {
+  if (!FWD.test(subject) || !blocks.length) return null;
+  let i = 0;
+  while (FWD.test(blocks[i]!.subject)) {
+    const next = blocks.findIndex((b, k) => k > i && b.marker);
+    if (next < 0) break;
+    i = next;
+  }
+  return blocks[i]!;
+}
+
 export async function parseEml(raw: Buffer): Promise<ParsedEmail> {
   const m = await simpleParser(raw, { skipHtmlToText: false, skipTextToHtml: true, skipImageLinks: true });
   const from = m.from?.value[0];
   const refs = Array.isArray(m.references) ? m.references : m.references ? [m.references] : [];
   const bodyText = (m.text ?? "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   const blocks = forwardedBlocks(bodyText);
-  const isManualForward = /^\s*(fwd?|fw):/i.test(m.subject ?? "") && blocks.length > 0;
+  const original = originalBlock(m.subject ?? "", blocks);
   const deliveredTo = m.headers.get("x-forwarded-to") ?? m.headers.get("delivered-to");
   return {
     messageId: m.messageId ?? `<no-id-${Date.now()}@bk-intake>`,
@@ -137,7 +158,7 @@ export async function parseEml(raw: Buffer): Promise<ParsedEmail> {
     cc: addresses(m.cc),
     subject: (m.subject ?? "").trim(),
     sentAt: m.date ?? null,
-    effectiveDate: originalDate(isManualForward ? blocks[0]!.date : null, m.date ?? null),
+    effectiveDate: originalDate(original?.date ?? null, m.date ?? null),
     forwardedSubjects: blocks.map((b) => b.subject).filter(Boolean),
     bodyText,
     forwardedVia: typeof deliveredTo === "string" ? deliveredTo : null,
