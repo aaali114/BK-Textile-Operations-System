@@ -10,20 +10,25 @@ import NotFound from '@/pages/not-found';
 import { Link, Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import {
   Activity, AlertCircle, ArrowLeft, ArrowRight, Boxes, Check, ClipboardCheck, Clock3, Factory, LayoutDashboard, LogIn, LogOut, Menu, PackageCheck,
-  Plus, Shirt, X,
+  Plus, Shirt, UsersRound, X,
 } from 'lucide-react';
 import {
   getGetDashboardSummaryQueryKey, getGetInspectionsQueryKey, getGetMaterialsQueryKey,
-  getGetWorkItemsQueryKey, useCreateInspection, useCreateMaterialLot, useGetDashboardSummary,
+  getGetWorkItemsQueryKey, getGetOrdersQueryKey, getListUsersQueryKey, useListUsers, useCreateInspection, useCreateMaterialLot, useGetDashboardSummary,
   useGetInspections, useGetMaterials, useGetOrders, useGetWorkItems,
   useHealthCheck, useUpdateWorkItem,
 } from '@workspace/api-client-react';
+import { AccessProvider, useAccess } from '@/components/access/AccessProvider';
+import type { Area } from '@/components/access/policy';
+import UsersAccessPage from '@/pages/users-access';
 import type {
   DashboardSummary, Department, Inspection, InspectionInput, MaterialLot, MaterialLotInput,
   Order, WorkItem, WorkItemStatus,
 } from '@workspace/api-client-react';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({ defaultOptions: { queries: {
+  retry: (failures, error) => (error as { status?: number }).status !== 403 && failures < 2,
+} } });
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -91,11 +96,11 @@ const clerkAppearance = {
 };
 
 const navItems = [
-  { href: '/dashboard', label: 'Operations desk', icon: LayoutDashboard },
-  { href: '/orders', label: 'Order register', icon: Shirt },
-  { href: '/workflows', label: 'Department work', icon: Factory },
-  { href: '/materials', label: 'Materials & lots', icon: Boxes },
-  { href: '/quality', label: 'Quality inspections', icon: ClipboardCheck },
+  { href: '/dashboard', label: 'Operations desk', icon: LayoutDashboard, area: 'dashboard' as Area },
+  { href: '/orders', label: 'Order register', icon: Shirt, area: 'merchandising' as Area },
+  { href: '/workflows', label: 'Department work', icon: Factory, area: 'department_work' as Area },
+  { href: '/materials', label: 'Materials & lots', icon: Boxes, area: 'materials' as Area },
+  { href: '/quality', label: 'Quality inspections', icon: ClipboardCheck, area: 'quality' as Area },
 ];
 
 function Brand({ small = false }: { small?: boolean }) {
@@ -111,6 +116,10 @@ function SignOutAction() {
 }
 
 function AppShell({ children }: { children: React.ReactNode }) {
+  const access = useAccess();
+  const visibleNav = navItems.filter((item) => access.canRead(item.area));
+  const users = useListUsers({ query: { queryKey: getListUsersQueryKey(), enabled: access.canManageUsers, refetchInterval: 30_000 } });
+  const pendingCount = users.data?.filter((user) => user.status === 'pending').length ?? 0;
   const [location] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, isLoaded } = useUser();
@@ -120,7 +129,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <Brand />
       <div className="nav-label">Production office</div>
       <nav aria-label="Main navigation">
-        {navItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href !== '/' && location.startsWith(href)) ? 'active' : ''}`} data-testid={`link-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={17} strokeWidth={1.8} /><span>{label}</span></Link>)}
+        {visibleNav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href !== '/' && location.startsWith(href)) ? 'active' : ''}`} data-testid={`link-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={17} strokeWidth={1.8} /><span>{label}</span></Link>)}
+        {access.canManageUsers && <Link href="/users" className={`nav-link ${location === '/users' ? 'active' : ''}`} data-testid="link-users-access"><UsersRound size={17} /><span>Users & access</span><span className="status-pill warn" data-testid="badge-pending-users" aria-label={`${pendingCount} pending users`}>{pendingCount}</span></Link>}
       </nav>
       <div className="sidebar-foot"><span className="status-pill blue"><span className="severity-dot info" />{health.isLoading ? 'Checking service' : health.isError ? 'Service unavailable' : 'Operations service ready'}</span><div style={{ marginTop: 12 }}>Shared daily view for orders, floor work, material lots and quality control.</div></div>
     </aside>
@@ -134,7 +144,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
           <SignOutAction />
         </div>
       </header>
-      {menuOpen && <div className="mobile-nav">{navItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''} onClick={() => setMenuOpen(false)}><Icon size={18} />{label.split(' ')[0]}</Link>)}</div>}
+      {menuOpen && <div className="mobile-nav">{visibleNav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''} onClick={() => setMenuOpen(false)}><Icon size={18} />{label}</Link>)}{access.canManageUsers && <Link href="/users" onClick={() => setMenuOpen(false)} data-testid="link-mobile-users-access"><UsersRound size={18} />Users & access ({pendingCount})</Link>}</div>}
       {children}
     </div>
   </div>;
@@ -160,6 +170,7 @@ function PublicHome() {
 }
 
 function Dashboard() {
+  const access = useAccess();
   const query = useGetDashboardSummary();
   const summary = query.data as DashboardSummary | undefined;
   const metrics = [
@@ -170,12 +181,12 @@ function Dashboard() {
   ];
   const maxTasks = Math.max(1, ...(summary?.departmentPulse ?? []).map((d) => d.openTasks));
   return <PageFrame>
-    <PageHeading eyebrow="Production office · Today" title="Operations desk" subtitle="A clear view of the work moving through the factory." action={<Link href="/orders" className="btn btn-primary"><Plus size={16} />Open order register</Link>} />
+    <PageHeading eyebrow="Production office · Today" title="Operations desk" subtitle="A clear view of the work moving through the factory." action={access.canRead('merchandising') && <Link href="/orders" className="btn btn-primary"><Plus size={16} />Open order register</Link>} />
     {query.isError && <QueryError onRetry={() => query.refetch()} />}
     {query.isLoading ? <><div className="metric-grid">{metrics.map((metric) => <div className="metric" key={metric.label} style={{ height: 119 }} />)}</div><div className="panel"><SkeletonRows /></div></> : summary && <>
       <div className="metric-grid">{metrics.map(({ label, value, note, icon: Icon, alert }) => <div className={`metric ${alert ? 'alert' : ''}`} key={label} data-testid={`metric-${label.toLowerCase().replaceAll(' ', '-')}`}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="metric-label">{label}</span><Icon size={16} color={alert ? '#b75b45' : '#628082'} /></div><div className="metric-value mono">{numberText(value)}</div><div className="metric-note">{note}</div></div>)}</div>
       <div className="dash-grid">
-        <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Floor pulse</p><h2 className="panel-title">Department workload</h2></div><Link className="ref-link" href="/workflows">View work queue <ArrowRight size={13} style={{ verticalAlign: 'middle' }} /></Link></div>
+        <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Floor pulse</p><h2 className="panel-title">Department workload</h2></div>{access.canRead('department_work') && <Link className="ref-link" href="/workflows">View work queue <ArrowRight size={13} style={{ verticalAlign: 'middle' }} /></Link>}</div>
           {summary.departmentPulse?.length ? summary.departmentPulse.map((dept) => <div className="dept-row" key={dept.department}><span className="dept-name">{statusLabel(dept.department)}</span><div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(4, dept.openTasks / maxTasks * 100)}%` }} /></div><span className="dept-number">{dept.openTasks} open</span><span className="dept-number" style={{ color: dept.overdueTasks ? '#a84c3d' : '#71817c' }}>{dept.overdueTasks} late</span></div>) : <EmptyState title="No department workload yet" text="Work items will appear here when they are added by the operations team." />}
           <div style={{ padding: '12px 20px', borderTop: '1px solid #eeeae1', display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#657672' }}><span>Ready to cut</span><strong className="mono">{numberText(summary.readyToCut)} orders</strong></div>
         </section>
@@ -193,6 +204,8 @@ function Dashboard() {
 }
 
 function Workflows() {
+  const access = useAccess();
+  const writable = access.canWrite('department_work');
   const [department, setDepartment] = useState('');
   const [status, setStatus] = useState('');
   const params = useMemo(() => ({ department: department ? department as Department : undefined, status: status ? status as WorkItemStatus : undefined }), [department, status]);
@@ -201,7 +214,7 @@ function Workflows() {
   const client = useQueryClient();
   const [notice, setNotice] = useState<{ message: string; error?: boolean } | null>(null);
   const items = query.data as WorkItem[] | undefined;
-  const updateField = (item: WorkItem, data: { status?: WorkItemStatus; assignee?: string | null }) => update.mutate({ workItemId: item.id, data }, {
+  const updateField = (item: WorkItem, data: { status?: WorkItemStatus; assignee?: string | null }) => writable && update.mutate({ workItemId: item.id, data }, {
     onSuccess: () => { void client.invalidateQueries({ queryKey: getGetWorkItemsQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); setNotice({ message: `${item.title} updated.` }); },
     onError: (err) => setNotice({ message: errorMessage(err), error: true }),
   });
@@ -210,7 +223,7 @@ function Workflows() {
     {notice && <Notice message={notice.message} error={notice.error} onClose={() => setNotice(null)} />}
     <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Work items</p><h2 className="panel-title">Current department queue {items ? <span className="mono" style={{ fontSize: 11, color: '#82908a', fontWeight: 400 }}>· {items.length}</span> : null}</h2></div><div className="table-tools"><select className="select" value={department} aria-label="Filter department" onChange={(e) => setDepartment(e.target.value)}><option value="">All departments</option>{departments.map((d) => <option value={d} key={d}>{statusLabel(d)}</option>)}</select><select className="select" value={status} aria-label="Filter work status" onChange={(e) => setStatus(e.target.value)}><option value="">All work states</option>{['not_started', 'in_progress', 'blocked', 'completed'].map((s) => <option value={s} key={s}>{statusLabel(s)}</option>)}</select></div></div>
       {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <SkeletonRows /> : !items?.length ? <EmptyState title="No work items in this view" text="Try another department or status filter. The queue is populated by operational work items." /> :
-        <div className="table-scroll"><table className="data-table"><thead><tr><th>Work item</th><th>Department</th><th>Assignee</th><th>Due date</th><th>Priority</th><th>State</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} data-testid={`row-work-item-${item.id}`}><td><strong>{item.title}</strong><div style={{ marginTop: 4 }}><Link href={`/orders/${item.orderId}`} className="ref-link">{item.orderReference}</Link></div></td><td>{statusLabel(item.department)}</td><td><input className="field" aria-label={`Assignee for ${item.title}`} defaultValue={item.assignee ?? ''} placeholder="Assign owner" style={{ maxWidth: 150, padding: '7px 8px' }} onBlur={(e) => { const next = e.target.value.trim() || null; if (next !== (item.assignee ?? null)) updateField(item, { assignee: next }); }} /></td><td>{dateText(item.dueDate)}</td><td><span className={`priority-marker ${item.priority}`}>{item.priority}</span></td><td><select aria-label={`Status for ${item.title}`} className="select status-select" value={item.status} disabled={update.isPending} onChange={(e) => updateField(item, { status: e.target.value as WorkItemStatus })}>{['not_started', 'in_progress', 'blocked', 'completed'].map((s) => <option value={s} key={s}>{statusLabel(s)}</option>)}</select></td></tr>)}</tbody></table></div>}
+        <div className="table-scroll"><table className="data-table"><thead><tr><th>Work item</th><th>Department</th><th>Assignee</th><th>Due date</th><th>Priority</th><th>State</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} data-testid={`row-work-item-${item.id}`}><td><strong>{item.title}</strong><div style={{ marginTop: 4 }}>{access.canRead('merchandising') ? <Link href={`/orders/${item.orderId}`} className="ref-link">{item.orderReference}</Link> : item.orderReference}</div></td><td>{statusLabel(item.department)}</td><td>{writable ? <input className="field" aria-label={`Assignee for ${item.title}`} defaultValue={item.assignee ?? ''} placeholder="Assign owner" style={{ maxWidth: 150, padding: '7px 8px' }} onBlur={(e) => { const next = e.target.value.trim() || null; if (next !== (item.assignee ?? null)) updateField(item, { assignee: next }); }} /> : item.assignee || '—'}</td><td>{dateText(item.dueDate)}</td><td><span className={`priority-marker ${item.priority}`}>{item.priority}</span></td><td>{writable ? <select aria-label={`Status for ${item.title}`} className="select status-select" value={item.status} disabled={update.isPending} onChange={(e) => updateField(item, { status: e.target.value as WorkItemStatus })}>{['not_started', 'in_progress', 'blocked', 'completed'].map((s) => <option value={s} key={s}>{statusLabel(s)}</option>)}</select> : <StatusPill status={item.status} />}</td></tr>)}</tbody></table></div>}
     </section>
   </PageFrame>;
 }
@@ -231,8 +244,10 @@ function MaterialForm({ orders, onSubmit, busy, onCancel }: { orders: Order[]; o
   </div><div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={onCancel}>Cancel</button><button className="btn btn-primary" type="submit" disabled={busy}>{busy ? 'Recording…' : 'Record receipt'}</button></div></form>;
 }
 function Materials() {
+  const access = useAccess();
+  const writable = access.canWrite('materials');
   const query = useGetMaterials();
-  const ordersQuery = useGetOrders();
+  const ordersQuery = useGetOrders(undefined, { query: { queryKey: getGetOrdersQueryKey(), enabled: writable && access.canRead('merchandising') } });
   const create = useCreateMaterialLot();
   const client = useQueryClient();
   const [modal, setModal] = useState(false);
@@ -245,13 +260,13 @@ function Materials() {
     onSuccess: () => { void client.invalidateQueries({ queryKey: getGetMaterialsQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); setNotice({ message: 'Material receipt recorded.' }); setModal(false); },
     onError: (err) => setNotice({ message: errorMessage(err), error: true }),
   });
-  return <PageFrame><PageHeading eyebrow="Production office · Incoming goods" title="Materials & lots" subtitle="Record receipts and keep each lot traceable through quality disposition." action={<button className="btn btn-primary" onClick={() => { setModal(true); setNotice(null); }}><Plus size={16} />Record receipt</button>} />
+  return <PageFrame><PageHeading eyebrow="Production office · Incoming goods" title="Materials & lots" subtitle="Record receipts and keep each lot traceable through quality disposition." action={writable && <button className="btn btn-primary" onClick={() => { setModal(true); setNotice(null); }}><Plus size={16} />Record receipt</button>} />
     {notice && <Notice message={notice.message} error={notice.error} onClose={() => setNotice(null)} />}
     <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Receiving register</p><h2 className="panel-title">Material lots {materials ? <span className="mono" style={{ fontSize: 11, color: '#82908a', fontWeight: 400 }}>· {materials.length}</span> : null}</h2></div><select className="select" style={{ width: 170 }} aria-label="Filter lots by status" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="">All lot statuses</option>{['pending_qc', 'available', 'hold', 'rejected'].map((s) => <option value={s} key={s}>{statusLabel(s)}</option>)}</select></div>
-      {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <SkeletonRows /> : !filtered?.length ? <EmptyState title="No material lots in this view" text={filter ? 'Try another disposition filter.' : 'Record a receipt to begin tracking material lots.'} action={!filter ? <button className="btn btn-primary" onClick={() => setModal(true)}><Plus size={15} />Record receipt</button> : undefined} /> :
-        <div className="table-scroll"><table className="data-table"><thead><tr><th>Material / lot</th><th>Order</th><th>Type</th><th>Supplier</th><th>Quantity</th><th>Received</th><th>Disposition</th></tr></thead><tbody>{filtered.map((lot) => <tr key={lot.id} data-testid={`row-material-${lot.id}`}><td><strong>{lot.material}</strong><div className="mono" style={{ fontSize: 10, marginTop: 4, color: '#75847e' }}>{lot.lotReference}</div></td><td>{lot.orderReference ? <Link className="ref-link" href={`/orders/${lot.orderId}`}>{lot.orderReference}</Link> : '—'}</td><td>{statusLabel(lot.type)}</td><td>{lot.supplier}</td><td className="mono">{numberText(lot.quantity)} {lot.unit}</td><td>{dateText(lot.receivedAt)}</td><td><StatusPill status={lot.status} /></td></tr>)}</tbody></table></div>}
+      {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <SkeletonRows /> : !filtered?.length ? <EmptyState title="No material lots in this view" text={filter ? 'Try another disposition filter.' : 'Material receipts will appear here when recorded.'} action={!filter && writable ? <button className="btn btn-primary" onClick={() => setModal(true)}><Plus size={15} />Record receipt</button> : undefined} /> :
+        <div className="table-scroll"><table className="data-table"><thead><tr><th>Material / lot</th><th>Order</th><th>Type</th><th>Supplier</th><th>Quantity</th><th>Received</th><th>Disposition</th></tr></thead><tbody>{filtered.map((lot) => <tr key={lot.id} data-testid={`row-material-${lot.id}`}><td><strong>{lot.material}</strong><div className="mono" style={{ fontSize: 10, marginTop: 4, color: '#75847e' }}>{lot.lotReference}</div></td><td>{lot.orderReference ? access.canRead('merchandising') ? <Link className="ref-link" href={`/orders/${lot.orderId}`}>{lot.orderReference}</Link> : lot.orderReference : '—'}</td><td>{statusLabel(lot.type)}</td><td>{lot.supplier}</td><td className="mono">{numberText(lot.quantity)} {lot.unit}</td><td>{dateText(lot.receivedAt)}</td><td><StatusPill status={lot.status} /></td></tr>)}</tbody></table></div>}
     </section>
-    {modal && <div className="modal-scrim" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setModal(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="receipt-title"><div className="modal-head"><div><div className="eyebrow">Incoming goods</div><h2 id="receipt-title" className="panel-title" style={{ fontSize: 20 }}>Record material receipt</h2></div><button className="icon-btn" aria-label="Close" onClick={() => setModal(false)}><X size={17} /></button></div><div className="modal-content">{ordersQuery.isError ? <QueryError onRetry={() => ordersQuery.refetch()} /> : <MaterialForm orders={orders ?? []} onSubmit={save} busy={create.isPending} onCancel={() => setModal(false)} />}</div></section></div>}
+    {modal && writable && <div className="modal-scrim" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setModal(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="receipt-title"><div className="modal-head"><div><div className="eyebrow">Incoming goods</div><h2 id="receipt-title" className="panel-title" style={{ fontSize: 20 }}>Record material receipt</h2></div><button className="icon-btn" aria-label="Close" onClick={() => setModal(false)}><X size={17} /></button></div><div className="modal-content">{ordersQuery.isError ? <QueryError onRetry={() => ordersQuery.refetch()} /> : <MaterialForm orders={access.canRead('merchandising') ? orders ?? [] : []} onSubmit={save} busy={create.isPending} onCancel={() => setModal(false)} />}</div></section></div>}
   </PageFrame>;
 }
 
@@ -268,28 +283,30 @@ function InspectionForm({ materials, onSubmit, busy, onCancel }: { materials: Ma
   </div><div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={onCancel}>Cancel</button><button className="btn btn-primary" type="submit" disabled={busy || !materials.length}>{busy ? 'Saving…' : 'Save inspection'}</button></div></form>;
 }
 function Quality() {
+  const access = useAccess();
+  const writable = access.canWrite('quality');
   const query = useGetInspections();
-  const materialsQuery = useGetMaterials();
+  const materialsQuery = useGetMaterials({ query: { queryKey: getGetMaterialsQueryKey(), enabled: access.canRead('materials') } });
   const create = useCreateInspection();
   const client = useQueryClient();
   const [modal, setModal] = useState(false);
   const [filter, setFilter] = useState('');
   const [notice, setNotice] = useState<{ message: string; error?: boolean } | null>(null);
   const inspections = query.data as Inspection[] | undefined;
-  const materials = materialsQuery.data as MaterialLot[] | undefined;
+  const materials = access.canRead('materials') ? materialsQuery.data as MaterialLot[] | undefined : undefined;
   const filtered = inspections?.filter((i) => !filter || i.result === filter);
   const materialById = useMemo(() => new Map((materials ?? []).map((m) => [m.id, m])), [materials]);
   const save = (data: InspectionInput) => create.mutate({ data }, {
     onSuccess: () => { void client.invalidateQueries({ queryKey: getGetInspectionsQueryKey() }); void client.invalidateQueries({ queryKey: getGetMaterialsQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); setNotice({ message: 'Inspection result saved.' }); setModal(false); },
     onError: (err) => setNotice({ message: errorMessage(err), error: true }),
   });
-  return <PageFrame><PageHeading eyebrow="Production office · Quality control" title="Quality inspections" subtitle="Capture incoming-lot inspection results and record disposition clearly." action={<button className="btn btn-primary" onClick={() => { setModal(true); setNotice(null); }}><Plus size={16} />New inspection</button>} />
+  return <PageFrame><PageHeading eyebrow="Production office · Quality control" title="Quality inspections" subtitle="Capture incoming-lot inspection results and record disposition clearly." action={writable && <button className="btn btn-primary" onClick={() => { setModal(true); setNotice(null); }}><Plus size={16} />New inspection</button>} />
     {notice && <Notice message={notice.message} error={notice.error} onClose={() => setNotice(null)} />}
     <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Inspection log</p><h2 className="panel-title">Recorded checks {inspections ? <span className="mono" style={{ fontSize: 11, color: '#82908a', fontWeight: 400 }}>· {inspections.length}</span> : null}</h2></div><select className="select" style={{ width: 170 }} aria-label="Filter inspections by result" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="">All results</option>{['accepted', 'hold', 'rejected'].map((s) => <option value={s} key={s}>{statusLabel(s)}</option>)}</select></div>
-      {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <SkeletonRows /> : !filtered?.length ? <EmptyState title="No inspections in this view" text={filter ? 'There are no inspections with this result yet.' : 'Log a material check to begin the quality record.'} action={!filter ? <button className="btn btn-primary" onClick={() => setModal(true)}><Plus size={15} />New inspection</button> : undefined} /> :
+      {query.isError ? <QueryError onRetry={() => query.refetch()} /> : query.isLoading ? <SkeletonRows /> : !filtered?.length ? <EmptyState title="No inspections in this view" text={filter ? 'There are no inspections with this result yet.' : 'Recorded material checks will appear here.'} action={!filter && writable ? <button className="btn btn-primary" onClick={() => setModal(true)}><Plus size={15} />New inspection</button> : undefined} /> :
         <div className="table-scroll"><table className="data-table"><thead><tr><th>Lot reference</th><th>Material</th><th>Type</th><th>Result</th><th>Defects</th><th>Notes</th><th>Inspected</th></tr></thead><tbody>{filtered.map((inspection) => <tr key={inspection.id} data-testid={`row-inspection-${inspection.id}`}><td className="mono">{inspection.lotReference}</td><td>{materialById.get(inspection.materialId)?.material ?? 'Material record'}</td><td>{statusLabel(inspection.inspectionType)}</td><td><StatusPill status={inspection.result} /></td><td className="mono">{numberText(inspection.defectCount)}</td><td style={{ maxWidth: 240 }}>{inspection.notes || '—'}</td><td>{dateText(inspection.inspectedAt)}</td></tr>)}</tbody></table></div>}
     </section>
-    {modal && <div className="modal-scrim" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setModal(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="inspection-title"><div className="modal-head"><div><div className="eyebrow">Incoming material quality</div><h2 id="inspection-title" className="panel-title" style={{ fontSize: 20 }}>Record inspection</h2></div><button className="icon-btn" aria-label="Close" onClick={() => setModal(false)}><X size={17} /></button></div><div className="modal-content">{materialsQuery.isError ? <QueryError onRetry={() => materialsQuery.refetch()} /> : materialsQuery.isLoading ? <SkeletonRows count={3} /> : !materials?.length ? <EmptyState title="No lots available to inspect" text="Record a material receipt first, then return to quality inspections." action={<Link className="btn btn-quiet" href="/materials">Go to materials</Link>} /> : <InspectionForm materials={materials} onSubmit={save} busy={create.isPending} onCancel={() => setModal(false)} />}</div></section></div>}
+    {modal && writable && <div className="modal-scrim" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setModal(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="inspection-title"><div className="modal-head"><div><div className="eyebrow">Incoming material quality</div><h2 id="inspection-title" className="panel-title" style={{ fontSize: 20 }}>Record inspection</h2></div><button className="icon-btn" aria-label="Close" onClick={() => setModal(false)}><X size={17} /></button></div><div className="modal-content">{!access.canRead('materials') ? <EmptyState title="Material access is needed" text="Ask your administrator for read access to Materials & lots to select a lot for inspection." /> : materialsQuery.isError ? <QueryError onRetry={() => materialsQuery.refetch()} /> : materialsQuery.isLoading ? <SkeletonRows count={3} /> : !materials?.length ? <EmptyState title="No lots available to inspect" text="Record a material receipt first, then return to quality inspections." action={<Link className="btn btn-quiet" href="/materials">Go to materials</Link>} /> : <InspectionForm materials={materials} onSubmit={save} busy={create.isPending} onCancel={() => setModal(false)} />}</div></section></div>}
   </PageFrame>;
 }
 
@@ -299,14 +316,33 @@ function AuthLoading() {
 
 function HomeRedirect() {
   const { isLoaded, isSignedIn } = useAuth();
+  const access = useAccess();
   if (!isLoaded) return <AuthLoading />;
-  return isSignedIn ? <Redirect to="/dashboard" /> : <PublicHome />;
+  return isSignedIn ? <Redirect to={access.homePath} /> : <PublicHome />;
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children, area, manageUsers = false }: { children: React.ReactNode; area?: Area; manageUsers?: boolean }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  const access = useAccess();
+  if (!isLoaded) return <AuthLoading />;
+  if (!isSignedIn) return <Redirect to="/" />;
+  if ((area && !access.canRead(area)) || (manageUsers && !access.canManageUsers)) {
+    return <AppShell><PageFrame><EmptyState title="You don’t have access to this area" text="Ask your administrator if your work requires access."
+      action={<Link href={access.homePath} className="btn btn-quiet" data-testid="link-allowed-home">Go to your workspace</Link>} /></PageFrame></AppShell>;
+  }
+  return <>{children}</>;
+}
+
+function AccessSession({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
   if (!isLoaded) return <AuthLoading />;
-  return isSignedIn ? <>{children}</> : <Redirect to="/" />;
+  return isSignedIn ? <AccessProvider>{children}</AccessProvider> : <>{children}</>;
+}
+
+function NoAssignedAreas() {
+  const access = useAccess();
+  if (access.homePath !== '/access') return <Redirect to={access.homePath} />;
+  return <PageFrame><EmptyState title="No work areas have been assigned" text="Your account is active. Ask your administrator to assign the areas you need." /></PageFrame>;
 }
 
 function AuthPage({ signup = false }: { signup?: boolean }) {
@@ -376,18 +412,20 @@ function Router() {
   >
     <ClerkQueryClientCacheInvalidator />
     <ErrorBoundary resetKey={location}>
-      <Switch>
+      <AccessSession><Switch>
         <Route path="/sign-in/*?" component={SignInPage} />
         <Route path="/sign-up/*?" component={SignUpPage} />
-        <Route path="/dashboard" component={() => <ProtectedRoute><AppShell><Dashboard /></AppShell></ProtectedRoute>} />
-        <Route path="/orders" component={() => <ProtectedRoute><AppShell><Orders /></AppShell></ProtectedRoute>} />
-        <Route path="/orders/:orderId" component={() => <ProtectedRoute><AppShell><OrderDetails /></AppShell></ProtectedRoute>} />
-        <Route path="/workflows" component={() => <ProtectedRoute><AppShell><Workflows /></AppShell></ProtectedRoute>} />
-        <Route path="/materials" component={() => <ProtectedRoute><AppShell><Materials /></AppShell></ProtectedRoute>} />
-        <Route path="/quality" component={() => <ProtectedRoute><AppShell><Quality /></AppShell></ProtectedRoute>} />
+        <Route path="/dashboard" component={() => <ProtectedRoute area="dashboard"><AppShell><Dashboard /></AppShell></ProtectedRoute>} />
+        <Route path="/orders" component={() => <ProtectedRoute area="merchandising"><AppShell><Orders /></AppShell></ProtectedRoute>} />
+        <Route path="/orders/:orderId" component={() => <ProtectedRoute area="merchandising"><AppShell><OrderDetails /></AppShell></ProtectedRoute>} />
+        <Route path="/workflows" component={() => <ProtectedRoute area="department_work"><AppShell><Workflows /></AppShell></ProtectedRoute>} />
+        <Route path="/materials" component={() => <ProtectedRoute area="materials"><AppShell><Materials /></AppShell></ProtectedRoute>} />
+        <Route path="/quality" component={() => <ProtectedRoute area="quality"><AppShell><Quality /></AppShell></ProtectedRoute>} />
+        <Route path="/users" component={() => <ProtectedRoute manageUsers><AppShell><UsersAccessPage /></AppShell></ProtectedRoute>} />
+        <Route path="/access" component={() => <ProtectedRoute><AppShell><NoAssignedAreas /></AppShell></ProtectedRoute>} />
         <Route path="/" component={HomeRedirect} />
         <Route component={NotFound} />
-      </Switch>
+      </Switch></AccessSession>
     </ErrorBoundary>
   </ClerkProvider>;
 }

@@ -4,8 +4,10 @@ import { Download, FilePlus2, Shirt, Upload } from 'lucide-react';
 import { getGetOrderFilesQueryKey, useCompleteOrderFileUpload, useGetOrderFiles, useRequestOrderFileUpload } from '@workspace/api-client-react';
 import type { OrderFile } from '@workspace/api-client-react';
 import { Notice, QueryError, SkeletonRows, errorMessage } from './ui';
+import { useAccess } from '../access/AccessProvider';
 
 export function OrderFilesPanel({ orderId }: { orderId: string }) {
+  const writable = useAccess().canWrite('merchandising');
   const client = useQueryClient();
   const filesQuery = useGetOrderFiles(orderId, { query: { queryKey: getGetOrderFilesQueryKey(orderId), enabled: !!orderId } });
   const requestUpload = useRequestOrderFileUpload();
@@ -19,6 +21,7 @@ export function OrderFilesPanel({ orderId }: { orderId: string }) {
   const images = files?.filter((file) => file.fileType === 'garment_image') ?? [];
 
   const uploadFile = async (file: File, fileType: 'document' | 'garment_image') => {
+    if (!writable) return;
     setBusy(true);
     setNotice(null);
     try {
@@ -49,7 +52,7 @@ export function OrderFilesPanel({ orderId }: { orderId: string }) {
   };
 
   const uploadButton = (label: string, onClick: () => void) => (
-    <button className="btn btn-quiet" type="button" onClick={onClick} disabled={busy}>
+    writable && <button className="btn btn-quiet" type="button" onClick={onClick} disabled={busy}>
       <Upload size={14} />{busy ? 'Uploading…' : label}
     </button>
   );
@@ -67,7 +70,7 @@ export function OrderFilesPanel({ orderId }: { orderId: string }) {
         <div className="panel-head">
           <div><p className="panel-kicker">Reference material</p><h2 className="panel-title">Documents</h2></div>
           {uploadButton('Add document', () => documentsInput.current?.click())}
-          <input ref={documentsInput} hidden type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain" onChange={selectFile('document')} />
+          <input ref={documentsInput} hidden disabled={!writable} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain" onChange={selectFile('document')} />
         </div>
         {filesQuery.isError ? <div className="document-list"><QueryError onRetry={() => filesQuery.refetch()} /></div> : filesQuery.isLoading ? <div className="document-list"><SkeletonRows count={2} /></div> : <div className="document-list">
           {documents.length ? documents.map((file) => <div className="document-row" key={file.id}>
@@ -81,7 +84,7 @@ export function OrderFilesPanel({ orderId }: { orderId: string }) {
         <div className="panel-head">
           <div><p className="panel-kicker">Style reference</p><h2 className="panel-title">Garment pictures</h2></div>
           {uploadButton('Add picture', () => imagesInput.current?.click())}
-          <input ref={imagesInput} hidden type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={selectFile('garment_image')} />
+          <input ref={imagesInput} hidden disabled={!writable} type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={selectFile('garment_image')} />
         </div>
         {filesQuery.isError ? <div className="document-list"><QueryError onRetry={() => filesQuery.refetch()} /></div> : filesQuery.isLoading ? <div className="document-list"><SkeletonRows count={2} /></div> : images.length ? <div className="garment-image-list">
           {images.map((file) => <article className="garment-image-card" key={file.id}>

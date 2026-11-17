@@ -668,4 +668,5 @@
 .counter-strip{display:flex;gap:34px;flex-wrap:wrap;padding:14px 20px}
 .counter-strip>div{display:grid;gap:4px}
 .counter-strip strong{font-size:20px;color:#22343b}
+@media(max-width:760px){.mobile-nav{flex-wrap:wrap;gap:4px}.mobile-nav a{flex:1 1 100px;min-width:0;text-align:center}.page-wrap{padding-bottom:150px}}
 @media(max-width:760px){.email-layout.has-detail{grid-template-columns:1fr}.email-list{border-right:0;max-height:none}.line-block{margin:12px 10px}.record-ids{gap:16px}.size-grid,.spec-table{min-width:0}}

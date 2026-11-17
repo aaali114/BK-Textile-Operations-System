@@ -7,6 +7,7 @@ import {
 import type { EmailAttachment, EmailCategory, OrderEmailUpdate } from '@workspace/api-client-react';
 import { EmptyState, Notice, QueryError, SkeletonRows } from './ui';
 import { apiErrorInfo, dateTimeText, humanize, refreshAfterEmailReview } from './helpers';
+import { useAccess } from '../access/AccessProvider';
 
 const CATEGORIES: EmailCategory[] = ['order_details', 'tech_pack', 'trims_accessories', 'sample_requirements', 'packaging', 'amendment', 'other', 'unclassified'];
 const matchClass = (s: string) => (s === 'needs_review' ? 'warn' : s === 'ignored' ? 'neutral' : 'blue');
@@ -29,11 +30,13 @@ function AttachmentButton({ orderId, emailId, att }: { orderId: string; emailId:
 }
 
 function EmailDetail({ orderId, emailId, onClose }: { orderId: string; emailId: string; onClose: () => void }) {
+  const writable = useAccess().canWrite('merchandising');
   const client = useQueryClient();
   const q = useGetOrderEmail(orderId, emailId, { query: { queryKey: getGetOrderEmailQueryKey(orderId, emailId), enabled: !!emailId } });
   const update = useUpdateOrderEmail();
   const [msg, setMsg] = useState<{ message: string; error?: boolean } | null>(null);
   const review = (data: OrderEmailUpdate, done: string) => {
+    if (!writable) return;
     setMsg(null);
     update.mutate({ orderId, emailId, data }, {
       onSuccess: () => { refreshAfterEmailReview(client, orderId, emailId); setMsg({ message: done }); },
@@ -54,14 +57,14 @@ function EmailDetail({ orderId, emailId, onClose }: { orderId: string; emailId: 
         <dt>Parse</dt><dd>{humanize(e.parseStatus)}{e.parseError && <span className="inline-error"> {e.parseError}</span>}</dd>
       </dl>
       {msg && <Notice message={msg.message} error={msg.error} onClose={() => setMsg(null)} />}
-      {e.matchStatus === 'needs_review' && <div className="review-bar" data-testid="bar-email-review">
+      {e.matchStatus === 'needs_review' && writable && <div className="review-bar" data-testid="bar-email-review">
         <span className="review-label">Needs review</span>
         <label className="sr-only" htmlFor="email-category">Category</label>
         <select id="email-category" className="select" style={{ width: 190 }} value={e.category} disabled={update.isPending} onChange={(ev) => review({ category: ev.target.value as EmailCategory }, 'Category updated.')} data-testid="select-email-category">{CATEGORIES.map((c) => <option key={c} value={c}>{humanize(c)}</option>)}</select>
         <button type="button" className="btn btn-primary" disabled={update.isPending} onClick={() => review({ matchStatus: 'matched' }, 'Email confirmed for this order.')} data-testid="button-email-confirm"><Check size={14} />{update.isPending ? 'Saving…' : 'Confirm'}</button>
         <button type="button" className="btn btn-quiet" disabled={update.isPending} onClick={() => review({ matchStatus: 'ignored' }, 'Email ignored for this order.')} data-testid="button-email-ignore"><X size={14} />Ignore</button>
       </div>}
-      {e.matchStatus !== 'needs_review' && <p className="support-note">Category: {humanize(e.category)}</p>}
+      {(e.matchStatus !== 'needs_review' || !writable) && <p className="support-note">Category: {humanize(e.category)}</p>}
       {e.attachments.length > 0 && <div className="att-list"><Paperclip size={13} />{e.attachments.map((a) => <AttachmentButton key={a.id} orderId={orderId} emailId={e.id} att={a} />)}</div>}
       <pre className="email-body" data-testid="text-email-body">{e.bodyText ?? 'No plain-text body was captured for this email.'}</pre>
     </>}

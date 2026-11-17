@@ -1,1 +1,2 @@
 - [Order intake requirements](order-intake.md) — IMAP on orders@bktextile.com; real data only for PO 36572 (BK Inv. 4040); backend changes via GitHub PRs, Replit frontend-only.
+- [Required Git handoff](git-handoff.md) — after each task commit and push HEAD:main; merge newer main and keep backend conflict versions.

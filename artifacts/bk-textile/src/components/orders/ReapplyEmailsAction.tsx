@@ -5,15 +5,17 @@ import { useReapplyOrderEmails } from '@workspace/api-client-react';
 import type { ReapplyReport } from '@workspace/api-client-react';
 import { apiErrorInfo, dateTimeText, humanize, refreshAfterEmailReapply } from './helpers';
 import { Notice } from './ui';
+import { useAccess } from '../access/AccessProvider';
 
 export function ReapplyEmailsAction({ orderId, invoiceAction, disabled = false }: { orderId: string; invoiceAction: ReactNode; disabled?: boolean }) {
+  const canReapply = useAccess().hasPermission('intake_run');
   const client = useQueryClient();
   const mutation = useReapplyOrderEmails();
   const [confirming, setConfirming] = useState(false);
   const [report, setReport] = useState<ReapplyReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reapply = () => {
-    if (mutation.isPending) return;
+    if (mutation.isPending || !canReapply) return;
     setError(null);
     setReport(null);
     mutation.mutate({ orderId }, {
@@ -33,12 +35,12 @@ export function ReapplyEmailsAction({ orderId, invoiceAction, disabled = false }
   return <div>
     <fieldset disabled={mutation.isPending || confirming} style={{ border: 0, padding: 0, margin: '0 0 12px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
     {invoiceAction}
-    <button type="button" className="btn btn-quiet" disabled={disabled || mutation.isPending || confirming}
+    {canReapply && <button type="button" className="btn btn-quiet" disabled={disabled || mutation.isPending || confirming}
       onClick={() => { setConfirming(true); setError(null); setReport(null); }} data-testid="button-reapply-emails">
       <RotateCcw size={14} />{mutation.isPending ? 'Re-applying emails…' : 'Re-apply emails'}
-    </button>
+    </button>}
     </fieldset>
-    {confirming && <section className="feedback error" aria-label="Confirm re-applying emails" style={{ marginTop: 12 }}>
+    {confirming && canReapply && <section className="feedback error" aria-label="Confirm re-applying emails" style={{ marginTop: 12 }}>
       <p><strong>Re-apply this order’s stored emails?</strong></p>
       <p>Staff edits to the same fields will be overwritten. Emails are applied oldest first, so the latest email wins.
         Changes are logged. The BK invoice number will not change. This does not read the mailbox.</p>

@@ -2,7 +2,7 @@ import { type FormEvent, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Hash, ShieldCheck } from 'lucide-react';
 import {
-  getGetCurrentUserQueryKey, getGetInvoiceCounterQueryKey, getGetOrderQueryKey, useGetCurrentUser, useGetInvoiceCounter,
+  getGetInvoiceCounterQueryKey, getGetOrderQueryKey, useGetInvoiceCounter,
   useSetInvoiceCounter, useSetOrderInvoiceNumber,
 } from '@workspace/api-client-react';
 import type { Order } from '@workspace/api-client-react';
@@ -10,12 +10,7 @@ import { apiErrorInfo, invoiceDisplay, refreshOrderCore, validInvoiceInput } fro
 import { Notice, QueryError, SkeletonRows } from './ui';
 import { getGetDashboardSummaryQueryKey, getGetOrdersQueryKey } from '@workspace/api-client-react';
 import { ReapplyEmailsAction } from './ReapplyEmailsAction';
-
-/** True only when the role has loaded and isAdmin is exactly true. */
-export function useIsAdmin() {
-  const me = useGetCurrentUser({ query: { queryKey: getGetCurrentUserQueryKey(), staleTime: 60_000 } });
-  return me.data?.isAdmin === true;
-}
+import { useAccess } from '../access/AccessProvider';
 
 function ReasonFields({ idPrefix, num, setNum, reason, setReason, numLabel }: { idPrefix: string; num: string; setNum: (v: string) => void; reason: string; setReason: (v: string) => void; numLabel: string }) {
   return <div className="form-grid">
@@ -65,9 +60,10 @@ function CounterPanel() {
   </section>;
 }
 
-export function InvoiceNumberingPanel() { return useIsAdmin() ? <CounterPanel /> : null; }
+export function InvoiceNumberingPanel() { return useAccess().hasPermission('invoice_override') ? <CounterPanel /> : null; }
 
 function Override({ order }: { order: Order }) {
+  const canOverride = useAccess().hasPermission('invoice_override');
   const client = useQueryClient();
   const mutate = useSetOrderInvoiceNumber();
   const [open, setOpen] = useState(false);
@@ -77,7 +73,7 @@ function Override({ order }: { order: Order }) {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const invalid = validInvoiceInput(num, reason);
-    if (invalid) { setMsg({ message: invalid, error: true }); return; }
+    if (invalid || !canOverride) { setMsg({ message: invalid ?? 'You do not have permission to override invoices.', error: true }); return; }
     setMsg(null);
     mutate.mutate({ orderId: order.id, data: { invoiceNumber: Number(num), reason: reason.trim() } }, {
       onSuccess: (saved) => {
@@ -93,14 +89,17 @@ function Override({ order }: { order: Order }) {
     <div className="panel-head"><div><p className="panel-kicker"><ShieldCheck size={11} /> Admin</p><h2 className="panel-title">Order administration</h2></div></div>
     <div style={{ padding: '14px 20px 18px' }}>
       <ReapplyEmailsAction key={order.id} orderId={order.id} disabled={open} invoiceAction={
-        !open && <button type="button" className="btn btn-quiet" onClick={() => { setOpen(true); setNum(order.invoiceNumber != null ? String(order.invoiceNumber) : ''); setMsg(null); }} data-testid="button-override-invoice"><Hash size={14} />Override invoice number</button>
+        !open && canOverride && <button type="button" className="btn btn-quiet" onClick={() => { setOpen(true); setNum(order.invoiceNumber != null ? String(order.invoiceNumber) : ''); setMsg(null); }} data-testid="button-override-invoice"><Hash size={14} />Override invoice number</button>
       } />
       {msg && <Notice message={msg.message} error={msg.error} onClose={() => setMsg(null)} />}
-      {open ? <form onSubmit={submit}><ReasonFields idPrefix="invoice" numLabel="Invoice number" num={num} setNum={setNum} reason={reason} setReason={setReason} />
+      {open && canOverride ? <form onSubmit={submit}><ReasonFields idPrefix="invoice" numLabel="Invoice number" num={num} setNum={setNum} reason={reason} setReason={setReason} />
         <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={() => setOpen(false)}>Cancel</button><button className="btn btn-primary" disabled={mutate.isPending} data-testid="button-save-invoice">{mutate.isPending ? 'Saving…' : 'Override invoice'}</button></div></form>
-        : <p className="support-note" style={{ margin: 0 }}>Current: <span className="mono">{invoiceDisplay(order).value}</span>. Changes require a reason and are logged.</p>}
+        : <p className="support-note" style={{ margin: 0 }}>Current: <span className="mono">{invoiceDisplay(order).value}</span>. {canOverride ? 'Invoice changes require a reason and are logged.' : 'Email re-application is logged and does not change the BK invoice.'}</p>}
     </div>
   </section>;
 }
 
-export function OverrideInvoiceAction({ order }: { order: Order }) { return useIsAdmin() ? <Override order={order} /> : null; }
+export function OverrideInvoiceAction({ order }: { order: Order }) {
+  const access = useAccess();
+  return access.hasPermission('invoice_override') || access.hasPermission('intake_run') ? <Override order={order} /> : null;
+}
