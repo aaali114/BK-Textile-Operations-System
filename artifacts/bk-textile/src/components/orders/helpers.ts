@@ -86,3 +86,16 @@ export function refreshAfterEmailReview(client: QueryClient, orderId: string, em
   void client.invalidateQueries({ queryKey: getGetOrderFabricsQueryKey(orderId) });
   void client.invalidateQueries({ queryKey: getGetOrderTrimsQueryKey(orderId) });
 }
+
+/** Re-apply can update every stored email's date and all extracted order fields. */
+export function refreshAfterEmailReapply(client: QueryClient, orderId: string) {
+  refreshOrderCore(client, orderId);
+  void client.invalidateQueries({ queryKey: getGetOrderEmailsQueryKey(orderId) });
+  const detailPrefix = `${getGetOrderEmailsQueryKey(orderId)[0]}/`;
+  void client.invalidateQueries({
+    predicate: (query) => typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith(detailPrefix),
+  });
+  void client.invalidateQueries({ queryKey: getGetOrderBreakdownQueryKey(orderId) });
+  void client.invalidateQueries({ queryKey: getGetOrderFabricsQueryKey(orderId) });
+  void client.invalidateQueries({ queryKey: getGetOrderTrimsQueryKey(orderId) });
+}

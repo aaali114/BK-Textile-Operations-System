@@ -71,3 +71,19 @@ test("email reviews refresh every affected order view and source email", () => {
   assert.deepEqual(invalidated.find((key) => key[0] === "getGetOrderEmailQueryKey"),
     ["getGetOrderEmailQueryKey", "fictional-order", "fictional-email"]);
 });
+
+test("email re-apply refreshes order data and every cached email detail for only this order", () => {
+  const calls = [];
+  helpers.refreshAfterEmailReapply({ invalidateQueries: (options) => calls.push(options) }, "fictional-order");
+  assert.deepEqual(calls.filter((c) => c.queryKey).map((c) => c.queryKey[0]).sort(), [
+    "getGetDashboardSummaryQueryKey", "getGetOrderActivityQueryKey", "getGetOrderBreakdownQueryKey",
+    "getGetOrderEmailsQueryKey", "getGetOrderFabricsQueryKey", "getGetOrderQueryKey",
+    "getGetOrderTrimsQueryKey", "getGetOrdersQueryKey",
+  ].sort());
+  const predicate = calls.find((c) => c.predicate).predicate;
+  // Stubbed key helper returns its own name rather than a URL.
+  assert.equal(predicate({ queryKey: ["getGetOrderEmailsQueryKey/email-one"] }), true);
+  assert.equal(predicate({ queryKey: ["getGetOrderEmailsQueryKey/email-two"] }), true);
+  assert.equal(predicate({ queryKey: ["/api/orders/another-order/emails/email-one"] }), false);
+  assert.equal(predicate({ queryKey: [42] }), false);
+});

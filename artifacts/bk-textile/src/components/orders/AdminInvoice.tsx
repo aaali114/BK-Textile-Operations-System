@@ -9,6 +9,7 @@ import type { Order } from '@workspace/api-client-react';
 import { apiErrorInfo, invoiceDisplay, refreshOrderCore, validInvoiceInput } from './helpers';
 import { Notice, QueryError, SkeletonRows } from './ui';
 import { getGetDashboardSummaryQueryKey, getGetOrdersQueryKey } from '@workspace/api-client-react';
+import { ReapplyEmailsAction } from './ReapplyEmailsAction';
 
 /** True only when the role has loaded and isAdmin is exactly true. */
 export function useIsAdmin() {
@@ -89,9 +90,11 @@ function Override({ order }: { order: Order }) {
     });
   };
   return <section className="panel admin-panel" style={{ marginBottom: 18 }} aria-label="Override invoice number">
-    <div className="panel-head"><div><p className="panel-kicker"><ShieldCheck size={11} /> Admin</p><h2 className="panel-title">BK invoice number</h2></div>
-      {!open && <button type="button" className="btn btn-quiet" onClick={() => { setOpen(true); setNum(order.invoiceNumber != null ? String(order.invoiceNumber) : ''); setMsg(null); }} data-testid="button-override-invoice"><Hash size={14} />Override invoice number</button>}</div>
+    <div className="panel-head"><div><p className="panel-kicker"><ShieldCheck size={11} /> Admin</p><h2 className="panel-title">Order administration</h2></div></div>
     <div style={{ padding: '14px 20px 18px' }}>
+      <ReapplyEmailsAction key={order.id} orderId={order.id} disabled={open} invoiceAction={
+        !open && <button type="button" className="btn btn-quiet" onClick={() => { setOpen(true); setNum(order.invoiceNumber != null ? String(order.invoiceNumber) : ''); setMsg(null); }} data-testid="button-override-invoice"><Hash size={14} />Override invoice number</button>
+      } />
       {msg && <Notice message={msg.message} error={msg.error} onClose={() => setMsg(null)} />}
       {open ? <form onSubmit={submit}><ReasonFields idPrefix="invoice" numLabel="Invoice number" num={num} setNum={setNum} reason={reason} setReason={setReason} />
         <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={() => setOpen(false)}>Cancel</button><button className="btn btn-primary" disabled={mutate.isPending} data-testid="button-save-invoice">{mutate.isPending ? 'Saving…' : 'Override invoice'}</button></div></form>
