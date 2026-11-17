@@ -190,7 +190,7 @@ Readers:
 
 Tested on the four sample PO 36572 emails (kept outside git) plus two fictional ones: order created as 4040/BK-SAS/2026; revised prices replaced the original ones and the change log shows both; the later trims sheet turned the PO's "Hang Tag: Not Required" into a required hang tag with its supplier; an unrelated PO email was never downloaded; a short thread reply was matched; re-runs and rescans stored nothing twice; an older PO arriving in a later run changed nothing.
 
-Manual forwards: forwarded blocks from Thunderbird, Gmail, Outlook (with or without a marker line, plain or bold headers), Apple Mail and cPanel webmail are read for the original subject and date; numeric dates are day-first and times without a zone are Pakistan time. A forwarded date later than the forward itself, or more than 3 years earlier, is ignored.
+Manual forwards: forwarded blocks from Thunderbird, Gmail, Outlook (with or without a marker line, plain or bold headers), Apple Mail and cPanel webmail are read for the original subject and date; numeric dates are day-first and times without a zone are Pakistan time. A forwarded date later than the forward itself, or more than 3 years earlier, is ignored. Forwards of forwards are followed inward (while the forwarded header's subject is itself "Fwd:", the next forwarded header is used); quoted reply headers further down are thread history and are never taken as the original.
 
 Re-apply (`POST /api/admin/orders/:id/reapply-emails`): re-parses each matched email from storage, corrects `sent_at`, re-applies PO and trims sheets oldest-first, sets "PO received" to the earliest original email if earlier, and logs everything. Running it twice changes nothing.
 
