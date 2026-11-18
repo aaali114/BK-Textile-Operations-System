@@ -130,9 +130,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <div className="nav-label">Production office</div>
       <nav aria-label="Main navigation">
         {visibleNav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href !== '/' && location.startsWith(href)) ? 'active' : ''}`} data-testid={`link-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={17} strokeWidth={1.8} /><span>{label}</span></Link>)}
-        {access.canManageUsers && <Link href="/users" className={`nav-link ${location === '/users' ? 'active' : ''}`} data-testid="link-users-access"><UsersRound size={17} /><span>Users & access</span><span className="status-pill warn" data-testid="badge-pending-users" aria-label={`${pendingCount} pending users`}>{pendingCount}</span></Link>}
       </nav>
       <div className="sidebar-foot"><span className="status-pill blue"><span className="severity-dot info" />{health.isLoading ? 'Checking service' : health.isError ? 'Service unavailable' : 'Operations service ready'}</span><div style={{ marginTop: 12 }}>Shared daily view for orders, floor work, material lots and quality control.</div></div>
+      {access.canManageUsers && <nav aria-label="Administration"><Link href="/users" className={`nav-link ${location === '/users' ? 'active' : ''}`} data-testid="link-users-access"><UsersRound size={17} /><span>Users & access</span><span className="status-pill warn" data-testid="badge-pending-users" aria-label={`${pendingCount} pending users`}>{pendingCount}</span></Link></nav>}
     </aside>
     <div className="main-area">
       <header className="topbar">
