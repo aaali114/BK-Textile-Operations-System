@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.6.0
+  version: 0.7.0
   description: B.K. Textile operations API
 servers:
   - url: /api
@@ -544,7 +544,8 @@ paths:
       summary: Read new mail from the orders mailbox now (admins only)
       description: >-
         Reads the mailbox read-only, stores emails about allow-listed POs
-        (INTAKE_PO_ALLOWLIST) with their attachments, creates the order for a
+        (INTAKE_PO_ALLOWLIST, or every PO when it is "*") that reached the
+        mailbox on or after INTAKE_START_DATE, with their attachments, creates the order for a
         new PO that arrives with its PO sheet, and applies PO and trims sheets
         to the order (later email wins). With dryRun nothing is written.
       requestBody:
@@ -1177,11 +1178,14 @@ components:
         error: { type: ["string", "null"] }
     IntakeRunSummary:
       type: object
-      required: [dryRun, mailbox, folder, fromUid, scanned, candidates, stored, duplicates, skipped, ordersCreated, emails, errors]
+      required: [dryRun, mailbox, folder, poScope, startDate, beforeStartDate, fromUid, scanned, candidates, stored, duplicates, skipped, ordersCreated, emails, errors]
       properties:
         dryRun: { type: boolean }
         mailbox: { type: string }
         folder: { type: string }
+        poScope: { type: string, description: '"all" (every PO), or the allow-listed POs' }
+        startDate: { type: ["string", "null"], format: date-time, description: Mail that reached the mailbox before this is skipped }
+        beforeStartDate: { type: integer, description: Messages before the start date (not downloaded) }
         fromUid: { type: integer }
         scanned: { type: integer }
         candidates: { type: integer }

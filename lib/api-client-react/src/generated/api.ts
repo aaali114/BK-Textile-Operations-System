@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.6.0
+ * OpenAPI spec version: 0.7.0
  */
 import {
   useMutation,
@@ -3023,7 +3023,7 @@ export const getRunEmailIntakeUrl = () => {
 }
 
 /**
- * Reads the mailbox read-only, stores emails about allow-listed POs (INTAKE_PO_ALLOWLIST) with their attachments, creates the order for a new PO that arrives with its PO sheet, and applies PO and trims sheets to the order (later email wins). With dryRun nothing is written.
+ * Reads the mailbox read-only, stores emails about allow-listed POs (INTAKE_PO_ALLOWLIST, or every PO when it is "*") that reached the mailbox on or after INTAKE_START_DATE, with their attachments, creates the order for a new PO that arrives with its PO sheet, and applies PO and trims sheets to the order (later email wins). With dryRun nothing is written.
  * @summary Read new mail from the orders mailbox now (admins only)
  */
 export const runEmailIntake = async (intakeRunRequest: IntakeRunRequest, options?: Parameters<typeof customFetch>[1]): Promise<IntakeRunSummary> => {
