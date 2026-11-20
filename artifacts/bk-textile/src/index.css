@@ -277,7 +277,12 @@
 .mono { font-family: var(--app-font-mono); letter-spacing: -.02em; }
 .display { font-family: var(--app-font-serif); letter-spacing: -.045em; }
 .app-shell { min-height: 100dvh; display: flex; }
-.sidebar { width: 246px; background: #22343b; color: #f0eee5; display:flex; flex-direction:column; padding:26px 15px 18px; flex-shrink:0; }
+.sidebar { width: 246px; background: #22343b; color: #f0eee5; display:flex; flex-direction:column; padding:26px 15px 18px; flex-shrink:0; position:sticky; top:0; align-self:flex-start; height:100dvh; box-sizing:border-box; overflow-y:auto; overscroll-behavior-y:contain; scrollbar-width:thin; scrollbar-color:#78928f #22343b; }
+.sidebar > * { flex-shrink:0; }
+.sidebar::-webkit-scrollbar { width:8px; }
+.sidebar::-webkit-scrollbar-track { background:#22343b; }
+.sidebar::-webkit-scrollbar-thumb { background:#78928f; border:2px solid #22343b; border-radius:8px; }
+.sidebar::-webkit-scrollbar-thumb:hover { background:#aabbb8; }
 .brand-mark { width:36px;height:36px;border:1px solid #8ba4a2;border-radius:50%;display:grid;place-items:center;color:#e1b65d;font:700 13px var(--app-font-mono); }
 .brand-lockup { display:flex;gap:11px;align-items:center;padding:0 11px 29px;border-bottom:1px solid #405157; }
 .brand-name {font:700 14px var(--app-font-serif); letter-spacing:.04em}

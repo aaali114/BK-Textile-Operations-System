@@ -125,7 +125,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const { user, isLoaded } = useUser();
   const health = useHealthCheck();
   return <div className="app-shell">
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label="Sidebar menu" tabIndex={0}>
       <Brand />
       <div className="nav-label">Production office</div>
       <nav aria-label="Main navigation">
