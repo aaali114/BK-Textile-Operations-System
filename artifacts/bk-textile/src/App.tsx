@@ -21,6 +21,7 @@ import {
 import { AccessProvider, useAccess } from '@/components/access/AccessProvider';
 import type { Area } from '@/components/access/policy';
 import UsersAccessPage from '@/pages/users-access';
+import CustomDashboardsPage from '@/components/dashboards/dashboard-page';
 import type {
   DashboardSummary, Department, Inspection, InspectionInput, MaterialLot, MaterialLotInput,
   Order, WorkItem, WorkItemStatus,
@@ -415,7 +416,7 @@ function Router() {
       <AccessSession><Switch>
         <Route path="/sign-in/*?" component={SignInPage} />
         <Route path="/sign-up/*?" component={SignUpPage} />
-        <Route path="/dashboard" component={() => <ProtectedRoute area="dashboard"><AppShell><Dashboard /></AppShell></ProtectedRoute>} />
+        <Route path="/dashboard" component={() => <ProtectedRoute area="dashboard"><AppShell><CustomDashboardsPage /></AppShell></ProtectedRoute>} />
         <Route path="/orders" component={() => <ProtectedRoute area="merchandising"><AppShell><Orders /></AppShell></ProtectedRoute>} />
         <Route path="/orders/:orderId" component={() => <ProtectedRoute area="merchandising"><AppShell><OrderDetails /></AppShell></ProtectedRoute>} />
         <Route path="/workflows" component={() => <ProtectedRoute area="department_work"><AppShell><Workflows /></AppShell></ProtectedRoute>} />

@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Check, Crown, Lock, RefreshCw, ShieldCheck, UserCheck, UserMinus, Users, Wand2, X } from 'lucide-react';
+import { AlertTriangle, Check, Lock, RefreshCw, UserCheck, Users, Wand2, X } from 'lucide-react';
 import {
   Department, Permission, getGetAccessTemplatesQueryKey, getGetCurrentUserQueryKey, getListUsersQueryKey,
-  useGetAccessTemplates, useListUsers, useSetUserRole, useTransferAdmin, useUpdateUserAccess,
+  useGetAccessTemplates, useListUsers, useUpdateUserAccess,
 } from '@workspace/api-client-react';
 import type { AccessLevel, AccessTemplate, AreaAccess, CurrentUser, UserAccessUpdate, UserAccount, UserStatus } from '@workspace/api-client-react';
 import { Form, FormField } from '@/components/ui/form';
 import { useAccess } from '../components/access/AccessProvider';
+import { UserRoleActions } from '../components/access/UserRoleActions';
+import { DashboardTemplatesPanel } from '../components/dashboards/dashboard-templates';
 import { AREA_LABELS, type Area } from '../components/access/policy';
 import { apiErrorInfo, dateTimeText, humanize } from '../components/orders/helpers';
 import '../components/access/users-access.css';
@@ -30,12 +32,11 @@ const permsEqual = (a: Permission[], b: Permission[]) => a.length === b.length &
 const areasEqual = (a: AreaAccess, b: AreaAccess) => AREAS.every((k) => a[k] === b[k]);
 const initials = (u: UserAccount) => (u.name || u.email || '?').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((s) => s[0]!.toUpperCase()).join('');
 const label = (u: UserAccount) => u.name || u.email || 'Unnamed user';
-const identity = (u: UserAccount) => u.email || u.id;
 
 /** Mirrors the backend safeguards so the UI explains them; the server remains authoritative. */
 function lockReason(actor: CurrentUser, target: UserAccount): string | null {
   if (target.id === actor.userId) return 'This is your own account. Nobody can change their own access here, so you cannot lock yourself out. Ask the administrator (or deputy) to make changes for you.';
-  if (target.role === 'admin') return 'The administrator\u2019s access cannot be changed. The administrator role must be transferred first.';
+  if (target.role === 'admin') return "Administrators' access cannot be changed by others; an administrator can only step down themselves.";
   if (target.role === 'deputy' && actor.role !== 'admin') return 'Only the administrator can change the deputy\u2019s access. You can view it here.';
   return null;
 }
@@ -72,19 +73,15 @@ function AccessEditor({ user, users, actor, templates, templatesState, adminLock
 }) {
   const client = useQueryClient();
   const update = useUpdateUserAccess();
-  const setRole = useSetUserRole();
-  const transfer = useTransferAdmin();
+  const [roleBusy, setRoleBusy] = useState(false);
   const [original, setOriginal] = useState<AccessForm>(() => toForm(user));
   const form = useForm<AccessForm>({ defaultValues: original });
   const values = form.watch();
   const [templateKey, setTemplateKey] = useState('');
   const [flash, setFlash] = useState<Flash>(null);
-  const [confirm, setConfirm] = useState<null | 'disable' | 'deputy' | 'undeputy' | 'transfer'>(null);
-  const [typed, setTyped] = useState('');
+  const [confirm, setConfirm] = useState<null | 'disable'>(null);
   const lock = lockReason(actor, user);
   const editable = !lock && !adminLocked;
-  const isAdminActor = actor.role === 'admin' && actor.canManageUsers && !adminLocked;
-  const otherDeputy = users.find((u) => u.role === 'deputy' && u.id !== user.id);
 
   const dirty = values.status !== original.status || values.department !== original.department || !areasEqual(values.areas, original.areas) || !permsEqual(values.permissions, original.permissions);
 
@@ -95,7 +92,7 @@ function AccessEditor({ user, users, actor, templates, templatesState, adminLock
   };
 
   const doSave = () => {
-    if (!editable || update.isPending || setRole.isPending || transfer.isPending) return;
+    if (!editable || update.isPending || roleBusy) return;
     const v = form.getValues();
     const data: UserAccessUpdate = {};
     if (v.status !== original.status) data.status = v.status;
@@ -129,44 +126,12 @@ function AccessEditor({ user, users, actor, templates, templatesState, adminLock
     setFlash({ message: `${humanize(t.department)} template applied to the form. Review, then save to make it take effect.` });
   };
 
-  const changeRole = (role: 'deputy' | 'user') => {
-    if (!isAdminActor || setRole.isPending || update.isPending || transfer.isPending) return;
-    setFlash(null);
-    setRole.mutate({ userId: user.id, data: { role } }, {
-      onSuccess: (saved) => { afterChange(saved); setConfirm(null); setFlash({ message: role === 'deputy' ? `${label(saved)} is now the deputy.` : `${label(saved)} is no longer the deputy.` }); },
-      onError: (err) => { setConfirm(null); setFlash({ message: apiErrorInfo(err).message, error: true }); },
-    });
-  };
-  const doTransfer = () => {
-    if (!isAdminActor || typed.trim() !== identity(user) || user.status !== 'active' || transfer.isPending || update.isPending || setRole.isPending) return;
-    setFlash(null);
-    window.dispatchEvent(new CustomEvent('bk:admin-transfer-start'));
-    transfer.mutate({ userId: user.id, data: { confirm: true } }, {
-      onSuccess: async (saved) => {
-        setConfirm(null); setTyped('');
-        afterChange(saved);
-        try {
-          await client.refetchQueries({ queryKey: getGetCurrentUserQueryKey() }, { throwOnError: true });
-          window.dispatchEvent(new CustomEvent('bk:admin-transfer-end'));
-        } catch {
-          setFlash({ message: 'The role was transferred, but your updated access could not be loaded. Reload before making further changes.', error: true });
-          return;
-        }
-        setFlash({ message: `${label(saved)} is now the administrator.` });
-      },
-      onError: (err) => {
-        window.dispatchEvent(new CustomEvent('bk:admin-transfer-end'));
-        setConfirm(null); setFlash({ message: apiErrorInfo(err).message, error: true });
-      },
-    });
-  };
 
   const statusOptions: { value: UserStatus; text: string }[] = original.status === 'pending'
     ? [{ value: 'pending', text: 'Keep pending' }, { value: 'active', text: 'Approve' }, { value: 'disabled', text: 'Disable' }]
     : original.status === 'active' ? [{ value: 'active', text: 'Active' }, { value: 'disabled', text: 'Disable' }]
     : [{ value: 'disabled', text: 'Disabled' }, { value: 'active', text: 'Restore' }];
 
-  const roleBusy = setRole.isPending || transfer.isPending;
 
   return <section className="panel ua-panel" data-testid={`panel-user-editor-${user.id}`}>
     <div className="ua-editor-head">
@@ -230,20 +195,6 @@ function AccessEditor({ user, users, actor, templates, templatesState, adminLock
           </label>)}</div>} />
         </div>
 
-        {actor.role === 'admin' && user.id !== actor.userId && user.role !== 'admin' && <div>
-          <div className="ua-section-label"><span>Administrator actions</span>{adminLocked && <span>Refreshing your role</span>}</div>
-          <div className="ua-role-actions">
-            {user.role === 'deputy'
-              ? <button type="button" className="btn btn-quiet" disabled={!isAdminActor || roleBusy} onClick={() => setConfirm('undeputy')} data-testid="button-remove-deputy"><UserMinus size={14} />Remove deputy</button>
-              : <>
-                <button type="button" className="btn btn-quiet" disabled={!isAdminActor || roleBusy || user.status !== 'active'} onClick={() => setConfirm('deputy')} data-testid="button-make-deputy"><ShieldCheck size={14} />Make deputy</button>
-                {user.status !== 'active' && <span className="support-note" style={{ margin: 0 }}>Approve this user before making them deputy.</span>}
-                {user.status === 'active' && otherDeputy && <span className="support-note" style={{ margin: 0 }}>{label(otherDeputy)} is already the deputy; there can be only one.</span>}
-              </>}
-            <button type="button" className="btn btn-quiet" style={{ color: '#8f3f36', borderColor: '#e2bfb3' }} disabled={!isAdminActor || roleBusy || user.status !== 'active'} onClick={() => { setTyped(''); setConfirm('transfer'); }} data-testid="button-transfer-admin"><Crown size={14} />Transfer administrator role</button>
-            {user.status !== 'active' && <span className="support-note" style={{ margin: 0 }}>Only active users can receive a role.</span>}
-          </div>
-        </div>}
       </div>
       {editable && <div className="ua-footer">
         <span className="ua-dirty" data-testid="text-unsaved">{dirty ? 'Unsaved changes' : <span style={{ color: '#82908a' }}>No changes</span>}</span>
@@ -253,20 +204,11 @@ function AccessEditor({ user, users, actor, templates, templatesState, adminLock
         </span>
       </div>}
     </fieldset></form></Form>
+    <UserRoleActions actor={actor} user={user} users={users} disabled={dirty || update.isPending || adminLocked} onChanged={afterChange} onBusyChange={setRoleBusy} />
 
     {confirm === 'disable' && <Modal testId="dialog-confirm-disable" eyebrow="Confirm access removal" title={`Disable ${label(user)}?`} onClose={() => setConfirm(null)}>
-      <p style={{ fontSize: 13, color: '#4d5f5f', lineHeight: 1.6, margin: 0 }}>{identity(user)} will lose access to the operations system at their next request. Their record stays, and you can restore access later.</p>
+      <p style={{ fontSize: 13, color: '#4d5f5f', lineHeight: 1.6, margin: 0 }}>{user.email || user.id} will lose access to the operations system at their next request. Their record stays, and you can restore access later.</p>
       <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={() => setConfirm(null)} data-testid="button-cancel-disable">Keep access</button><button type="button" className="btn btn-danger" disabled={update.isPending} onClick={doSave} data-testid="button-confirm-disable">{update.isPending ? 'Saving' : 'Disable and save'}</button></div>
-    </Modal>}
-    {(confirm === 'deputy' || confirm === 'undeputy') && <Modal testId="dialog-confirm-deputy" eyebrow="Deputy role" title={confirm === 'deputy' ? `Make ${label(user)} the deputy?` : `Remove ${label(user)} as deputy?`} onClose={() => setConfirm(null)}>
-      <p style={{ fontSize: 13, color: '#4d5f5f', lineHeight: 1.6, margin: 0 }}>{confirm === 'deputy' ? `${identity(user)} will be able to approve users and grant access to everyone except the administrator and themselves.` : `${identity(user)} will no longer be able to manage users. Their area access is unchanged.`}</p>
-      <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={() => setConfirm(null)} data-testid="button-cancel-deputy">Cancel</button><button type="button" className="btn btn-primary" disabled={setRole.isPending} onClick={() => changeRole(confirm === 'deputy' ? 'deputy' : 'user')} data-testid="button-confirm-deputy">{setRole.isPending ? 'Saving' : confirm === 'deputy' ? 'Make deputy' : 'Remove deputy'}</button></div>
-    </Modal>}
-    {confirm === 'transfer' && <Modal testId="dialog-transfer-admin" eyebrow="Transfer administrator role" title={`Hand the administrator role to ${label(user)}`} onClose={() => setConfirm(null)}>
-      <div className="ua-danger-box"><strong style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 6 }}><AlertTriangle size={15} />You will stop being the administrator.</strong>Only one administrator exists. After the transfer you lose the ability to appoint the deputy or transfer the role again, and the new administrator decides your access from then on.</div>
-      <label htmlFor="transfer-confirm" style={{ fontSize: 11, fontWeight: 700, color: '#526360', display: 'block', marginBottom: 6 }}>Type <span className="mono" style={{ background: '#efebe1', padding: '1px 5px', borderRadius: 3 }}>{identity(user)}</span> to confirm</label>
-      <input id="transfer-confirm" className="field" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} data-testid="input-transfer-confirm" />
-      <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={() => setConfirm(null)} data-testid="button-cancel-transfer">Cancel</button><button type="button" className="btn btn-danger" disabled={typed.trim() !== identity(user) || transfer.isPending} onClick={doTransfer} data-testid="button-confirm-transfer">{transfer.isPending ? 'Transferring' : 'Transfer administrator role'}</button></div>
     </Modal>}
   </section>;
 }
@@ -288,7 +230,7 @@ function UsersWorkspace({ actor }: { actor: CurrentUser }) {
     const by = (s: UserStatus) => all.filter((u) => u.status === s).sort((a, b) => label(a).localeCompare(label(b)));
     return [{ key: 'pending', title: 'Waiting for approval', items: by('pending') }, { key: 'active', title: 'Active staff', items: by('active') }, { key: 'disabled', title: 'Access removed', items: by('disabled') }];
   }, [users, filter]);
-  const counts = useMemo(() => ({ pending: users?.filter((u) => u.status === 'pending').length ?? 0, active: users?.filter((u) => u.status === 'active').length ?? 0, disabled: users?.filter((u) => u.status === 'disabled').length ?? 0, deputy: users?.find((u) => u.role === 'deputy') }), [users]);
+  const counts = useMemo(() => ({ pending: users?.filter((u) => u.status === 'pending').length ?? 0, active: users?.filter((u) => u.status === 'active').length ?? 0, disabled: users?.filter((u) => u.status === 'disabled').length ?? 0, administrators: users?.filter((u) => u.role === 'admin') ?? [], deputies: users?.filter((u) => u.role === 'deputy') ?? [] }), [users]);
   const selected = users?.find((u) => u.id === selectedId);
 
   return <>
@@ -296,7 +238,7 @@ function UsersWorkspace({ actor }: { actor: CurrentUser }) {
       <div className="ua-sum pending"><span className="metric-label">Waiting approval</span><strong className="mono" data-testid="text-count-pending">{list.isLoading ? '--' : counts.pending}</strong></div>
       <div className="ua-sum"><span className="metric-label">Active staff</span><strong className="mono" data-testid="text-count-active">{list.isLoading ? '--' : counts.active}</strong></div>
       <div className="ua-sum"><span className="metric-label">Access removed</span><strong className="mono" data-testid="text-count-disabled">{list.isLoading ? '--' : counts.disabled}</strong></div>
-      <div className="ua-sum"><span className="metric-label">Deputy</span><strong style={{ fontSize: 14, marginTop: 12 }} data-testid="text-deputy">{list.isLoading ? '--' : counts.deputy ? label(counts.deputy) : 'Not appointed'}</strong></div>
+      <div className="ua-sum"><span className="metric-label">Leadership seats</span><strong style={{ fontSize: 14, marginTop: 12 }} data-testid="text-role-counts">{list.isLoading ? '--' : `${counts.administrators.length}/2 administrators · ${counts.deputies.length}/2 deputies`}</strong><p style={{ fontSize: 11, marginBottom: 0 }}>{[...counts.administrators, ...counts.deputies].map(label).join(', ') || 'Not appointed'}</p></div>
     </div>
     <div className="ua-grid">
       <section className="panel" style={{ overflow: 'hidden' }}>
@@ -326,7 +268,7 @@ export default function UsersAccessPage() {
   return <main className="page-wrap" data-testid="page-users-access">
     <div className="page-title-row"><div><div className="eyebrow">Administration · Access control</div><h1 className="page-title">Users &amp; access</h1>
       <p className="page-subtitle">Approve new sign-ins and decide, area by area, who can see and change orders, floor work, lots and inspections.</p></div></div>
-    {user && canManageUsers ? <UsersWorkspace actor={user} />
+    {user && canManageUsers ? <><UsersWorkspace actor={user} /><DashboardTemplatesPanel /></>
       : <section className="panel"><div className="blank-state" data-testid="state-users-forbidden"><div className="blank-icon"><Lock size={18} /></div><p className="blank-title">Only the administrator or deputy can manage users</p><p style={{ fontSize: 12 }}>Ask them if your access needs to change.</p></div></section>}
   </main>;
 }
