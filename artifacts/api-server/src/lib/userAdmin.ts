@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { activityTable, db, userAreaAccessTable, userPermissionsTable, usersTable } from "@workspace/db";
 import { accessOf, AREAS, PERMISSIONS, type Access, type Area, type Level, type Permission } from "./access";
 
@@ -66,10 +66,10 @@ async function getTarget(id: string) {
 }
 
 function guardEdit(actor: Access, target: typeof usersTable.$inferSelect) {
-  if (!actor.canManageUsers) throw new UserAdminError(403, "Only the administrator or deputy can manage users.");
+  if (!actor.canManageUsers) throw new UserAdminError(403, "Only administrators and deputies can manage users.");
   if (target.id === actor.userId) throw new UserAdminError(403, "You cannot change your own access.");
-  if (target.role === "admin") throw new UserAdminError(403, "The administrator's access cannot be changed. Transfer the administrator role first.");
-  if (target.role === "deputy" && actor.role !== "admin") throw new UserAdminError(403, "Only the administrator can change the deputy.");
+  if (target.role === "admin") throw new UserAdminError(403, "Administrators' access cannot be changed by others; an administrator can only step down themselves.");
+  if (target.role === "deputy" && actor.role !== "admin") throw new UserAdminError(403, "Only an administrator can change a deputy.");
 }
 
 export type AccessUpdate = {
@@ -128,48 +128,54 @@ export async function updateUserAccess(actor: Access, targetId: string, input: A
 }
 
 /** The administrator appoints or removes the single deputy. */
-export async function setUserRole(actor: Access, targetId: string, role: "deputy" | "user"): Promise<UserAccount> {
-  if (actor.role !== "admin" || !actor.canManageUsers) throw new UserAdminError(403, "Only the administrator can appoint or remove the deputy.");
-  const target = await getTarget(targetId);
-  if (target.id === actor.userId) throw new UserAdminError(403, "You cannot change your own role.");
-  if (target.role === "admin") throw new UserAdminError(403, "Use the administrator transfer instead.");
-  if (target.role === role) return toAccount(target);
-  if (role === "deputy") {
-    if (target.status !== "active") throw new UserAdminError(409, "Approve the user before making them deputy.");
-    const [existing] = await db.select().from(usersTable).where(eq(usersTable.role, "deputy"));
-    if (existing) throw new UserAdminError(409, `${label(existing)} is already the deputy. Remove them first.`);
-  }
+export const MAX_ADMINS = 2;
+export const MAX_DEPUTIES = 2;
+const ROLE_LOCK = 83439044;
+
+/**
+ * Role changes, by an administrator only:
+ *  - promote an approved user to administrator or deputy while fewer than
+ *    MAX_ADMINS / MAX_DEPUTIES hold that role;
+ *  - demote a deputy;
+ *  - an administrator can never demote or disable another administrator;
+ *    they can only step down themselves, and only while another administrator remains.
+ * Serialised with a transaction-level lock so two administrators cannot fill a seat twice.
+ */
+export async function setUserRole(actor: Access, targetId: string, role: "admin" | "deputy" | "user"): Promise<UserAccount> {
+  if (actor.role !== "admin" || !actor.canManageUsers) throw new UserAdminError(403, "Only an administrator can change roles.");
   await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(${ROLE_LOCK})`);
+    const [target] = await tx.select().from(usersTable).where(eq(usersTable.id, targetId));
+    if (!target) throw new UserAdminError(404, "User not found. They appear here after their first sign-in.");
+    if (target.role === role) return;
+    const self = target.id === actor.userId;
+    if (self) {
+      if (role === "admin") return;
+      const [other] = await tx
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(and(eq(usersTable.role, "admin"), eq(usersTable.status, "active"), ne(usersTable.id, actor.userId)));
+      if (!other) throw new UserAdminError(409, "You are the only administrator. Promote another administrator before stepping down.");
+    } else if (target.role === "admin") {
+      throw new UserAdminError(403, "An administrator can only step down themselves; you cannot change another administrator.");
+    }
+    if (role === "admin" || role === "deputy") {
+      if (target.status !== "active") throw new UserAdminError(409, `Approve the user before making them ${role === "admin" ? "an administrator" : "a deputy"}.`);
+      const holders = await tx.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email }).from(usersTable).where(eq(usersTable.role, role));
+      const max = role === "admin" ? MAX_ADMINS : MAX_DEPUTIES;
+      if (holders.filter((h) => h.id !== targetId).length >= max) {
+        throw new UserAdminError(409, `There are already ${max} ${role === "admin" ? "administrators" : "deputies"} (${holders.map((h) => h.name || h.email || h.id).join(", ")}).`);
+      }
+    }
     await tx.update(usersTable).set({ role }).where(eq(usersTable.id, targetId));
-    await logUserChange(tx, actor, target, "user.role_changed", [{ field: "role", from: target.role, to: role }]);
+    await logUserChange(tx, actor, target, self ? "user.stepped_down" : "user.role_changed", [{ field: "role", from: target.role, to: role }]);
   });
   return toAccount(await getTarget(targetId));
 }
 
-/**
- * Hands the administrator role to another approved user. The previous
- * administrator becomes deputy (the target's deputy seat, or a free one);
- * if the deputy seat is held by someone else, they become a regular user.
- */
+/** Kept for the existing "make administrator" action: promotes without demoting the actor. */
 export async function transferAdmin(actor: Access, targetId: string): Promise<UserAccount> {
-  if (actor.role !== "admin" || !actor.canManageUsers) throw new UserAdminError(403, "Only the administrator can transfer the administrator role.");
-  const target = await getTarget(targetId);
-  if (target.id === actor.userId) throw new UserAdminError(400, "You are already the administrator.");
-  if (target.status !== "active") throw new UserAdminError(409, "Approve the user before making them administrator.");
-  await db.transaction(async (tx) => {
-    const [deputy] = await tx.select().from(usersTable).where(eq(usersTable.role, "deputy"));
-    const deputySeatFree = !deputy || deputy.id === targetId;
-    // release the unique seats in a safe order
-    await tx.update(usersTable).set({ role: "user" }).where(eq(usersTable.id, actor.userId));
-    if (target.role !== "user") await tx.update(usersTable).set({ role: "user" }).where(eq(usersTable.id, targetId));
-    await tx.update(usersTable).set({ role: "admin" }).where(eq(usersTable.id, targetId));
-    await tx.update(usersTable).set({ role: deputySeatFree ? "deputy" : "user" }).where(eq(usersTable.id, actor.userId));
-    await logUserChange(tx, actor, target, "user.admin_transferred", [
-      { field: "role", from: target.role, to: "admin" },
-      { field: `previous administrator ${actor.email ?? actor.userId}`, from: "admin", to: deputySeatFree ? "deputy" : "user" },
-    ]);
-  });
-  return toAccount(await getTarget(targetId));
+  return setUserRole(actor, targetId, "admin");
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];

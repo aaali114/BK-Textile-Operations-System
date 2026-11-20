@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.7.0
+ * OpenAPI spec version: 0.7.1
  */
 import type { EmailAttachment } from './emailAttachment';
 import type { EmailCategory } from './emailCategory';

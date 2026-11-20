@@ -109,7 +109,7 @@ router.post("/admin/users/:userId/make-admin", async (req, res): Promise<void> =
   }
   try {
     const user = await transferAdmin(accessFrom(res)!, params.data.userId);
-    req.log.warn({ newAdmin: params.data.userId }, "Administrator role transferred");
+    req.log.warn({ newAdmin: params.data.userId }, "User promoted to administrator");
     res.json(TransferAdminResponse.parse(user));
   } catch (error) {
     if (!userAdminError(res, error)) throw error;

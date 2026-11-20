@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { check, index, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 /**
  * People who have signed in. Passwords and sign-in stay with Clerk; this
@@ -15,7 +15,7 @@ export const usersTable = pgTable(
     name: text("name"),
     // pending | active | disabled
     status: text("status").notNull().default("pending"),
-    // admin (exactly one) | deputy (at most one) | user
+    // admin (at most 2) | deputy (at most 2) | user; limits enforced in api-server lib/userAdmin.ts
     role: text("role").notNull().default("user"),
     // merchandising, fabrication, export, accounts, ... (see Department in the API)
     department: text("department"),
@@ -28,8 +28,7 @@ export const usersTable = pgTable(
   (t) => [
     check("bk_users_status_valid", sql`${t.status} IN ('pending', 'active', 'disabled')`),
     check("bk_users_role_valid", sql`${t.role} IN ('admin', 'deputy', 'user')`),
-    uniqueIndex("bk_users_one_admin").on(t.role).where(sql`${t.role} = 'admin'`),
-    uniqueIndex("bk_users_one_deputy").on(t.role).where(sql`${t.role} = 'deputy'`),
+    index("bk_users_role_idx").on(t.role),
   ],
 );
 

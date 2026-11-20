@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.7.0
+ * OpenAPI spec version: 0.7.1
  */
 import * as zod from 'zod';
 
@@ -393,7 +393,7 @@ export const GetCurrentUserResponse = zod.object({
   "email": zod.string().nullable(),
   "name": zod.string().nullable(),
   "status": zod.enum(['pending', 'active', 'disabled']).describe('pending = signed in, waiting for approval (no access); disabled = access removed'),
-  "role": zod.enum(['admin', 'deputy', 'user']).describe('One administrator; at most one deputy; both approve users and grant access'),
+  "role": zod.enum(['admin', 'deputy', 'user']).describe('Up to 2 administrators and 2 deputies; all of them approve users and grant access'),
   "department": zod.string().nullable(),
   "isAdmin": zod.boolean().describe('Same as canManageUsers (kept for older screens). Use permissions for invoice/intake actions.'),
   "canManageUsers": zod.boolean().describe('Active administrator or deputy'),
@@ -741,7 +741,7 @@ export const ListUsersResponseItem = zod.object({
   "email": zod.string().nullable(),
   "name": zod.string().nullable(),
   "status": zod.enum(['pending', 'active', 'disabled']).describe('pending = signed in, waiting for approval (no access); disabled = access removed'),
-  "role": zod.enum(['admin', 'deputy', 'user']).describe('One administrator; at most one deputy; both approve users and grant access'),
+  "role": zod.enum(['admin', 'deputy', 'user']).describe('Up to 2 administrators and 2 deputies; all of them approve users and grant access'),
   "department": zod.string().nullable(),
   "areas": zod.object({
   "dashboard": zod.enum(['none', 'read', 'write']),
@@ -805,7 +805,7 @@ export const UpdateUserAccessResponse = zod.object({
   "email": zod.string().nullable(),
   "name": zod.string().nullable(),
   "status": zod.enum(['pending', 'active', 'disabled']).describe('pending = signed in, waiting for approval (no access); disabled = access removed'),
-  "role": zod.enum(['admin', 'deputy', 'user']).describe('One administrator; at most one deputy; both approve users and grant access'),
+  "role": zod.enum(['admin', 'deputy', 'user']).describe('Up to 2 administrators and 2 deputies; all of them approve users and grant access'),
   "department": zod.string().nullable(),
   "areas": zod.object({
   "dashboard": zod.enum(['none', 'read', 'write']),
@@ -823,7 +823,8 @@ export const UpdateUserAccessResponse = zod.object({
 
 
 /**
- * @summary Appoint or remove the deputy (administrator only; one deputy at a time)
+ * Up to 2 administrators and 2 deputies. An administrator can promote an approved user to administrator or deputy, or demote a deputy. Nobody can change another administrator; an administrator can step down themselves (role deputy or user) only while another administrator remains.
+ * @summary Change a user's role (administrators only)
  */
 
 
@@ -833,7 +834,7 @@ export const SetUserRoleParams = zod.object({
 })
 
 export const SetUserRoleBody = zod.object({
-  "role": zod.enum(['deputy', 'user'])
+  "role": zod.enum(['admin', 'deputy', 'user'])
 })
 
 export const SetUserRoleResponse = zod.object({
@@ -841,7 +842,7 @@ export const SetUserRoleResponse = zod.object({
   "email": zod.string().nullable(),
   "name": zod.string().nullable(),
   "status": zod.enum(['pending', 'active', 'disabled']).describe('pending = signed in, waiting for approval (no access); disabled = access removed'),
-  "role": zod.enum(['admin', 'deputy', 'user']).describe('One administrator; at most one deputy; both approve users and grant access'),
+  "role": zod.enum(['admin', 'deputy', 'user']).describe('Up to 2 administrators and 2 deputies; all of them approve users and grant access'),
   "department": zod.string().nullable(),
   "areas": zod.object({
   "dashboard": zod.enum(['none', 'read', 'write']),
@@ -859,8 +860,8 @@ export const SetUserRoleResponse = zod.object({
 
 
 /**
- * The previous administrator becomes deputy if the seat is free (or was held by the new administrator), otherwise a regular user.
- * @summary Hand the administrator role to an approved user (administrator only)
+ * Same as setting role admin. The acting administrator keeps their role.
+ * @summary Make an approved user an administrator (administrators only; up to 2)
  */
 
 
@@ -878,7 +879,7 @@ export const TransferAdminResponse = zod.object({
   "email": zod.string().nullable(),
   "name": zod.string().nullable(),
   "status": zod.enum(['pending', 'active', 'disabled']).describe('pending = signed in, waiting for approval (no access); disabled = access removed'),
-  "role": zod.enum(['admin', 'deputy', 'user']).describe('One administrator; at most one deputy; both approve users and grant access'),
+  "role": zod.enum(['admin', 'deputy', 'user']).describe('Up to 2 administrators and 2 deputies; all of them approve users and grant access'),
   "department": zod.string().nullable(),
   "areas": zod.object({
   "dashboard": zod.enum(['none', 'read', 'write']),

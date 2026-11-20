@@ -3,11 +3,11 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.7.0
+ * OpenAPI spec version: 0.7.1
  */
 
 /**
- * One administrator; at most one deputy; both approve users and grant access
+ * Up to 2 administrators and 2 deputies; all of them approve users and grant access
  */
 export type UserRole = typeof UserRole[keyof typeof UserRole];
 

@@ -3,13 +3,14 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.7.0
+ * OpenAPI spec version: 0.7.1
  */
 
 export type UserRoleUpdateRole = typeof UserRoleUpdateRole[keyof typeof UserRoleUpdateRole];
 
 
 export const UserRoleUpdateRole = {
+  admin: 'admin',
   deputy: 'deputy',
   user: 'user',
 } as const;

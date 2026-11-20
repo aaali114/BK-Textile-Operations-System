@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.7.0
+  version: 0.7.1
   description: B.K. Textile operations API
 servers:
   - url: /api
@@ -480,7 +480,13 @@ paths:
     put:
       operationId: setUserRole
       tags: [admin]
-      summary: Appoint or remove the deputy (administrator only; one deputy at a time)
+      summary: Change a user's role (administrators only)
+      description: >-
+        Up to 2 administrators and 2 deputies. An administrator can promote an
+        approved user to administrator or deputy, or demote a deputy. Nobody
+        can change another administrator; an administrator can step down
+        themselves (role deputy or user) only while another administrator
+        remains.
       parameters:
         - $ref: "#/components/parameters/UserId"
       requestBody:
@@ -495,13 +501,13 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/UserAccount" }
         "403": { description: Not the administrator }
-        "409": { description: "Another deputy exists, or the user is not approved" }
+        "409": { description: "The role is full (2 already), the user is not approved, or you are the only administrator" }
   /admin/users/{userId}/make-admin:
     post:
       operationId: transferAdmin
       tags: [admin]
-      summary: Hand the administrator role to an approved user (administrator only)
-      description: The previous administrator becomes deputy if the seat is free (or was held by the new administrator), otherwise a regular user.
+      summary: Make an approved user an administrator (administrators only; up to 2)
+      description: Same as setting role admin. The acting administrator keeps their role.
       parameters:
         - $ref: "#/components/parameters/UserId"
       requestBody:
@@ -516,7 +522,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/UserAccount" }
         "403": { description: Not the administrator }
-        "409": { description: The user is not approved }
+        "409": { description: "The user is not approved, or there are already 2 administrators" }
   /admin/orders/{orderId}/reapply-emails:
     post:
       operationId: reapplyOrderEmails
@@ -857,7 +863,7 @@ components:
       enum: [pending, active, disabled]
     UserRole:
       type: string
-      description: One administrator; at most one deputy; both approve users and grant access
+      description: Up to 2 administrators and 2 deputies; all of them approve users and grant access
       enum: [admin, deputy, user]
     AccessLevel:
       type: string
@@ -917,7 +923,7 @@ components:
       type: object
       required: [role]
       properties:
-        role: { type: string, enum: [deputy, user] }
+        role: { type: string, enum: [admin, deputy, user] }
     TransferAdminRequest:
       type: object
       required: [confirm]
