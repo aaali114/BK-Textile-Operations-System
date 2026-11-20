@@ -64,6 +64,13 @@
       "when": 1795194833116,
       "tag": "0008_two_admins_two_deputies",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795194954010,
+      "tag": "0009_dashboards",
+      "breakpoints": true
     }
   ]
 }

@@ -338,6 +338,190 @@ export interface OrderFileUploadResponse {
   uploadURL: string;
 }
 
+export type Visualization = typeof Visualization[keyof typeof Visualization];
+
+
+export const Visualization = {
+  kpi: 'kpi',
+  table: 'table',
+  bar: 'bar',
+  line: 'line',
+  pie: 'pie',
+} as const;
+
+export type DashboardSourceParamType = typeof DashboardSourceParamType[keyof typeof DashboardSourceParamType];
+
+
+export const DashboardSourceParamType = {
+  enum: 'enum',
+  integer: 'integer',
+} as const;
+
+export type DashboardSourceParamOptionsItem = {
+  value: string;
+  label: string;
+};
+
+export interface DashboardSourceParam {
+  name: string;
+  label: string;
+  type: DashboardSourceParamType;
+  options?: DashboardSourceParamOptionsItem[];
+  min?: number;
+  max?: number;
+  default: string | number;
+}
+
+export interface DashboardSource {
+  id: string;
+  title: string;
+  description: string;
+  area: string;
+  visualizations: Visualization[];
+  defaultVisualization: Visualization;
+  params: DashboardSourceParam[];
+}
+
+export type DashboardDataRequestParams = { [key: string]: unknown };
+
+export interface DashboardDataRequest {
+  params?: DashboardDataRequestParams;
+}
+
+export type DashboardDataColumnsItemType = typeof DashboardDataColumnsItemType[keyof typeof DashboardDataColumnsItemType];
+
+
+export const DashboardDataColumnsItemType = {
+  string: 'string',
+  number: 'number',
+  date: 'date',
+  money: 'money',
+} as const;
+
+export type DashboardDataColumnsItem = {
+  key: string;
+  label: string;
+  type: DashboardDataColumnsItemType;
+};
+
+export type DashboardDataRowsItem = { [key: string]: unknown };
+
+export interface DashboardData {
+  columns: DashboardDataColumnsItem[];
+  rows: DashboardDataRowsItem[];
+  /** @nullable */
+  labelKey: string | null;
+  valueKeys: string[];
+  /**
+     * Something the viewer should know (e.g. no department set)
+     * @nullable
+     */
+  note: string | null;
+  generatedAt: string;
+}
+
+export type DashboardWidgetParams = { [key: string]: unknown };
+
+export interface DashboardWidget {
+  /** Unique within the layout: letters, digits, - or _ */
+  id: string;
+  /** A DashboardSource id */
+  source: string;
+  viz: Visualization;
+  /**
+     * Optional custom title (max 80)
+     * @nullable
+     */
+  title?: string | null;
+  params?: DashboardWidgetParams;
+  /**
+     * Column (12-column grid)
+     * @minimum 0
+     * @maximum 11
+     */
+  x: number;
+  /** @minimum 0 */
+  y: number;
+  /**
+     * @minimum 1
+     * @maximum 12
+     */
+  w: number;
+  /**
+     * @minimum 1
+     * @maximum 20
+     */
+  h: number;
+  /** Returned by the server: false when the user lost access to this widget's source */
+  accessible?: boolean;
+}
+
+export interface DashboardLayout {
+  /** @maxItems 30 */
+  widgets: DashboardWidget[];
+}
+
+export type DashboardScope = typeof DashboardScope[keyof typeof DashboardScope];
+
+
+export const DashboardScope = {
+  user: 'user',
+  department: 'department',
+  builtin: 'builtin',
+} as const;
+
+export interface Dashboard {
+  /**
+     * Null for the built-in standard layout
+     * @nullable
+     */
+  id: string | null;
+  scope: DashboardScope;
+  name: string;
+  /** @nullable */
+  department: string | null;
+  isDefault: boolean;
+  layout: DashboardLayout;
+  updatedAt: string;
+  /** @nullable */
+  updatedBy: string | null;
+}
+
+export interface DashboardList {
+  dashboards: Dashboard[];
+  template: Dashboard;
+}
+
+export interface DashboardInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  name: string;
+  layout: DashboardLayout;
+  isDefault?: boolean;
+}
+
+export interface DashboardUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  name?: string;
+  layout?: DashboardLayout;
+  /** true makes this the user's default dashboard */
+  isDefault?: boolean;
+}
+
+export interface DashboardTemplateInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  name: string;
+  layout: DashboardLayout;
+}
+
 /**
  * pending = signed in, waiting for approval (no access); disabled = access removed
  */

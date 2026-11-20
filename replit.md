@@ -61,6 +61,12 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 - **Enforced on the server:** every API route has a rule in `artifacts/api-server/src/lib/access.ts` (`RULES`); anything without a rule is refused. When adding a route, add its rule. Activity feeds are filtered by what the user may see.
 - Every access change is logged in `bk_activity` (entity `user`).
 
+## Dashboards
+
+- **Data sources** (`artifacts/api-server/src/lib/dashboardSources.ts`): each has an area, allowed visualisations and options, and returns a table (`columns`, `rows`, `labelKey`, `valueKeys`). Users only see and query sources in areas they can read. To add a source, add it there (no other change needed).
+- **Saved dashboards** (`bk_dashboards`): up to 10 per user, one default; a 12-column grid of widgets (source, visualisation, options, position). Layouts are validated on save.
+- **Templates:** administrators/deputies set one per department, plus `*` for everyone; a user without their own dashboard sees their department's template, else `*`, else the built-in standard layout. Widgets the viewer cannot access are removed from templates; on a user's own dashboard they stay, marked `accessible: false`.
+
 ## Data rules
 
 - **Real data is allowed for one order only: PO 36572 (BK invoice 4040/BK-SAS/2026).** Its real colourways, size×colour quantities, fabrics, trims, source emails, and attachments may be stored in the database and object storage.
