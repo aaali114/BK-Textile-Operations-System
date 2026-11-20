@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.6.0
+ * OpenAPI spec version: 0.7.1
  */
 import * as zod from 'zod';
 
@@ -923,7 +923,7 @@ export const ReapplyOrderEmailsResponse = zod.object({
 
 
 /**
- * Reads the mailbox read-only, stores emails about allow-listed POs (INTAKE_PO_ALLOWLIST) with their attachments, creates the order for a new PO that arrives with its PO sheet, and applies PO and trims sheets to the order (later email wins). With dryRun nothing is written.
+ * Reads the mailbox read-only, stores emails about allow-listed POs (INTAKE_PO_ALLOWLIST, or every PO when it is "*") that reached the mailbox on or after INTAKE_START_DATE, with their attachments, creates the order for a new PO that arrives with its PO sheet, and applies PO and trims sheets to the order (later email wins). With dryRun nothing is written.
  * @summary Read new mail from the orders mailbox now (admins only)
  */
 
@@ -938,6 +938,9 @@ export const RunEmailIntakeResponse = zod.object({
   "dryRun": zod.boolean(),
   "mailbox": zod.string(),
   "folder": zod.string(),
+  "poScope": zod.string().describe('"all" (every PO), or the allow-listed POs'),
+  "startDate": zod.coerce.date().nullable().describe('Mail that reached the mailbox before this is skipped'),
+  "beforeStartDate": zod.number().int().describe('Messages before the start date (not downloaded)'),
   "fromUid": zod.number().int(),
   "scanned": zod.number().int(),
   "candidates": zod.number().int(),

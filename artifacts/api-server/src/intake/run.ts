@@ -72,6 +72,11 @@ export type IntakeRunSummary = {
   dryRun: boolean;
   mailbox: string;
   folder: string;
+  /** "all", or the allow-listed PO keys */
+  poScope: string;
+  startDate: string | null;
+  /** Messages that reached the mailbox before the start date (not downloaded). */
+  beforeStartDate: number;
   fromUid: number;
   scanned: number;
   candidates: number;
@@ -91,6 +96,10 @@ export async function runIntake(opts: {
   blobs: BlobStore;
   dryRun: boolean;
   poAllowlist: Set<string>;
+  /** Every PO is handled (go-live); poAllowlist is then ignored. */
+  allPos?: boolean;
+  /** Mail that reached the mailbox before this moment is skipped without being downloaded. */
+  startDate?: Date | null;
   rescanFromUid?: number;
 }): Promise<IntakeRunSummary> {
   const lockClient = await pool.connect();
@@ -107,9 +116,11 @@ export async function runIntake(opts: {
   }
 }
 
-async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: Parameters<typeof runIntake>[0]): Promise<IntakeRunSummary> {
+async function runLocked({ source, blobs, dryRun, poAllowlist, allPos = false, startDate = null, rescanFromUid }: Parameters<typeof runIntake>[0]): Promise<IntakeRunSummary> {
+  const allowPo = (key: string) => allPos || poAllowlist.has(key);
   const summary: IntakeRunSummary = {
     dryRun, mailbox: source.mailbox, folder: source.folder, fromUid: 0,
+    poScope: allPos ? "all" : [...poAllowlist].join(", "), startDate: startDate?.toISOString() ?? null, beforeStartDate: 0,
     scanned: 0, candidates: 0, stored: 0, duplicates: 0, skipped: 0, ordersCreated: [], emails: [], errors: [],
   };
   const skippedUids: number[] = [];
@@ -130,13 +141,18 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
     const knownInvoices = new Set(known.map((o) => o.invoiceNumber).filter((n): n is number => n !== null));
     let candidates: Envelope[] = [];
     const watchKeys = [...new Set([...knownPos, ...poAllowlist])];
+    const beforeStart = new Set<number>();
     for (const env of envelopes) {
+      if (startDate && env.internalDate && env.internalDate.getTime() < startDate.getTime()) {
+        beforeStart.add(env.uid);
+        continue;
+      }
       const pos = findPoKeys(env.subject, watchKeys);
       const inThread = (await linkedOrderIdsForMessages([env.inReplyTo, ...env.references].filter((x): x is string => !!x))).length > 0;
       const relevant =
-        pos.some((p) => poAllowlist.has(p)) ||
+        pos.some((p) => allowPo(p)) ||
         invoiceNumbersIn(env.subject).some((n) => knownInvoices.has(n)) ||
-        (inThread && (pos.length === 0 || pos.some((p) => knownPos.has(p) || poAllowlist.has(p))));
+        (inThread && (pos.length === 0 || pos.some((p) => knownPos.has(p) || allowPo(p))));
       if (relevant) candidates.push(env);
     }
     // Replies to a candidate in this same batch are candidates too (their parent is not stored yet).
@@ -144,7 +160,7 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
       grew = false;
       const ids = new Set(candidates.map((c) => c.messageId).filter(Boolean));
       for (const env of envelopes) {
-        if (candidates.includes(env) || findPoKeys(env.subject, watchKeys).some((p) => !poAllowlist.has(p) && !knownPos.has(p))) continue;
+        if (candidates.includes(env) || beforeStart.has(env.uid) || findPoKeys(env.subject, watchKeys).some((p) => !allowPo(p) && !knownPos.has(p))) continue;
         if ([env.inReplyTo, ...env.references].some((id) => id && ids.has(id))) {
           candidates.push(env);
           grew = true;
@@ -152,7 +168,8 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
       }
     }
     candidates = candidates.sort((a, b) => a.uid - b.uid);
-    for (const env of envelopes) if (!candidates.includes(env)) skippedUids.push(env.uid);
+    for (const env of envelopes) if (!candidates.includes(env) && !beforeStart.has(env.uid)) skippedUids.push(env.uid);
+    summary.beforeStartDate = beforeStart.size;
     summary.candidates = candidates.length;
     // Dry run: orders it would create, so later emails in the batch are reported against them.
     const simulated = new Map<string, { id: string; invoiceRef: string }>();
@@ -198,7 +215,7 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
           const sim = [...simulated.values()].find((v) => v.id === id)!;
           rep.orders.push({ invoiceRef: sim.invoiceRef, poNumber: id.slice(8), matchStatus: "matched", matchMethod: "thread", created: false });
         }
-        for (const po of poNumbersInSubject.filter((p) => poAllowlist.has(p) && !simulated.has(p) && !orders.some((o) => o.poNumber && poKey(o.poNumber) === p))) {
+        for (const po of poNumbersInSubject.filter((p) => allowPo(p) && !simulated.has(p) && !orders.some((o) => o.poNumber && poKey(o.poNumber) === p))) {
           const sheet = attachments.find((a) => a.po && poKey(a.po.poNumber) === po)?.po;
           if (!sheet) {
             rep.attachments.push({ filename: "-", kind: "note", changes: 0, warnings: [`PO ${po} is not in the system yet and this email has no PO sheet for it, so no order was created.`], skipped: null });
@@ -216,7 +233,7 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
           if (!dryRun) links = [...links.filter((l) => l.orderId !== created.id), { orderId: created.id, matchStatus: "matched", matchMethod: "po_subject", matchReason: `subject: PO ${po}; order created from its PO sheet` }];
         }
         // ---- the trial only stores emails about allow-listed POs
-        const allowedIds = new Set((await knownOrders()).filter((o) => o.poNumber && poAllowlist.has(poKey(o.poNumber))).map((o) => o.id));
+        const allowedIds = new Set((await knownOrders()).filter((o) => o.poNumber && allowPo(poKey(o.poNumber))).map((o) => o.id));
         links = links.filter((l) => allowedIds.has(l.orderId));
         for (const l of links) {
           const o = (await knownOrders()).find((x) => x.id === l.orderId)!;
@@ -255,13 +272,13 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, rescanFromUid }: 
       }
       await db.insert(activityTable).values({
         actor: "Email intake",
-        description: `Mailbox run: ${summary.scanned} scanned, ${summary.stored} stored, ${summary.duplicates} already stored, ${summary.skipped} skipped${summary.errors.length ? `, ${summary.errors.length} error(s)` : ""}`,
+        description: `Mailbox run: ${summary.scanned} scanned, ${summary.stored} stored, ${summary.duplicates} already stored, ${summary.skipped} skipped${summary.beforeStartDate ? `, ${summary.beforeStartDate} before the start date` : ""}${summary.errors.length ? `, ${summary.errors.length} error(s)` : ""}`,
         entityType: "intake",
         entityId: source.mailbox,
         source: "email_intake",
         action: "intake.run",
         // Skipped messages are recorded by UID only: never subject, sender or content.
-        details: { scanned: summary.scanned, stored: summary.stored, duplicates: summary.duplicates, skippedUids, errors: summary.errors.length, ordersCreated: summary.ordersCreated },
+        details: { scanned: summary.scanned, stored: summary.stored, duplicates: summary.duplicates, skippedUids, beforeStartDate: summary.beforeStartDate, poScope: summary.poScope, startDate: summary.startDate, errors: summary.errors.length, ordersCreated: summary.ordersCreated },
       });
     }
     return summary;

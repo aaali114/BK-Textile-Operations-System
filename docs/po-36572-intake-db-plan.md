@@ -194,6 +194,8 @@ Manual forwards: forwarded blocks from Thunderbird, Gmail, Outlook (with or with
 
 Re-apply (`POST /api/admin/orders/:id/reapply-emails`): re-parses each matched email from storage, corrects `sent_at`, re-applies PO and trims sheets oldest-first, sets "PO received" to the earliest original email if earlier, and logs everything. Running it twice changes nothing.
 
+Go-live mode: `INTAKE_PO_ALLOWLIST=*` handles every PO and requires `INTAKE_START_DATE`; envelopes whose arrival time (IMAP INTERNALDATE) is before the start date are skipped without download and counted in the run summary (`beforeStartDate`). A new PO without its PO sheet is reported but creates no order; if its sheet arrives in a later email, that email creates the order, and the earlier email can be picked up with `rescanFromUid`.
+
 Known limits:
 
 - A PO mentioned only in an email **body** is not detected (bodies are not downloaded for screening). Use a rescan or, later, manual import.

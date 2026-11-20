@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.6.0
+ * OpenAPI spec version: 0.7.1
  */
 
 export type Priority = typeof Priority[keyof typeof Priority];

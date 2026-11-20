@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.6.0
+ * OpenAPI spec version: 0.7.1
  */
 export interface HealthStatus {
   status: string;
@@ -831,6 +831,15 @@ export interface IntakeRunSummary {
   dryRun: boolean;
   mailbox: string;
   folder: string;
+  /** "all" (every PO), or the allow-listed POs */
+  poScope: string;
+  /**
+     * Mail that reached the mailbox before this is skipped
+     * @nullable
+     */
+  startDate: string | null;
+  /** Messages before the start date (not downloaded) */
+  beforeStartDate: number;
   fromUid: number;
   scanned: number;
   candidates: number;

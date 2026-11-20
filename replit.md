@@ -12,7 +12,7 @@ A new B.K. Textile-owned web system for coordinating garment orders, department 
 - `pnpm --filter @workspace/db run generate -- --name <change>` — generate a new migration after a schema change (backend only)
 - Database changes belong to the backend developer and arrive as reviewed migrations. Replit Agent must not run `push`, `push-force` or `generate`.
 - Required env: `DATABASE_URL` — Postgres connection string
-- Email intake env: `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASSWORD` (secrets) and `INTAKE_PO_ALLOWLIST` (required, comma-separated PO numbers the intake may store, e.g. `36572`). Optional: `INTAKE_FOLDER` (default `INBOX`), `INTAKE_POLL_MINUTES` (automatic runs; unset = only manual runs).
+- Email intake env: `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASSWORD` (secrets) and `INTAKE_PO_ALLOWLIST` (required: comma-separated PO numbers the intake may store, e.g. `36572`, or `*` for every PO). `INTAKE_START_DATE` (`YYYY-MM-DD`, midnight Pakistan time): mail that reached the mailbox earlier is skipped without being downloaded; **required when the allowlist is `*`**. Optional: `INTAKE_FOLDER` (default `INBOX`), `INTAKE_POLL_MINUTES` (automatic runs; unset = only manual runs).
 - `ADMIN_USER_IDS` — **one-time setup only**: while no administrator exists in the database, the first listed user to sign in becomes the administrator. After that the database decides and this setting is ignored.
 
 ## Stack
@@ -63,7 +63,8 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 
 ## Data rules
 
-- **Real data is allowed for one order only: PO 36572 (BK invoice 4040/BK-SAS/2026).** Its real colourways, size×colour quantities, fabrics, trims, source emails, and attachments may be stored in the database and object storage.
+- **Trial:** real data was allowed for one order only, PO 36572 (BK invoice 4040/BK-SAS/2026). **At go-live** (`INTAKE_PO_ALLOWLIST=*` with `INTAKE_START_DATE`), real data is allowed for every PO that reaches `orders@` from the start date.
+- **Trial rule (until go-live): real data is allowed for one order only: PO 36572 (BK invoice 4040/BK-SAS/2026).** Its real colourways, size×colour quantities, fabrics, trims, source emails, and attachments may be stored in the database and object storage.
 - All other records stay synthetic until the user approves the next order or a wider rollout.
 - The buyer list (names and abbreviations) and the invoice counter's starting number are reference data and live in migration `0004`.
 - Real order data lives only in the database and object storage. Never commit it to git: no real emails, attachments, PO sheets, seed files, fixtures, or screenshots of them. Test fixtures must be synthetic.
