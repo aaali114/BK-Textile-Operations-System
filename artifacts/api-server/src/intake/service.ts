@@ -18,7 +18,7 @@ export function reapplyOrder(orderId: string, actor: { id: string; label: string
 /** One run against the real mailbox using the Replit secrets. */
 export async function runMailboxIntake(opts: { dryRun: boolean; rescanFromUid?: number }) {
   const config = readIntakeConfig();
-  return runIntake({ source: new ImapMailSource(config), blobs: objectStorageBlobs, poAllowlist: config.poAllowlist, ...opts });
+  return runIntake({ source: new ImapMailSource(config), blobs: objectStorageBlobs, poAllowlist: config.poAllowlist, allPos: config.allPos, startDate: config.startDate, ...opts });
 }
 
 /** Optional schedule: set INTAKE_POLL_MINUTES (e.g. 15) to read the mailbox automatically. Off by default. */
