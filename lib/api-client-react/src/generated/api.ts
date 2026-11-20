@@ -2769,7 +2769,8 @@ export const getSetUserRoleUrl = (userId: string,) => {
 }
 
 /**
- * @summary Appoint or remove the deputy (administrator only; one deputy at a time)
+ * Up to 2 administrators and 2 deputies. An administrator can promote an approved user to administrator or deputy, or demote a deputy. Nobody can change another administrator; an administrator can step down themselves (role deputy or user) only while another administrator remains.
+ * @summary Change a user's role (administrators only)
  */
 export const setUserRole = async (userId: string,
     userRoleUpdate: UserRoleUpdate, options?: Parameters<typeof customFetch>[1]): Promise<UserAccount> => {
@@ -2836,7 +2837,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SetUserRoleMutationVariables = {userId: string;data: BodyType<UserRoleUpdate>}
 
     /**
- * @summary Appoint or remove the deputy (administrator only; one deputy at a time)
+ * @summary Change a user's role (administrators only)
  */
 export const useSetUserRole = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setUserRole>>, TError,SetUserRoleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -2858,8 +2859,8 @@ export const getTransferAdminUrl = (userId: string,) => {
 }
 
 /**
- * The previous administrator becomes deputy if the seat is free (or was held by the new administrator), otherwise a regular user.
- * @summary Hand the administrator role to an approved user (administrator only)
+ * Same as setting role admin. The acting administrator keeps their role.
+ * @summary Make an approved user an administrator (administrators only; up to 2)
  */
 export const transferAdmin = async (userId: string,
     transferAdminRequest: TransferAdminRequest, options?: Parameters<typeof customFetch>[1]): Promise<UserAccount> => {
@@ -2926,7 +2927,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type TransferAdminMutationVariables = {userId: string;data: BodyType<TransferAdminRequest>}
 
     /**
- * @summary Hand the administrator role to an approved user (administrator only)
+ * @summary Make an approved user an administrator (administrators only; up to 2)
  */
 export const useTransferAdmin = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferAdmin>>, TError,TransferAdminMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}

@@ -54,7 +54,7 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 
 - Sign-in and passwords stay with Clerk. `bk_users` records everyone who signs in (name, email, department, status, role, last sign-in); passwords are never stored by the app.
 - New users are **pending** with no access until the administrator or deputy approves them (`PUT /api/admin/users/:id/access`).
-- **Roles:** exactly one `admin` and at most one `deputy` (enforced in the database). Both approve users and grant access and have full access themselves. Only the administrator appoints/removes the deputy or transfers the administrator role. Nobody can change their own access; the deputy cannot change the administrator.
+- **Roles:** up to **2 administrators and 2 deputies** (enforced in `lib/userAdmin.ts` under a lock). All of them approve users, grant access and have full access themselves. Only administrators change roles. Nobody can change another administrator; an administrator can only step down themselves, and only while another administrator remains. Nobody can change their own access; deputies cannot change administrators or other deputies.
 - **Areas** (`dashboard`, `merchandising`, `department_work`, `materials`, `quality`): `none` / `read` / `write` per user. No grant = the area is hidden and its API refuses.
 - **Special permissions:** `invoice_override` (invoice counter and per-order override), `commercial_edit` (create orders; edit buyer, PO, value, terms, quantity, dates), `intake_run` (read the mailbox, re-apply emails).
 - Department templates (`GET /api/admin/access-templates`) are suggestions only; the administrator applies and adjusts them per person.

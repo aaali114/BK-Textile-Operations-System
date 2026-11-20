@@ -351,7 +351,7 @@ export const UserStatus = {
 } as const;
 
 /**
- * One administrator; at most one deputy; both approve users and grant access
+ * Up to 2 administrators and 2 deputies; all of them approve users and grant access
  */
 export type UserRole = typeof UserRole[keyof typeof UserRole];
 
@@ -450,6 +450,7 @@ export type UserRoleUpdateRole = typeof UserRoleUpdateRole[keyof typeof UserRole
 
 
 export const UserRoleUpdateRole = {
+  admin: 'admin',
   deputy: 'deputy',
   user: 'user',
 } as const;
