@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.7.1
+ * OpenAPI spec version: 0.8.0
  */
 import * as zod from 'zod';
 
@@ -406,6 +406,437 @@ export const GetCurrentUserResponse = zod.object({
 }),
   "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails'))
 })
+
+
+/**
+ * Only sources in areas the user can read are listed.
+ * @summary Data sources this user may put on a dashboard
+ */
+export const ListDashboardSourcesResponseItem = zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "area": zod.string(),
+  "visualizations": zod.array(zod.enum(['kpi', 'table', 'bar', 'line', 'pie'])),
+  "defaultVisualization": zod.enum(['kpi', 'table', 'bar', 'line', 'pie']),
+  "params": zod.array(zod.object({
+  "name": zod.string(),
+  "label": zod.string(),
+  "type": zod.enum(['enum', 'integer']),
+  "options": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "min": zod.number().int().optional(),
+  "max": zod.number().int().optional(),
+  "default": zod.union([zod.string(),zod.number().int()])
+}))
+})
+export const ListDashboardSourcesResponse = zod.array(ListDashboardSourcesResponseItem)
+
+
+/**
+ * Returns a table (columns + rows); labelKey/valueKeys say which columns to chart. Missing options take their defaults.
+ * @summary Data for one widget
+ */
+export const GetDashboardSourceDataParams = zod.object({
+  "sourceId": zod.coerce.string()
+})
+
+export const GetDashboardSourceDataBody = zod.object({
+  "params": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+export const GetDashboardSourceDataResponse = zod.object({
+  "columns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "type": zod.enum(['string', 'number', 'date', 'money'])
+})),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "labelKey": zod.string().nullable(),
+  "valueKeys": zod.array(zod.string()),
+  "note": zod.string().nullable().describe('Something the viewer should know (e.g. no department set)'),
+  "generatedAt": zod.coerce.date()
+})
+
+
+/**
+ * template is the user's department template, else the organisation-wide one, else the built-in standard layout; widgets the user cannot access are removed from it. On the user's own dashboards such widgets stay, marked accessible=false.
+ * @summary The user's saved dashboards and the template that applies to them
+ */
+export const listDashboardsResponseDashboardsItemLayoutWidgetsItemXMin = 0;
+export const listDashboardsResponseDashboardsItemLayoutWidgetsItemXMax = 11;
+
+export const listDashboardsResponseDashboardsItemLayoutWidgetsItemYMin = 0;
+
+export const listDashboardsResponseDashboardsItemLayoutWidgetsItemWMax = 12;
+
+export const listDashboardsResponseDashboardsItemLayoutWidgetsItemHMax = 20;
+
+export const listDashboardsResponseDashboardsItemLayoutWidgetsMax = 30;
+
+export const listDashboardsResponseTemplateLayoutWidgetsItemXMin = 0;
+export const listDashboardsResponseTemplateLayoutWidgetsItemXMax = 11;
+
+export const listDashboardsResponseTemplateLayoutWidgetsItemYMin = 0;
+
+export const listDashboardsResponseTemplateLayoutWidgetsItemWMax = 12;
+
+export const listDashboardsResponseTemplateLayoutWidgetsItemHMax = 20;
+
+export const listDashboardsResponseTemplateLayoutWidgetsMax = 30;
+
+
+
+export const ListDashboardsResponse = zod.object({
+  "dashboards": zod.array(zod.object({
+  "id": zod.string().uuid().nullable().describe('Null for the built-in standard layout'),
+  "scope": zod.enum(['user', 'department', 'builtin']),
+  "name": zod.string(),
+  "department": zod.string().nullable(),
+  "isDefault": zod.boolean(),
+  "layout": zod.object({
+  "widgets": zod.array(zod.object({
+  "id": zod.string().describe('Unique within the layout: letters, digits, - or _'),
+  "source": zod.string().describe('A DashboardSource id'),
+  "viz": zod.enum(['kpi', 'table', 'bar', 'line', 'pie']),
+  "title": zod.string().nullish().describe('Optional custom title (max 80)'),
+  "params": zod.record(zod.string(), zod.unknown()).optional(),
+  "x": zod.number().int().min(listDashboardsResponseDashboardsItemLayoutWidgetsItemXMin).max(listDashboardsResponseDashboardsItemLayoutWidgetsItemXMax).describe('Column (12-column grid)'),
+  "y": zod.number().int().min(listDashboardsResponseDashboardsItemLayoutWidgetsItemYMin),
+  "w": zod.number().int().min(1).max(listDashboardsResponseDashboardsItemLayoutWidgetsItemWMax),
+  "h": zod.number().int().min(1).max(listDashboardsResponseDashboardsItemLayoutWidgetsItemHMax),
+  "accessible": zod.boolean().optional().describe('Returned by the server: false when the user lost access to this widget\'s source')
+})).max(listDashboardsResponseDashboardsItemLayoutWidgetsMax)
+}),
+  "updatedAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable()
+})),
+  "template": zod.object({
+  "id": zod.string().uuid().nullable().describe('Null for the built-in standard layout'),
+  "scope": zod.enum(['user', 'department', 'builtin']),
+  "name": zod.string(),
+  "department": zod.string().nullable(),
+  "isDefault": zod.boolean(),
+  "layout": zod.object({
+  "widgets": zod.array(zod.object({
+  "id": zod.string().describe('Unique within the layout: letters, digits, - or _'),
+  "source": zod.string().describe('A DashboardSource id'),
+  "viz": zod.enum(['kpi', 'table', 'bar', 'line', 'pie']),
+  "title": zod.string().nullish().describe('Optional custom title (max 80)'),
+  "params": zod.record(zod.string(), zod.unknown()).optional(),
+  "x": zod.number().int().min(listDashboardsResponseTemplateLayoutWidgetsItemXMin).max(listDashboardsResponseTemplateLayoutWidgetsItemXMax).describe('Column (12-column grid)'),
+  "y": zod.number().int().min(listDashboardsResponseTemplateLayoutWidgetsItemYMin),
+  "w": zod.number().int().min(1).max(listDashboardsResponseTemplateLayoutWidgetsItemWMax),
+  "h": zod.number().int().min(1).max(listDashboardsResponseTemplateLayoutWidgetsItemHMax),
+  "accessible": zod.boolean().optional().describe('Returned by the server: false when the user lost access to this widget\'s source')
+})).max(listDashboardsResponseTemplateLayoutWidgetsMax)
+}),
+  "updatedAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable()
+})
+})
+
+
+/**
+ * @summary Save a new dashboard (up to 10 per user; the first becomes the default)
+ */
+export const createDashboardBodyNameMax = 80;
+
+export const createDashboardBodyLayoutWidgetsItemXMin = 0;
+export const createDashboardBodyLayoutWidgetsItemXMax = 11;
+
+export const createDashboardBodyLayoutWidgetsItemYMin = 0;
+
+export const createDashboardBodyLayoutWidgetsItemWMax = 12;
+
+export const createDashboardBodyLayoutWidgetsItemHMax = 20;
+
+export const createDashboardBodyLayoutWidgetsMax = 30;
+
+
+
+export const CreateDashboardBody = zod.object({
+  "name": zod.string().min(1).max(createDashboardBodyNameMax),
+  "layout": zod.object({
+  "widgets": zod.array(zod.object({
+  "id": zod.string().describe('Unique within the layout: letters, digits, - or _'),
+  "source": zod.string().describe('A DashboardSource id'),
+  "viz": zod.enum(['kpi', 'table', 'bar', 'line', 'pie']),
+  "title": zod.string().nullish().describe('Optional custom title (max 80)'),
+  "params": zod.record(zod.string(), zod.unknown()).optional(),
+  "x": zod.number().int().min(createDashboardBodyLayoutWidgetsItemXMin).max(createDashboardBodyLayoutWidgetsItemXMax).describe('Column (12-column grid)'),
+  "y": zod.number().int().min(createDashboardBodyLayoutWidgetsItemYMin),
+  "w": zod.number().int().min(1).max(createDashboardBodyLayoutWidgetsItemWMax),
+  "h": zod.number().int().min(1).max(createDashboardBodyLayoutWidgetsItemHMax),
+  "accessible": zod.boolean().optional().describe('Returned by the server: false when the user lost access to this widget\'s source')
+})).max(createDashboardBodyLayoutWidgetsMax)
+}),
+  "isDefault": zod.boolean().optional()
+})
+
+export const createDashboardResponseLayoutWidgetsItemXMin = 0;
+export const createDashboardResponseLayoutWidgetsItemXMax = 11;
+
+export const createDashboardResponseLayoutWidgetsItemYMin = 0;
+
+export const createDashboardResponseLayoutWidgetsItemWMax = 12;
+
+export const createDashboardResponseLayoutWidgetsItemHMax = 20;
+
+export const createDashboardResponseLayoutWidgetsMax = 30;
+
+
+
+export const CreateDashboardResponse = zod.object({
+  "id": zod.string().uuid().nullable().describe('Null for the built-in standard layout'),
+  "scope": zod.enum(['user', 'department', 'builtin']),
+  "name": zod.string(),
+  "department": zod.string().nullable(),
+  "isDefault": zod.boolean(),
+  "layout": zod.object({
+  "widgets": zod.array(zod.object({
+  "id": zod.string().describe('Unique within the layout: letters, digits, - or _'),
+  "source": zod.string().describe('A DashboardSource id'),
+  "viz": zod.enum(['kpi', 'table', 'bar', 'line', 'pie']),
+  "title": zod.string().nullish().describe('Optional custom title (max 80)'),
+  "params": zod.record(zod.string(), zod.unknown()).optional(),
+  "x": zod.number().int().min(createDashboardResponseLayoutWidgetsItemXMin).max(createDashboardResponseLayoutWidgetsItemXMax).describe('Column (12-column grid)'),
+  "y": zod.number().int().min(createDashboardResponseLayoutWidgetsItemYMin),
+  "w": zod.number().int().min(1).max(createDashboardResponseLayoutWidgetsItemWMax),
+  "h": zod.number().int().min(1).max(createDashboardResponseLayoutWidgetsItemHMax),
+  "accessible": zod.boolean().optional().describe('Returned by the server: false when the user lost access to this widget\'s source')
+})).max(createDashboardResponseLayoutWidgetsMax)
+}),
+  "updatedAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable()
+})
+
+
+/**
+ * @summary Rename, re-arrange or make default one of your dashboards
+ */
+export const UpdateDashboardParams = zod.object({
+  "dashboardId": zod.coerce.string().uuid()
+})
+
+export const updateDashboardBodyNameMax = 80;
+
+export const updateDashboardBodyLayoutWidgetsItemXMin = 0;
+export const updateDashboardBodyLayoutWidgetsItemXMax = 11;
+
+export const updateDashboardBodyLayoutWidgetsItemYMin = 0;
+
+export const updateDashboardBodyLayoutWidgetsItemWMax = 12;
+
+export const updateDashboardBodyLayoutWidgetsItemHMax = 20;
+
+export const updateDashboardBodyLayoutWidgetsMax = 30;
+
+
+
+export const UpdateDashboardBody = zod.object({
+  "name": zod.string().min(1).max(updateDashboardBodyNameMax).optional(),
+  "layout": zod.object({
+  "widgets": zod.array(zod.object({
+  "id": zod.string().describe('Unique within the layout: letters, digits, - or _'),
+  "source": zod.string().describe('A DashboardSource id'),
+  "viz": zod.enum(['kpi', 'table', 'bar', 'line', 'pie']),
+  "title": zod.string().nullish().describe('Optional custom title (max 80)'),
+  "params": zod.record(zod.string(), zod.unknown()).optional(),
+  "x": zod.number().int().min(updateDashboardBodyLayoutWidgetsItemXMin).max(updateDashboardBodyLayoutWidgetsItemXMax).describe('Column (12-column grid)'),
+  "y": zod.number().int().min(updateDashboardBodyLayoutWidgetsItemYMin),
+  "w": zod.number().int().min(1).max(updateDashboardBodyLayoutWidgetsItemWMax),
+  "h": zod.number().int().min(1).max(updateDashboardBodyLayoutWidgetsItemHMax),
+  "accessible": zod.boolean().optional().describe('Returned by the server: false when the user lost access to this widget\'s source')
+})).max(updateDashboardBodyLayoutWidgetsMax)
+}).optional(),
+  "isDefault": zod.boolean().optional().describe('true makes this the user\'s default dashboard')
+})
+
+export const updateDashboardResponseLayoutWidgetsItemXMin = 0;
+export const updateDashboardResponseLayoutWidgetsItemXMax = 11;
+
+export const updateDashboardResponseLayoutWidgetsItemYMin = 0;
+
+export const updateDashboardResponseLayoutWidgetsItemWMax = 12;
+
+export const updateDashboardResponseLayoutWidgetsItemHMax = 20;
+
+export const updateDashboardResponseLayoutWidgetsMax = 30;
+
+
+
+export const UpdateDashboardResponse = zod.object({
+  "id": zod.string().uuid().nullable().describe('Null for the built-in standard layout'),
+  "scope": zod.enum(['user', 'department', 'builtin']),
+  "name": zod.string(),
+  "department": zod.string().nullable(),
+  "isDefault": zod.boolean(),
+  "layout": zod.object({
+  "widgets": zod.array(zod.object({
+  "id": zod.string().describe('Unique within the layout: letters, digits, - or _'),
+  "source": zod.string().describe('A DashboardSource id'),
+  "viz": zod.enum(['kpi', 'table', 'bar', 'line', 'pie']),
+  "title": zod.string().nullish().describe('Optional custom title (max 80)'),
+  "params": zod.record(zod.string(), zod.unknown()).optional(),
+  "x": zod.number().int().min(updateDashboardResponseLayoutWidgetsItemXMin).max(updateDashboardResponseLayoutWidgetsItemXMax).describe('Column (12-column grid)'),
+  "y": zod.number().int().min(updateDashboardResponseLayoutWidgetsItemYMin),
+  "w": zod.number().int().min(1).max(updateDashboardResponseLayoutWidgetsItemWMax),
+  "h": zod.number().int().min(1).max(updateDashboardResponseLayoutWidgetsItemHMax),
+  "accessible": zod.boolean().optional().describe('Returned by the server: false when the user lost access to this widget\'s source')
+})).max(updateDashboardResponseLayoutWidgetsMax)
+}),
+  "updatedAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable()
+})
+
+
+/**
+ * @summary Delete one of your dashboards
+ */
+export const DeleteDashboardParams = zod.object({
+  "dashboardId": zod.coerce.string().uuid()
+})
+
+export const DeleteDashboardResponse = zod.void()
+
+
+/**
+ * @summary Department dashboard templates (administrators and deputies)
+ */
+export const listDashboardTemplatesResponseLayoutWidgetsItemXMin = 0;
+export const listDashboardTemplatesResponseLayoutWidgetsItemXMax = 11;
+
+export const listDashboardTemplatesResponseLayoutWidgetsItemYMin = 0;
+
+export const listDashboardTemplatesResponseLayoutWidgetsItemWMax = 12;
+
+export const listDashboardTemplatesResponseLayoutWidgetsItemHMax = 20;
+
+export const listDashboardTemplatesResponseLayoutWidgetsMax = 30;
+
+
+
+export const ListDashboardTemplatesResponseItem = zod.object({
+  "id": zod.string().uuid().nullable().describe('Null for the built-in standard layout'),
+  "scope": zod.enum(['user', 'department', 'builtin']),
+  "name": zod.string(),
+  "department": zod.string().nullable(),
+  "isDefault": zod.boolean(),
+  "layout": zod.object({
+  "widgets": zod.array(zod.object({
+  "id": zod.string().describe('Unique within the layout: letters, digits, - or _'),
+  "source": zod.string().describe('A DashboardSource id'),
+  "viz": zod.enum(['kpi', 'table', 'bar', 'line', 'pie']),
+  "title": zod.string().nullish().describe('Optional custom title (max 80)'),
+  "params": zod.record(zod.string(), zod.unknown()).optional(),
+  "x": zod.number().int().min(listDashboardTemplatesResponseLayoutWidgetsItemXMin).max(listDashboardTemplatesResponseLayoutWidgetsItemXMax).describe('Column (12-column grid)'),
+  "y": zod.number().int().min(listDashboardTemplatesResponseLayoutWidgetsItemYMin),
+  "w": zod.number().int().min(1).max(listDashboardTemplatesResponseLayoutWidgetsItemWMax),
+  "h": zod.number().int().min(1).max(listDashboardTemplatesResponseLayoutWidgetsItemHMax),
+  "accessible": zod.boolean().optional().describe('Returned by the server: false when the user lost access to this widget\'s source')
+})).max(listDashboardTemplatesResponseLayoutWidgetsMax)
+}),
+  "updatedAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable()
+})
+export const ListDashboardTemplatesResponse = zod.array(ListDashboardTemplatesResponseItem)
+
+
+/**
+ * @summary Create or replace a department's template ("*" = everyone without a department template)
+ */
+
+
+
+export const SaveDashboardTemplateParams = zod.object({
+  "department": zod.coerce.string().min(1)
+})
+
+export const saveDashboardTemplateBodyNameMax = 80;
+
+export const saveDashboardTemplateBodyLayoutWidgetsItemXMin = 0;
+export const saveDashboardTemplateBodyLayoutWidgetsItemXMax = 11;
+
+export const saveDashboardTemplateBodyLayoutWidgetsItemYMin = 0;
+
+export const saveDashboardTemplateBodyLayoutWidgetsItemWMax = 12;
+
+export const saveDashboardTemplateBodyLayoutWidgetsItemHMax = 20;
+
+export const saveDashboardTemplateBodyLayoutWidgetsMax = 30;
+
+
+
+export const SaveDashboardTemplateBody = zod.object({
+  "name": zod.string().min(1).max(saveDashboardTemplateBodyNameMax),
+  "layout": zod.object({
+  "widgets": zod.array(zod.object({
+  "id": zod.string().describe('Unique within the layout: letters, digits, - or _'),
+  "source": zod.string().describe('A DashboardSource id'),
+  "viz": zod.enum(['kpi', 'table', 'bar', 'line', 'pie']),
+  "title": zod.string().nullish().describe('Optional custom title (max 80)'),
+  "params": zod.record(zod.string(), zod.unknown()).optional(),
+  "x": zod.number().int().min(saveDashboardTemplateBodyLayoutWidgetsItemXMin).max(saveDashboardTemplateBodyLayoutWidgetsItemXMax).describe('Column (12-column grid)'),
+  "y": zod.number().int().min(saveDashboardTemplateBodyLayoutWidgetsItemYMin),
+  "w": zod.number().int().min(1).max(saveDashboardTemplateBodyLayoutWidgetsItemWMax),
+  "h": zod.number().int().min(1).max(saveDashboardTemplateBodyLayoutWidgetsItemHMax),
+  "accessible": zod.boolean().optional().describe('Returned by the server: false when the user lost access to this widget\'s source')
+})).max(saveDashboardTemplateBodyLayoutWidgetsMax)
+})
+})
+
+export const saveDashboardTemplateResponseLayoutWidgetsItemXMin = 0;
+export const saveDashboardTemplateResponseLayoutWidgetsItemXMax = 11;
+
+export const saveDashboardTemplateResponseLayoutWidgetsItemYMin = 0;
+
+export const saveDashboardTemplateResponseLayoutWidgetsItemWMax = 12;
+
+export const saveDashboardTemplateResponseLayoutWidgetsItemHMax = 20;
+
+export const saveDashboardTemplateResponseLayoutWidgetsMax = 30;
+
+
+
+export const SaveDashboardTemplateResponse = zod.object({
+  "id": zod.string().uuid().nullable().describe('Null for the built-in standard layout'),
+  "scope": zod.enum(['user', 'department', 'builtin']),
+  "name": zod.string(),
+  "department": zod.string().nullable(),
+  "isDefault": zod.boolean(),
+  "layout": zod.object({
+  "widgets": zod.array(zod.object({
+  "id": zod.string().describe('Unique within the layout: letters, digits, - or _'),
+  "source": zod.string().describe('A DashboardSource id'),
+  "viz": zod.enum(['kpi', 'table', 'bar', 'line', 'pie']),
+  "title": zod.string().nullish().describe('Optional custom title (max 80)'),
+  "params": zod.record(zod.string(), zod.unknown()).optional(),
+  "x": zod.number().int().min(saveDashboardTemplateResponseLayoutWidgetsItemXMin).max(saveDashboardTemplateResponseLayoutWidgetsItemXMax).describe('Column (12-column grid)'),
+  "y": zod.number().int().min(saveDashboardTemplateResponseLayoutWidgetsItemYMin),
+  "w": zod.number().int().min(1).max(saveDashboardTemplateResponseLayoutWidgetsItemWMax),
+  "h": zod.number().int().min(1).max(saveDashboardTemplateResponseLayoutWidgetsItemHMax),
+  "accessible": zod.boolean().optional().describe('Returned by the server: false when the user lost access to this widget\'s source')
+})).max(saveDashboardTemplateResponseLayoutWidgetsMax)
+}),
+  "updatedAt": zod.coerce.date(),
+  "updatedBy": zod.string().nullable()
+})
+
+
+/**
+ * @summary Remove a department's template
+ */
+
+
+
+export const DeleteDashboardTemplateParams = zod.object({
+  "department": zod.coerce.string().min(1)
+})
+
+export const DeleteDashboardTemplateResponse = zod.void()
 
 
 /**

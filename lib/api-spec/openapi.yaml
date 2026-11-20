@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.7.1
+  version: 0.8.0
   description: B.K. Textile operations API
 servers:
   - url: /api
@@ -16,6 +16,8 @@ tags:
     description: Merchandising orders
   - name: order-files
     description: Private documents and garment images attached to orders
+  - name: dashboards
+    description: Customisable dashboards (data sources, saved layouts, department templates)
   - name: buyers
     description: Buyers and sourcing agents that issue POs
   - name: order-detail
@@ -243,6 +245,150 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/CurrentUser" }
+  /dashboard/sources:
+    get:
+      operationId: listDashboardSources
+      tags: [dashboards]
+      summary: Data sources this user may put on a dashboard
+      description: Only sources in areas the user can read are listed.
+      responses:
+        "200":
+          description: Sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DashboardSource" }
+  /dashboard/sources/{sourceId}/data:
+    post:
+      operationId: getDashboardSourceData
+      tags: [dashboards]
+      summary: Data for one widget
+      description: Returns a table (columns + rows); labelKey/valueKeys say which columns to chart. Missing options take their defaults.
+      parameters:
+        - name: sourceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DashboardDataRequest" }
+      responses:
+        "200":
+          description: Data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DashboardData" }
+        "400": { description: Invalid options }
+        "403": { description: No access to this source's area }
+        "404": { description: Unknown source }
+  /dashboards:
+    get:
+      operationId: listDashboards
+      tags: [dashboards]
+      summary: The user's saved dashboards and the template that applies to them
+      description: >-
+        template is the user's department template, else the organisation-wide
+        one, else the built-in standard layout; widgets the user cannot access
+        are removed from it. On the user's own dashboards such widgets stay,
+        marked accessible=false.
+      responses:
+        "200":
+          description: Dashboards
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DashboardList" }
+    post:
+      operationId: createDashboard
+      tags: [dashboards]
+      summary: Save a new dashboard (up to 10 per user; the first becomes the default)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DashboardInput" }
+      responses:
+        "201":
+          description: Saved dashboard
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dashboard" }
+        "400": { description: Invalid layout (message says which widget and why) }
+        "403": { description: A widget uses a source the user cannot access }
+        "409": { description: Already 10 dashboards }
+  /dashboards/{dashboardId}:
+    put:
+      operationId: updateDashboard
+      tags: [dashboards]
+      summary: Rename, re-arrange or make default one of your dashboards
+      parameters:
+        - $ref: "#/components/parameters/DashboardId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DashboardUpdate" }
+      responses:
+        "200":
+          description: Updated dashboard
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dashboard" }
+        "400": { description: Invalid layout }
+        "403": { description: A widget uses a source the user cannot access }
+        "404": { description: Not found (or not yours) }
+    delete:
+      operationId: deleteDashboard
+      tags: [dashboards]
+      summary: Delete one of your dashboards
+      parameters:
+        - $ref: "#/components/parameters/DashboardId"
+      responses:
+        "204": { description: Deleted }
+        "404": { description: Not found (or not yours) }
+  /admin/dashboard-templates:
+    get:
+      operationId: listDashboardTemplates
+      tags: [dashboards]
+      summary: Department dashboard templates (administrators and deputies)
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Dashboard" }
+  /admin/dashboard-templates/{department}:
+    put:
+      operationId: saveDashboardTemplate
+      tags: [dashboards]
+      summary: Create or replace a department's template ("*" = everyone without a department template)
+      parameters:
+        - $ref: "#/components/parameters/TemplateDepartment"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DashboardTemplateInput" }
+      responses:
+        "200":
+          description: Saved template
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dashboard" }
+        "400": { description: Invalid layout or department }
+    delete:
+      operationId: deleteDashboardTemplate
+      tags: [dashboards]
+      summary: Remove a department's template
+      parameters:
+        - $ref: "#/components/parameters/TemplateDepartment"
+      responses:
+        "204": { description: Deleted }
+        "404": { description: No template for that department }
   /buyers:
     get:
       operationId: getBuyers
@@ -676,6 +822,16 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    DashboardId:
+      name: dashboardId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TemplateDepartment:
+      name: department
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
     UserId:
       name: userId
       in: path
@@ -841,6 +997,127 @@ components:
       properties:
         fileId: { type: string, format: uuid }
         uploadURL: { type: string, format: uri }
+    Visualization:
+      type: string
+      enum: [kpi, table, bar, line, pie]
+    DashboardSourceParam:
+      type: object
+      required: [name, label, type, default]
+      properties:
+        name: { type: string }
+        label: { type: string }
+        type: { type: string, enum: [enum, integer] }
+        options:
+          type: array
+          items:
+            type: object
+            required: [value, label]
+            properties:
+              value: { type: string }
+              label: { type: string }
+        min: { type: integer }
+        max: { type: integer }
+        default: { oneOf: [{ type: string }, { type: integer }] }
+    DashboardSource:
+      type: object
+      required: [id, title, description, area, visualizations, defaultVisualization, params]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        area: { type: string }
+        visualizations: { type: array, items: { $ref: "#/components/schemas/Visualization" } }
+        defaultVisualization: { $ref: "#/components/schemas/Visualization" }
+        params: { type: array, items: { $ref: "#/components/schemas/DashboardSourceParam" } }
+    DashboardDataRequest:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties: true
+    DashboardData:
+      type: object
+      required: [columns, rows, labelKey, valueKeys, note, generatedAt]
+      properties:
+        columns:
+          type: array
+          items:
+            type: object
+            required: [key, label, type]
+            properties:
+              key: { type: string }
+              label: { type: string }
+              type: { type: string, enum: [string, number, date, money] }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        labelKey: { type: ["string", "null"] }
+        valueKeys: { type: array, items: { type: string } }
+        note: { type: ["string", "null"], description: Something the viewer should know (e.g. no department set) }
+        generatedAt: { type: string, format: date-time }
+    DashboardWidget:
+      type: object
+      required: [id, source, viz, x, y, w, h]
+      properties:
+        id: { type: string, description: "Unique within the layout: letters, digits, - or _" }
+        source: { type: string, description: A DashboardSource id }
+        viz: { $ref: "#/components/schemas/Visualization" }
+        title: { type: ["string", "null"], description: Optional custom title (max 80) }
+        params:
+          type: object
+          additionalProperties: true
+        x: { type: integer, minimum: 0, maximum: 11, description: Column (12-column grid) }
+        y: { type: integer, minimum: 0 }
+        w: { type: integer, minimum: 1, maximum: 12 }
+        h: { type: integer, minimum: 1, maximum: 20 }
+        accessible: { type: boolean, description: "Returned by the server: false when the user lost access to this widget's source" }
+    DashboardLayout:
+      type: object
+      required: [widgets]
+      properties:
+        widgets:
+          type: array
+          maxItems: 30
+          items: { $ref: "#/components/schemas/DashboardWidget" }
+    Dashboard:
+      type: object
+      required: [id, scope, name, department, isDefault, layout, updatedAt, updatedBy]
+      properties:
+        id: { type: ["string", "null"], format: uuid, description: Null for the built-in standard layout }
+        scope: { type: string, enum: [user, department, builtin] }
+        name: { type: string }
+        department: { type: ["string", "null"] }
+        isDefault: { type: boolean }
+        layout: { $ref: "#/components/schemas/DashboardLayout" }
+        updatedAt: { type: string, format: date-time }
+        updatedBy: { type: ["string", "null"] }
+    DashboardList:
+      type: object
+      required: [dashboards, template]
+      properties:
+        dashboards: { type: array, items: { $ref: "#/components/schemas/Dashboard" } }
+        template: { $ref: "#/components/schemas/Dashboard" }
+    DashboardInput:
+      type: object
+      required: [name, layout]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        layout: { $ref: "#/components/schemas/DashboardLayout" }
+        isDefault: { type: boolean }
+    DashboardUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        layout: { $ref: "#/components/schemas/DashboardLayout" }
+        isDefault: { type: boolean, description: true makes this the user's default dashboard }
+    DashboardTemplateInput:
+      type: object
+      required: [name, layout]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        layout: { $ref: "#/components/schemas/DashboardLayout" }
     CurrentUser:
       type: object
       required: [userId, email, name, status, role, department, isAdmin, canManageUsers, areas, permissions]

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.7.1
+ * OpenAPI spec version: 0.8.0
  */
 
 export * from './accessLevel';
@@ -17,7 +17,26 @@ export * from './attentionItemSeverity';
 export * from './buyer';
 export * from './colourway';
 export * from './currentUser';
+export * from './dashboard';
+export * from './dashboardData';
+export * from './dashboardDataColumnsItem';
+export * from './dashboardDataColumnsItemType';
+export * from './dashboardDataRequest';
+export * from './dashboardDataRequestParams';
+export * from './dashboardDataRowsItem';
+export * from './dashboardInput';
+export * from './dashboardLayout';
+export * from './dashboardList';
+export * from './dashboardScope';
+export * from './dashboardSource';
+export * from './dashboardSourceParam';
+export * from './dashboardSourceParamOptionsItem';
+export * from './dashboardSourceParamType';
 export * from './dashboardSummary';
+export * from './dashboardTemplateInput';
+export * from './dashboardUpdate';
+export * from './dashboardWidget';
+export * from './dashboardWidgetParams';
 export * from './department';
 export * from './departmentCount';
 export * from './emailAttachment';
@@ -79,6 +98,7 @@ export * from './userRole';
 export * from './userRoleUpdate';
 export * from './userRoleUpdateRole';
 export * from './userStatus';
+export * from './visualization';
 export * from './workItem';
 export * from './workItemStatus';
 export * from './workItemUpdate';

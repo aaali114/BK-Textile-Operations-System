@@ -40,6 +40,16 @@ export const RULES: [method: string, path: RegExp, need: Requirement][] = [
   // dashboard
   ["GET", /^\/dashboard\/summary$/, { area: "dashboard", level: "read" }],
   ["GET", /^\/activity$/, { area: "dashboard", level: "read" }],
+  // customisable dashboards: personal ones need dashboard access; each data source also checks its own area
+  ["GET", /^\/dashboard\/sources$/, { area: "dashboard", level: "read" }],
+  ["POST", /^\/dashboard\/sources\/[^/]+\/data$/, { area: "dashboard", level: "read" }],
+  ["GET", /^\/dashboards$/, { area: "dashboard", level: "read" }],
+  ["POST", /^\/dashboards$/, { area: "dashboard", level: "read" }],
+  ["PUT", /^\/dashboards\/[^/]+$/, { area: "dashboard", level: "read" }],
+  ["DELETE", /^\/dashboards\/[^/]+$/, { area: "dashboard", level: "read" }],
+  ["GET", /^\/admin\/dashboard-templates$/, { manageUsers: true }],
+  ["PUT", /^\/admin\/dashboard-templates\/[^/]+$/, { manageUsers: true }],
+  ["DELETE", /^\/admin\/dashboard-templates\/[^/]+$/, { manageUsers: true }],
   // merchandising: orders and everything under an order
   ["GET", /^\/buyers$/, { area: "merchandising", level: "read" }],
   ["GET", /^\/orders$/, { area: "merchandising", level: "read" }],

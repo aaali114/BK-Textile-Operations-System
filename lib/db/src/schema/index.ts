@@ -20,6 +20,7 @@
 export * from "./activity";
 export * from "./buyers";
 export * from "./colourways";
+export * from "./dashboards";
 export * from "./fabrics";
 export * from "./intake";
 export * from "./materials";

@@ -72,6 +72,8 @@ requests to seed a database. Real data is approved only for PO 36572 (BK Inv.
     administrator role" (`useTransferAdmin`, body `{confirm: true}`, behind a
     typed confirmation). Show server error messages as returned (e.g. you
     cannot change your own access).
+- **API 0.8.0 — customisable dashboards (frontend to build):** see the
+  "Dashboards" brief below.
 - Not yet: manual import of a missed email, staff editing of
   lines/grid/fabrics/trims.
 - Owner decisions that change these requests:
@@ -283,3 +285,41 @@ UI-only downloads are not a substitute for durable revision history.
   `pnpm --filter @workspace/api-spec run codegen` before using generated hooks.
 - Track request status here as operations are delivered; do not mark any request
   complete merely because this planning document exists.
+
+
+## Brief: customisable dashboards (API 0.8.0)
+
+Build in `artifacts/bk-textile` only, using the generated hooks. Use a charting
+library (e.g. Recharts) and a draggable/resizable grid (e.g. react-grid-layout,
+12 columns); add them as UI-only dependencies.
+
+1. **Operations desk becomes the dashboard.** On load, `useListDashboards`:
+   show the user's default dashboard (`isDefault`), else `template`. Tabs or a
+   picker switch between the user's saved dashboards (up to 10).
+2. **Widgets.** For each widget call `useGetDashboardSourceData(source, {params})`
+   and render by `viz`:
+   - `kpi`: one big number per row (`labelKey` = label, first `valueKeys` = value);
+   - `table`: all `columns` (format `date` and `money` columns);
+   - `bar` / `line`: x = `labelKey`, one series per `valueKeys`;
+   - `pie`: `labelKey` vs first `valueKeys`.
+   Show `note` when present, an empty state when `rows` is empty, and a
+   "No access" placeholder when `accessible === false` (do not call the data
+   hook then). Title = widget `title` or the source's `title`. Each widget has
+   a refresh button; refresh all every few minutes while the page is open.
+3. **Edit mode** ("Customise" button): drag and resize widgets; "Add widget"
+   opens a picker from `useListDashboardSources` (title, description) then lets
+   the user choose a visualisation from the source's `visualizations` and its
+   `params` (enum → select, integer → number with min/max); per-widget menu:
+   change visualisation/options/title, remove. "Save" → `useUpdateDashboard`
+   (or `useCreateDashboard` when editing the template for the first time:
+   "Save as my dashboard"). "Cancel" discards. Also: rename, "Make default",
+   "Duplicate", "Delete" (`useDeleteDashboard`), and "Reset to department
+   template" (delete own copy). Show server validation messages as returned.
+4. **Templates (administrators/deputies only, `canManageUsers`):** on the
+   Users & access page (or a "Dashboard templates" page), list
+   `useListDashboardTemplates`, edit one per department (plus "Everyone" = `*`)
+   with the same editor, save with `useSaveDashboardTemplate`, remove with
+   `useDeleteDashboardTemplate`. Note on screen: people only see the widgets
+   their access allows.
+5. Keep the existing summary cards working until the new dashboard replaces
+   them; the old `useGetDashboardSummary` stays available.
