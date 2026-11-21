@@ -5,7 +5,7 @@ import { db, userAreaAccessTable, userPermissionsTable, usersTable } from "@work
 import { logger } from "./logger";
 
 export const AREAS = ["dashboard", "merchandising", "department_work", "materials", "quality"] as const;
-export const PERMISSIONS = ["invoice_override", "commercial_edit", "intake_run"] as const;
+export const PERMISSIONS = ["invoice_override", "commercial_edit", "intake_run", "prepare_documents", "approve_documents"] as const;
 export type Area = (typeof AREAS)[number];
 export type Permission = (typeof PERMISSIONS)[number];
 export type Level = "none" | "read" | "write";
@@ -60,6 +60,17 @@ export const RULES: [method: string, path: RegExp, need: Requirement][] = [
   ["PATCH", /^\/orders\/[^/]+$/, { area: "merchandising", level: "write" }], // commercial fields also need commercial_edit (checked in the route)
   ["PATCH", /^\/orders\/[^/]+\/emails\/[^/]+$/, { area: "merchandising", level: "write" }],
   ["POST", /^\/orders\/[^/]+\/files\/(upload-url|[^/]+\/complete)$/, { area: "merchandising", level: "write" }],
+  // documents (cutting programs, packing lists): viewing follows merchandising; preparing/approving need permissions
+  ["GET", /^\/orders\/[^/]+\/documents$/, { area: "merchandising", level: "read" }],
+  ["GET", /^\/orders\/[^/]+\/documents\/[^/]+(\/files\/(xlsx|pdf))?$/, { area: "merchandising", level: "read" }],
+  ["POST", /^\/orders\/[^/]+\/documents$/, { area: "merchandising", level: "read", permission: "prepare_documents" }],
+  ["PATCH", /^\/orders\/[^/]+\/documents\/[^/]+$/, { area: "merchandising", level: "read", permission: "prepare_documents" }],
+  ["POST", /^\/orders\/[^/]+\/documents\/[^/]+\/submit$/, { area: "merchandising", level: "read", permission: "prepare_documents" }],
+  ["POST", /^\/orders\/[^/]+\/documents\/[^/]+\/(approve|request-changes)$/, { area: "merchandising", level: "read", permission: "approve_documents" }],
+  ["GET", /^\/documents\/awaiting-approval$/, { area: "merchandising", level: "read" }],
+  ["PUT", /^\/orders\/[^/]+\/responsible$/, { manageUsers: true }],
+  ["GET", /^\/admin\/company-profile$/, { manageUsers: true }],
+  ["PUT", /^\/admin\/company-profile$/, { manageUsers: true }],
   // departments, materials, quality
   ["GET", /^\/work-items$/, { area: "department_work", level: "read" }],
   ["PATCH", /^\/work-items\/[^/]+$/, { area: "department_work", level: "write" }],
@@ -212,6 +223,7 @@ export function canSeeActivity(a: Access, entityType: string): boolean {
     case "order":
     case "source_email":
     case "intake":
+    case "document":
       return hasArea(a, "merchandising", "read");
     case "invoice_counter":
       return hasPermission(a, "invoice_override");

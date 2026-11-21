@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.8.0
+ * OpenAPI spec version: 0.9.0
  */
 import * as zod from 'zod';
 
@@ -73,6 +73,9 @@ export const GetOrdersResponseItem = zod.object({
   "shipVia": zod.string().nullable(),
   "countryOfOrigin": zod.string().nullable(),
   "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
+  "responsibleUserId": zod.string().nullish().describe('Merchandiser responsible for the order (may approve its documents)'),
+  "pcsPerCarton": zod.number().int().nullish().describe('Pieces per export carton (from the PO packing method'),
+  "garmentDescription": zod.string().nullish().describe('Garment description used on documents'),
   "agencyName": zod.string().nullable(),
   "previousOrderReference": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
@@ -144,6 +147,9 @@ export const CreateOrderResponse = zod.object({
   "shipVia": zod.string().nullable(),
   "countryOfOrigin": zod.string().nullable(),
   "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
+  "responsibleUserId": zod.string().nullish().describe('Merchandiser responsible for the order (may approve its documents)'),
+  "pcsPerCarton": zod.number().int().nullish().describe('Pieces per export carton (from the PO packing method'),
+  "garmentDescription": zod.string().nullish().describe('Garment description used on documents'),
   "agencyName": zod.string().nullable(),
   "previousOrderReference": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
@@ -182,6 +188,9 @@ export const GetOrderResponse = zod.object({
   "shipVia": zod.string().nullable(),
   "countryOfOrigin": zod.string().nullable(),
   "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
+  "responsibleUserId": zod.string().nullish().describe('Merchandiser responsible for the order (may approve its documents)'),
+  "pcsPerCarton": zod.number().int().nullish().describe('Pieces per export carton (from the PO packing method'),
+  "garmentDescription": zod.string().nullish().describe('Garment description used on documents'),
   "agencyName": zod.string().nullable(),
   "previousOrderReference": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
@@ -205,6 +214,10 @@ export const UpdateOrderParams = zod.object({
   "orderId": zod.coerce.string().uuid()
 })
 
+export const updateOrderBodyPcsPerCartonMax = 10000;
+
+export const updateOrderBodyGarmentDescriptionMax = 300;
+
 export const updateOrderBodyOverShipTolerancePctMin = 0;
 export const updateOrderBodyOverShipTolerancePctMax = 100;
 
@@ -219,6 +232,8 @@ export const updateOrderBodyCurrencyCodeMax = 3;
 
 
 export const UpdateOrderBody = zod.object({
+  "pcsPerCarton": zod.number().int().min(1).max(updateOrderBodyPcsPerCartonMax).nullish(),
+  "garmentDescription": zod.string().max(updateOrderBodyGarmentDescriptionMax).nullish(),
   "poIssueDate": zod.coerce.date().nullish(),
   "endCustomer": zod.string().nullish(),
   "priceTerms": zod.string().nullish(),
@@ -255,6 +270,9 @@ export const UpdateOrderResponse = zod.object({
   "shipVia": zod.string().nullable(),
   "countryOfOrigin": zod.string().nullable(),
   "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
+  "responsibleUserId": zod.string().nullish().describe('Merchandiser responsible for the order (may approve its documents)'),
+  "pcsPerCarton": zod.number().int().nullish().describe('Pieces per export carton (from the PO packing method'),
+  "garmentDescription": zod.string().nullish().describe('Garment description used on documents'),
   "agencyName": zod.string().nullable(),
   "previousOrderReference": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
@@ -404,7 +422,7 @@ export const GetCurrentUserResponse = zod.object({
   "materials": zod.enum(['none', 'read', 'write']),
   "quality": zod.enum(['none', 'read', 'write'])
 }),
-  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails'))
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run', 'prepare_documents', 'approve_documents']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails; prepare_documents = draft, edit and submit documents; approve_documents = approve or send back documents (as administrator, deputy or the order\'s responsible merchandiser, never one\'s own)'))
 })
 
 
@@ -840,6 +858,1050 @@ export const DeleteDashboardTemplateResponse = zod.void()
 
 
 /**
+ * @summary An order's documents, all revisions (newest first per type)
+ */
+export const ListOrderDocumentsParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const listOrderDocumentsResponseDataOneCompanyNameMax = 120;
+
+export const listOrderDocumentsResponseDataOneCompanyTaglineLinesItemMax = 160;
+
+export const listOrderDocumentsResponseDataOneCompanyTaglineLinesMax = 4;
+
+export const listOrderDocumentsResponseDataOneCompanyAddressMax = 300;
+
+
+
+export const ListOrderDocumentsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "orderId": zod.string().uuid(),
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "title": zod.string(),
+  "revision": zod.number().int(),
+  "status": zod.enum(['draft', 'in_review', 'changes_requested', 'approved', 'superseded']),
+  "docNumber": zod.string(),
+  "settings": zod.object({
+  "allowancePct": zod.number().describe('Cutting/packing margin over buyer quantity (default 5)'),
+  "pcsPerCarton": zod.number().int().nullable().describe('Overrides the order\'s pieces per carton'),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.record(zod.string(), zod.object({
+  "description": zod.string().nullish().describe('Description of goods (one line per row)'),
+  "quality": zod.string().nullish().describe('Quality line on the cutting program')
+})).describe('Per priced line (key = line id) text overrides')
+}),
+  "templateVersion": zod.string(),
+  "preparedBy": zod.string(),
+  "contributors": zod.array(zod.string()),
+  "submittedBy": zod.string().nullable(),
+  "submittedAt": zod.coerce.date().nullable(),
+  "reviewedBy": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "problems": zod.array(zod.string()),
+  "outOfDate": zod.boolean().describe('Approved, but the order\'s data has changed since; offer a new revision'),
+  "canEdit": zod.boolean(),
+  "canSubmit": zod.boolean(),
+  "approvalBlocker": zod.string().nullable().describe('In review: null when the signed-in user may approve, otherwise why not'),
+  "files": zod.object({
+  "xlsxSha256": zod.string().nullish(),
+  "pdfSha256": zod.string().nullish()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "data": zod.union([zod.object({
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "docNumber": zod.string(),
+  "company": zod.object({
+  "name": zod.string().max(listOrderDocumentsResponseDataOneCompanyNameMax),
+  "taglineLines": zod.array(zod.string().max(listOrderDocumentsResponseDataOneCompanyTaglineLinesItemMax)).max(listOrderDocumentsResponseDataOneCompanyTaglineLinesMax),
+  "address": zod.string().max(listOrderDocumentsResponseDataOneCompanyAddressMax)
+}),
+  "order": zod.object({
+  "id": zod.string(),
+  "poNumber": zod.string().nullable(),
+  "buyer": zod.string(),
+  "style": zod.string(),
+  "invoiceRef": zod.string().nullable()
+}),
+  "allowancePct": zod.number(),
+  "pcsPerCarton": zod.number().int().nullable(),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.array(zod.object({
+  "lineId": zod.string(),
+  "finish": zod.string(),
+  "styleNumber": zod.string(),
+  "lineQty": zod.number().int(),
+  "descriptionLines": zod.array(zod.string()),
+  "quality": zod.string().nullable(),
+  "sizes": zod.array(zod.string()),
+  "cuttingRows": zod.array(zod.object({
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int()
+})),
+  "packingRows": zod.array(zod.object({
+  "cartonFrom": zod.number().int(),
+  "cartonTo": zod.number().int(),
+  "po": zod.string(),
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actualQty": zod.number().int().nullable().describe('Buyer quantity on the first row of a size; null on part-carton rows'),
+  "cartons": zod.number().int(),
+  "perCarton": zod.number().int(),
+  "totalPcs": zod.number().int()
+})),
+  "totals": zod.object({
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int(),
+  "cartons": zod.number().int(),
+  "dozens": zod.number()
+})
+})),
+  "problems": zod.array(zod.string()).describe('Must be fixed before submitting')
+}),zod.null()]).describe('Present on single-document responses')
+})
+export const ListOrderDocumentsResponse = zod.array(ListOrderDocumentsResponseItem)
+
+
+/**
+ * @summary Start a draft (or a new revision after approval) of a document type
+ */
+export const CreateOrderDocumentParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const CreateOrderDocumentBody = zod.object({
+  "type": zod.enum(['cutting_program', 'packing_list'])
+})
+
+export const createOrderDocumentResponseDataOneCompanyNameMax = 120;
+
+export const createOrderDocumentResponseDataOneCompanyTaglineLinesItemMax = 160;
+
+export const createOrderDocumentResponseDataOneCompanyTaglineLinesMax = 4;
+
+export const createOrderDocumentResponseDataOneCompanyAddressMax = 300;
+
+
+
+export const CreateOrderDocumentResponse = zod.object({
+  "id": zod.string().uuid(),
+  "orderId": zod.string().uuid(),
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "title": zod.string(),
+  "revision": zod.number().int(),
+  "status": zod.enum(['draft', 'in_review', 'changes_requested', 'approved', 'superseded']),
+  "docNumber": zod.string(),
+  "settings": zod.object({
+  "allowancePct": zod.number().describe('Cutting/packing margin over buyer quantity (default 5)'),
+  "pcsPerCarton": zod.number().int().nullable().describe('Overrides the order\'s pieces per carton'),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.record(zod.string(), zod.object({
+  "description": zod.string().nullish().describe('Description of goods (one line per row)'),
+  "quality": zod.string().nullish().describe('Quality line on the cutting program')
+})).describe('Per priced line (key = line id) text overrides')
+}),
+  "templateVersion": zod.string(),
+  "preparedBy": zod.string(),
+  "contributors": zod.array(zod.string()),
+  "submittedBy": zod.string().nullable(),
+  "submittedAt": zod.coerce.date().nullable(),
+  "reviewedBy": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "problems": zod.array(zod.string()),
+  "outOfDate": zod.boolean().describe('Approved, but the order\'s data has changed since; offer a new revision'),
+  "canEdit": zod.boolean(),
+  "canSubmit": zod.boolean(),
+  "approvalBlocker": zod.string().nullable().describe('In review: null when the signed-in user may approve, otherwise why not'),
+  "files": zod.object({
+  "xlsxSha256": zod.string().nullish(),
+  "pdfSha256": zod.string().nullish()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "data": zod.union([zod.object({
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "docNumber": zod.string(),
+  "company": zod.object({
+  "name": zod.string().max(createOrderDocumentResponseDataOneCompanyNameMax),
+  "taglineLines": zod.array(zod.string().max(createOrderDocumentResponseDataOneCompanyTaglineLinesItemMax)).max(createOrderDocumentResponseDataOneCompanyTaglineLinesMax),
+  "address": zod.string().max(createOrderDocumentResponseDataOneCompanyAddressMax)
+}),
+  "order": zod.object({
+  "id": zod.string(),
+  "poNumber": zod.string().nullable(),
+  "buyer": zod.string(),
+  "style": zod.string(),
+  "invoiceRef": zod.string().nullable()
+}),
+  "allowancePct": zod.number(),
+  "pcsPerCarton": zod.number().int().nullable(),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.array(zod.object({
+  "lineId": zod.string(),
+  "finish": zod.string(),
+  "styleNumber": zod.string(),
+  "lineQty": zod.number().int(),
+  "descriptionLines": zod.array(zod.string()),
+  "quality": zod.string().nullable(),
+  "sizes": zod.array(zod.string()),
+  "cuttingRows": zod.array(zod.object({
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int()
+})),
+  "packingRows": zod.array(zod.object({
+  "cartonFrom": zod.number().int(),
+  "cartonTo": zod.number().int(),
+  "po": zod.string(),
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actualQty": zod.number().int().nullable().describe('Buyer quantity on the first row of a size; null on part-carton rows'),
+  "cartons": zod.number().int(),
+  "perCarton": zod.number().int(),
+  "totalPcs": zod.number().int()
+})),
+  "totals": zod.object({
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int(),
+  "cartons": zod.number().int(),
+  "dozens": zod.number()
+})
+})),
+  "problems": zod.array(zod.string()).describe('Must be fixed before submitting')
+}),zod.null()]).describe('Present on single-document responses')
+})
+
+
+/**
+ * @summary One document with its data (live for drafts, frozen for approved)
+ */
+export const GetOrderDocumentParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "documentId": zod.coerce.string().uuid()
+})
+
+export const getOrderDocumentResponseDataOneCompanyNameMax = 120;
+
+export const getOrderDocumentResponseDataOneCompanyTaglineLinesItemMax = 160;
+
+export const getOrderDocumentResponseDataOneCompanyTaglineLinesMax = 4;
+
+export const getOrderDocumentResponseDataOneCompanyAddressMax = 300;
+
+
+
+export const GetOrderDocumentResponse = zod.object({
+  "id": zod.string().uuid(),
+  "orderId": zod.string().uuid(),
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "title": zod.string(),
+  "revision": zod.number().int(),
+  "status": zod.enum(['draft', 'in_review', 'changes_requested', 'approved', 'superseded']),
+  "docNumber": zod.string(),
+  "settings": zod.object({
+  "allowancePct": zod.number().describe('Cutting/packing margin over buyer quantity (default 5)'),
+  "pcsPerCarton": zod.number().int().nullable().describe('Overrides the order\'s pieces per carton'),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.record(zod.string(), zod.object({
+  "description": zod.string().nullish().describe('Description of goods (one line per row)'),
+  "quality": zod.string().nullish().describe('Quality line on the cutting program')
+})).describe('Per priced line (key = line id) text overrides')
+}),
+  "templateVersion": zod.string(),
+  "preparedBy": zod.string(),
+  "contributors": zod.array(zod.string()),
+  "submittedBy": zod.string().nullable(),
+  "submittedAt": zod.coerce.date().nullable(),
+  "reviewedBy": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "problems": zod.array(zod.string()),
+  "outOfDate": zod.boolean().describe('Approved, but the order\'s data has changed since; offer a new revision'),
+  "canEdit": zod.boolean(),
+  "canSubmit": zod.boolean(),
+  "approvalBlocker": zod.string().nullable().describe('In review: null when the signed-in user may approve, otherwise why not'),
+  "files": zod.object({
+  "xlsxSha256": zod.string().nullish(),
+  "pdfSha256": zod.string().nullish()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "data": zod.union([zod.object({
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "docNumber": zod.string(),
+  "company": zod.object({
+  "name": zod.string().max(getOrderDocumentResponseDataOneCompanyNameMax),
+  "taglineLines": zod.array(zod.string().max(getOrderDocumentResponseDataOneCompanyTaglineLinesItemMax)).max(getOrderDocumentResponseDataOneCompanyTaglineLinesMax),
+  "address": zod.string().max(getOrderDocumentResponseDataOneCompanyAddressMax)
+}),
+  "order": zod.object({
+  "id": zod.string(),
+  "poNumber": zod.string().nullable(),
+  "buyer": zod.string(),
+  "style": zod.string(),
+  "invoiceRef": zod.string().nullable()
+}),
+  "allowancePct": zod.number(),
+  "pcsPerCarton": zod.number().int().nullable(),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.array(zod.object({
+  "lineId": zod.string(),
+  "finish": zod.string(),
+  "styleNumber": zod.string(),
+  "lineQty": zod.number().int(),
+  "descriptionLines": zod.array(zod.string()),
+  "quality": zod.string().nullable(),
+  "sizes": zod.array(zod.string()),
+  "cuttingRows": zod.array(zod.object({
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int()
+})),
+  "packingRows": zod.array(zod.object({
+  "cartonFrom": zod.number().int(),
+  "cartonTo": zod.number().int(),
+  "po": zod.string(),
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actualQty": zod.number().int().nullable().describe('Buyer quantity on the first row of a size; null on part-carton rows'),
+  "cartons": zod.number().int(),
+  "perCarton": zod.number().int(),
+  "totalPcs": zod.number().int()
+})),
+  "totals": zod.object({
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int(),
+  "cartons": zod.number().int(),
+  "dozens": zod.number()
+})
+})),
+  "problems": zod.array(zod.string()).describe('Must be fixed before submitting')
+}),zod.null()]).describe('Present on single-document responses')
+})
+
+
+/**
+ * @summary Edit a draft's settings (allowance, pieces per carton, texts)
+ */
+export const UpdateOrderDocumentParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "documentId": zod.coerce.string().uuid()
+})
+
+export const updateOrderDocumentBodyAllowancePctMin = 0;
+export const updateOrderDocumentBodyAllowancePctMax = 50;
+
+export const updateOrderDocumentBodyPcsPerCartonMax = 10000;
+
+export const updateOrderDocumentBodyPreviousReferenceMax = 120;
+
+export const updateOrderDocumentBodyRemarksMax = 500;
+
+export const updateOrderDocumentBodySectionsDescriptionMax = 600;
+
+export const updateOrderDocumentBodySectionsQualityMax = 200;
+
+
+
+export const UpdateOrderDocumentBody = zod.object({
+  "allowancePct": zod.number().min(updateOrderDocumentBodyAllowancePctMin).max(updateOrderDocumentBodyAllowancePctMax).optional(),
+  "pcsPerCarton": zod.number().int().min(1).max(updateOrderDocumentBodyPcsPerCartonMax).nullish(),
+  "previousReference": zod.string().max(updateOrderDocumentBodyPreviousReferenceMax).nullish(),
+  "remarks": zod.string().max(updateOrderDocumentBodyRemarksMax).nullish(),
+  "sections": zod.record(zod.string(), zod.object({
+  "description": zod.string().max(updateOrderDocumentBodySectionsDescriptionMax).nullish(),
+  "quality": zod.string().max(updateOrderDocumentBodySectionsQualityMax).nullish()
+})).optional()
+})
+
+export const updateOrderDocumentResponseDataOneCompanyNameMax = 120;
+
+export const updateOrderDocumentResponseDataOneCompanyTaglineLinesItemMax = 160;
+
+export const updateOrderDocumentResponseDataOneCompanyTaglineLinesMax = 4;
+
+export const updateOrderDocumentResponseDataOneCompanyAddressMax = 300;
+
+
+
+export const UpdateOrderDocumentResponse = zod.object({
+  "id": zod.string().uuid(),
+  "orderId": zod.string().uuid(),
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "title": zod.string(),
+  "revision": zod.number().int(),
+  "status": zod.enum(['draft', 'in_review', 'changes_requested', 'approved', 'superseded']),
+  "docNumber": zod.string(),
+  "settings": zod.object({
+  "allowancePct": zod.number().describe('Cutting/packing margin over buyer quantity (default 5)'),
+  "pcsPerCarton": zod.number().int().nullable().describe('Overrides the order\'s pieces per carton'),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.record(zod.string(), zod.object({
+  "description": zod.string().nullish().describe('Description of goods (one line per row)'),
+  "quality": zod.string().nullish().describe('Quality line on the cutting program')
+})).describe('Per priced line (key = line id) text overrides')
+}),
+  "templateVersion": zod.string(),
+  "preparedBy": zod.string(),
+  "contributors": zod.array(zod.string()),
+  "submittedBy": zod.string().nullable(),
+  "submittedAt": zod.coerce.date().nullable(),
+  "reviewedBy": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "problems": zod.array(zod.string()),
+  "outOfDate": zod.boolean().describe('Approved, but the order\'s data has changed since; offer a new revision'),
+  "canEdit": zod.boolean(),
+  "canSubmit": zod.boolean(),
+  "approvalBlocker": zod.string().nullable().describe('In review: null when the signed-in user may approve, otherwise why not'),
+  "files": zod.object({
+  "xlsxSha256": zod.string().nullish(),
+  "pdfSha256": zod.string().nullish()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "data": zod.union([zod.object({
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "docNumber": zod.string(),
+  "company": zod.object({
+  "name": zod.string().max(updateOrderDocumentResponseDataOneCompanyNameMax),
+  "taglineLines": zod.array(zod.string().max(updateOrderDocumentResponseDataOneCompanyTaglineLinesItemMax)).max(updateOrderDocumentResponseDataOneCompanyTaglineLinesMax),
+  "address": zod.string().max(updateOrderDocumentResponseDataOneCompanyAddressMax)
+}),
+  "order": zod.object({
+  "id": zod.string(),
+  "poNumber": zod.string().nullable(),
+  "buyer": zod.string(),
+  "style": zod.string(),
+  "invoiceRef": zod.string().nullable()
+}),
+  "allowancePct": zod.number(),
+  "pcsPerCarton": zod.number().int().nullable(),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.array(zod.object({
+  "lineId": zod.string(),
+  "finish": zod.string(),
+  "styleNumber": zod.string(),
+  "lineQty": zod.number().int(),
+  "descriptionLines": zod.array(zod.string()),
+  "quality": zod.string().nullable(),
+  "sizes": zod.array(zod.string()),
+  "cuttingRows": zod.array(zod.object({
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int()
+})),
+  "packingRows": zod.array(zod.object({
+  "cartonFrom": zod.number().int(),
+  "cartonTo": zod.number().int(),
+  "po": zod.string(),
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actualQty": zod.number().int().nullable().describe('Buyer quantity on the first row of a size; null on part-carton rows'),
+  "cartons": zod.number().int(),
+  "perCarton": zod.number().int(),
+  "totalPcs": zod.number().int()
+})),
+  "totals": zod.object({
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int(),
+  "cartons": zod.number().int(),
+  "dozens": zod.number()
+})
+})),
+  "problems": zod.array(zod.string()).describe('Must be fixed before submitting')
+}),zod.null()]).describe('Present on single-document responses')
+})
+
+
+/**
+ * @summary Send a draft for approval
+ */
+export const SubmitOrderDocumentParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "documentId": zod.coerce.string().uuid()
+})
+
+export const submitOrderDocumentResponseDataOneCompanyNameMax = 120;
+
+export const submitOrderDocumentResponseDataOneCompanyTaglineLinesItemMax = 160;
+
+export const submitOrderDocumentResponseDataOneCompanyTaglineLinesMax = 4;
+
+export const submitOrderDocumentResponseDataOneCompanyAddressMax = 300;
+
+
+
+export const SubmitOrderDocumentResponse = zod.object({
+  "id": zod.string().uuid(),
+  "orderId": zod.string().uuid(),
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "title": zod.string(),
+  "revision": zod.number().int(),
+  "status": zod.enum(['draft', 'in_review', 'changes_requested', 'approved', 'superseded']),
+  "docNumber": zod.string(),
+  "settings": zod.object({
+  "allowancePct": zod.number().describe('Cutting/packing margin over buyer quantity (default 5)'),
+  "pcsPerCarton": zod.number().int().nullable().describe('Overrides the order\'s pieces per carton'),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.record(zod.string(), zod.object({
+  "description": zod.string().nullish().describe('Description of goods (one line per row)'),
+  "quality": zod.string().nullish().describe('Quality line on the cutting program')
+})).describe('Per priced line (key = line id) text overrides')
+}),
+  "templateVersion": zod.string(),
+  "preparedBy": zod.string(),
+  "contributors": zod.array(zod.string()),
+  "submittedBy": zod.string().nullable(),
+  "submittedAt": zod.coerce.date().nullable(),
+  "reviewedBy": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "problems": zod.array(zod.string()),
+  "outOfDate": zod.boolean().describe('Approved, but the order\'s data has changed since; offer a new revision'),
+  "canEdit": zod.boolean(),
+  "canSubmit": zod.boolean(),
+  "approvalBlocker": zod.string().nullable().describe('In review: null when the signed-in user may approve, otherwise why not'),
+  "files": zod.object({
+  "xlsxSha256": zod.string().nullish(),
+  "pdfSha256": zod.string().nullish()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "data": zod.union([zod.object({
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "docNumber": zod.string(),
+  "company": zod.object({
+  "name": zod.string().max(submitOrderDocumentResponseDataOneCompanyNameMax),
+  "taglineLines": zod.array(zod.string().max(submitOrderDocumentResponseDataOneCompanyTaglineLinesItemMax)).max(submitOrderDocumentResponseDataOneCompanyTaglineLinesMax),
+  "address": zod.string().max(submitOrderDocumentResponseDataOneCompanyAddressMax)
+}),
+  "order": zod.object({
+  "id": zod.string(),
+  "poNumber": zod.string().nullable(),
+  "buyer": zod.string(),
+  "style": zod.string(),
+  "invoiceRef": zod.string().nullable()
+}),
+  "allowancePct": zod.number(),
+  "pcsPerCarton": zod.number().int().nullable(),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.array(zod.object({
+  "lineId": zod.string(),
+  "finish": zod.string(),
+  "styleNumber": zod.string(),
+  "lineQty": zod.number().int(),
+  "descriptionLines": zod.array(zod.string()),
+  "quality": zod.string().nullable(),
+  "sizes": zod.array(zod.string()),
+  "cuttingRows": zod.array(zod.object({
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int()
+})),
+  "packingRows": zod.array(zod.object({
+  "cartonFrom": zod.number().int(),
+  "cartonTo": zod.number().int(),
+  "po": zod.string(),
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actualQty": zod.number().int().nullable().describe('Buyer quantity on the first row of a size; null on part-carton rows'),
+  "cartons": zod.number().int(),
+  "perCarton": zod.number().int(),
+  "totalPcs": zod.number().int()
+})),
+  "totals": zod.object({
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int(),
+  "cartons": zod.number().int(),
+  "dozens": zod.number()
+})
+})),
+  "problems": zod.array(zod.string()).describe('Must be fixed before submitting')
+}),zod.null()]).describe('Present on single-document responses')
+})
+
+
+/**
+ * @summary Send a document in review back with a note (approvers only)
+ */
+export const RequestOrderDocumentChangesParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "documentId": zod.coerce.string().uuid()
+})
+
+export const requestOrderDocumentChangesBodyNoteMax = 1000;
+
+
+
+export const RequestOrderDocumentChangesBody = zod.object({
+  "note": zod.string().min(1).max(requestOrderDocumentChangesBodyNoteMax)
+})
+
+export const requestOrderDocumentChangesResponseDataOneCompanyNameMax = 120;
+
+export const requestOrderDocumentChangesResponseDataOneCompanyTaglineLinesItemMax = 160;
+
+export const requestOrderDocumentChangesResponseDataOneCompanyTaglineLinesMax = 4;
+
+export const requestOrderDocumentChangesResponseDataOneCompanyAddressMax = 300;
+
+
+
+export const RequestOrderDocumentChangesResponse = zod.object({
+  "id": zod.string().uuid(),
+  "orderId": zod.string().uuid(),
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "title": zod.string(),
+  "revision": zod.number().int(),
+  "status": zod.enum(['draft', 'in_review', 'changes_requested', 'approved', 'superseded']),
+  "docNumber": zod.string(),
+  "settings": zod.object({
+  "allowancePct": zod.number().describe('Cutting/packing margin over buyer quantity (default 5)'),
+  "pcsPerCarton": zod.number().int().nullable().describe('Overrides the order\'s pieces per carton'),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.record(zod.string(), zod.object({
+  "description": zod.string().nullish().describe('Description of goods (one line per row)'),
+  "quality": zod.string().nullish().describe('Quality line on the cutting program')
+})).describe('Per priced line (key = line id) text overrides')
+}),
+  "templateVersion": zod.string(),
+  "preparedBy": zod.string(),
+  "contributors": zod.array(zod.string()),
+  "submittedBy": zod.string().nullable(),
+  "submittedAt": zod.coerce.date().nullable(),
+  "reviewedBy": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "problems": zod.array(zod.string()),
+  "outOfDate": zod.boolean().describe('Approved, but the order\'s data has changed since; offer a new revision'),
+  "canEdit": zod.boolean(),
+  "canSubmit": zod.boolean(),
+  "approvalBlocker": zod.string().nullable().describe('In review: null when the signed-in user may approve, otherwise why not'),
+  "files": zod.object({
+  "xlsxSha256": zod.string().nullish(),
+  "pdfSha256": zod.string().nullish()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "data": zod.union([zod.object({
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "docNumber": zod.string(),
+  "company": zod.object({
+  "name": zod.string().max(requestOrderDocumentChangesResponseDataOneCompanyNameMax),
+  "taglineLines": zod.array(zod.string().max(requestOrderDocumentChangesResponseDataOneCompanyTaglineLinesItemMax)).max(requestOrderDocumentChangesResponseDataOneCompanyTaglineLinesMax),
+  "address": zod.string().max(requestOrderDocumentChangesResponseDataOneCompanyAddressMax)
+}),
+  "order": zod.object({
+  "id": zod.string(),
+  "poNumber": zod.string().nullable(),
+  "buyer": zod.string(),
+  "style": zod.string(),
+  "invoiceRef": zod.string().nullable()
+}),
+  "allowancePct": zod.number(),
+  "pcsPerCarton": zod.number().int().nullable(),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.array(zod.object({
+  "lineId": zod.string(),
+  "finish": zod.string(),
+  "styleNumber": zod.string(),
+  "lineQty": zod.number().int(),
+  "descriptionLines": zod.array(zod.string()),
+  "quality": zod.string().nullable(),
+  "sizes": zod.array(zod.string()),
+  "cuttingRows": zod.array(zod.object({
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int()
+})),
+  "packingRows": zod.array(zod.object({
+  "cartonFrom": zod.number().int(),
+  "cartonTo": zod.number().int(),
+  "po": zod.string(),
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actualQty": zod.number().int().nullable().describe('Buyer quantity on the first row of a size; null on part-carton rows'),
+  "cartons": zod.number().int(),
+  "perCarton": zod.number().int(),
+  "totalPcs": zod.number().int()
+})),
+  "totals": zod.object({
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int(),
+  "cartons": zod.number().int(),
+  "dozens": zod.number()
+})
+})),
+  "problems": zod.array(zod.string()).describe('Must be fixed before submitting')
+}),zod.null()]).describe('Present on single-document responses')
+})
+
+
+/**
+ * Approvers: administrators, deputies or the order's responsible merchandiser, holding the approve_documents permission, who did not prepare, edit or submit the document. Approval renders the final Excel and PDF, stores them with SHA-256 fingerprints and freezes the data; the document can never be changed or deleted afterwards. The previous approved revision becomes superseded.
+ * @summary Approve and freeze a document (four-eyes)
+ */
+export const ApproveOrderDocumentParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "documentId": zod.coerce.string().uuid()
+})
+
+export const approveOrderDocumentBodyNoteMax = 1000;
+
+
+
+export const ApproveOrderDocumentBody = zod.object({
+  "note": zod.string().max(approveOrderDocumentBodyNoteMax).optional()
+})
+
+export const approveOrderDocumentResponseDataOneCompanyNameMax = 120;
+
+export const approveOrderDocumentResponseDataOneCompanyTaglineLinesItemMax = 160;
+
+export const approveOrderDocumentResponseDataOneCompanyTaglineLinesMax = 4;
+
+export const approveOrderDocumentResponseDataOneCompanyAddressMax = 300;
+
+
+
+export const ApproveOrderDocumentResponse = zod.object({
+  "id": zod.string().uuid(),
+  "orderId": zod.string().uuid(),
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "title": zod.string(),
+  "revision": zod.number().int(),
+  "status": zod.enum(['draft', 'in_review', 'changes_requested', 'approved', 'superseded']),
+  "docNumber": zod.string(),
+  "settings": zod.object({
+  "allowancePct": zod.number().describe('Cutting/packing margin over buyer quantity (default 5)'),
+  "pcsPerCarton": zod.number().int().nullable().describe('Overrides the order\'s pieces per carton'),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.record(zod.string(), zod.object({
+  "description": zod.string().nullish().describe('Description of goods (one line per row)'),
+  "quality": zod.string().nullish().describe('Quality line on the cutting program')
+})).describe('Per priced line (key = line id) text overrides')
+}),
+  "templateVersion": zod.string(),
+  "preparedBy": zod.string(),
+  "contributors": zod.array(zod.string()),
+  "submittedBy": zod.string().nullable(),
+  "submittedAt": zod.coerce.date().nullable(),
+  "reviewedBy": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "problems": zod.array(zod.string()),
+  "outOfDate": zod.boolean().describe('Approved, but the order\'s data has changed since; offer a new revision'),
+  "canEdit": zod.boolean(),
+  "canSubmit": zod.boolean(),
+  "approvalBlocker": zod.string().nullable().describe('In review: null when the signed-in user may approve, otherwise why not'),
+  "files": zod.object({
+  "xlsxSha256": zod.string().nullish(),
+  "pdfSha256": zod.string().nullish()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "data": zod.union([zod.object({
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "docNumber": zod.string(),
+  "company": zod.object({
+  "name": zod.string().max(approveOrderDocumentResponseDataOneCompanyNameMax),
+  "taglineLines": zod.array(zod.string().max(approveOrderDocumentResponseDataOneCompanyTaglineLinesItemMax)).max(approveOrderDocumentResponseDataOneCompanyTaglineLinesMax),
+  "address": zod.string().max(approveOrderDocumentResponseDataOneCompanyAddressMax)
+}),
+  "order": zod.object({
+  "id": zod.string(),
+  "poNumber": zod.string().nullable(),
+  "buyer": zod.string(),
+  "style": zod.string(),
+  "invoiceRef": zod.string().nullable()
+}),
+  "allowancePct": zod.number(),
+  "pcsPerCarton": zod.number().int().nullable(),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.array(zod.object({
+  "lineId": zod.string(),
+  "finish": zod.string(),
+  "styleNumber": zod.string(),
+  "lineQty": zod.number().int(),
+  "descriptionLines": zod.array(zod.string()),
+  "quality": zod.string().nullable(),
+  "sizes": zod.array(zod.string()),
+  "cuttingRows": zod.array(zod.object({
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int()
+})),
+  "packingRows": zod.array(zod.object({
+  "cartonFrom": zod.number().int(),
+  "cartonTo": zod.number().int(),
+  "po": zod.string(),
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actualQty": zod.number().int().nullable().describe('Buyer quantity on the first row of a size; null on part-carton rows'),
+  "cartons": zod.number().int(),
+  "perCarton": zod.number().int(),
+  "totalPcs": zod.number().int()
+})),
+  "totals": zod.object({
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int(),
+  "cartons": zod.number().int(),
+  "dozens": zod.number()
+})
+})),
+  "problems": zod.array(zod.string()).describe('Must be fixed before submitting')
+}),zod.null()]).describe('Present on single-document responses')
+})
+
+
+/**
+ * @summary Download as Excel or PDF (drafts carry a DRAFT watermark; approved files are the stored originals)
+ */
+export const DownloadOrderDocumentFileParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "documentId": zod.coerce.string().uuid(),
+  "format": zod.enum(['xlsx', 'pdf'])
+})
+
+export const DownloadOrderDocumentFileResponse = zod.unknown()
+
+
+/**
+ * @summary Documents in review that the signed-in user may approve
+ */
+export const listDocumentsAwaitingApprovalResponseDataOneCompanyNameMax = 120;
+
+export const listDocumentsAwaitingApprovalResponseDataOneCompanyTaglineLinesItemMax = 160;
+
+export const listDocumentsAwaitingApprovalResponseDataOneCompanyTaglineLinesMax = 4;
+
+export const listDocumentsAwaitingApprovalResponseDataOneCompanyAddressMax = 300;
+
+
+
+export const ListDocumentsAwaitingApprovalResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "orderId": zod.string().uuid(),
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "title": zod.string(),
+  "revision": zod.number().int(),
+  "status": zod.enum(['draft', 'in_review', 'changes_requested', 'approved', 'superseded']),
+  "docNumber": zod.string(),
+  "settings": zod.object({
+  "allowancePct": zod.number().describe('Cutting/packing margin over buyer quantity (default 5)'),
+  "pcsPerCarton": zod.number().int().nullable().describe('Overrides the order\'s pieces per carton'),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.record(zod.string(), zod.object({
+  "description": zod.string().nullish().describe('Description of goods (one line per row)'),
+  "quality": zod.string().nullish().describe('Quality line on the cutting program')
+})).describe('Per priced line (key = line id) text overrides')
+}),
+  "templateVersion": zod.string(),
+  "preparedBy": zod.string(),
+  "contributors": zod.array(zod.string()),
+  "submittedBy": zod.string().nullable(),
+  "submittedAt": zod.coerce.date().nullable(),
+  "reviewedBy": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "problems": zod.array(zod.string()),
+  "outOfDate": zod.boolean().describe('Approved, but the order\'s data has changed since; offer a new revision'),
+  "canEdit": zod.boolean(),
+  "canSubmit": zod.boolean(),
+  "approvalBlocker": zod.string().nullable().describe('In review: null when the signed-in user may approve, otherwise why not'),
+  "files": zod.object({
+  "xlsxSha256": zod.string().nullish(),
+  "pdfSha256": zod.string().nullish()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "data": zod.union([zod.object({
+  "type": zod.enum(['cutting_program', 'packing_list']),
+  "docNumber": zod.string(),
+  "company": zod.object({
+  "name": zod.string().max(listDocumentsAwaitingApprovalResponseDataOneCompanyNameMax),
+  "taglineLines": zod.array(zod.string().max(listDocumentsAwaitingApprovalResponseDataOneCompanyTaglineLinesItemMax)).max(listDocumentsAwaitingApprovalResponseDataOneCompanyTaglineLinesMax),
+  "address": zod.string().max(listDocumentsAwaitingApprovalResponseDataOneCompanyAddressMax)
+}),
+  "order": zod.object({
+  "id": zod.string(),
+  "poNumber": zod.string().nullable(),
+  "buyer": zod.string(),
+  "style": zod.string(),
+  "invoiceRef": zod.string().nullable()
+}),
+  "allowancePct": zod.number(),
+  "pcsPerCarton": zod.number().int().nullable(),
+  "previousReference": zod.string().nullable(),
+  "remarks": zod.string().nullable(),
+  "sections": zod.array(zod.object({
+  "lineId": zod.string(),
+  "finish": zod.string(),
+  "styleNumber": zod.string(),
+  "lineQty": zod.number().int(),
+  "descriptionLines": zod.array(zod.string()),
+  "quality": zod.string().nullable(),
+  "sizes": zod.array(zod.string()),
+  "cuttingRows": zod.array(zod.object({
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int()
+})),
+  "packingRows": zod.array(zod.object({
+  "cartonFrom": zod.number().int(),
+  "cartonTo": zod.number().int(),
+  "po": zod.string(),
+  "style": zod.string(),
+  "colour": zod.string(),
+  "size": zod.string(),
+  "actualQty": zod.number().int().nullable().describe('Buyer quantity on the first row of a size; null on part-carton rows'),
+  "cartons": zod.number().int(),
+  "perCarton": zod.number().int(),
+  "totalPcs": zod.number().int()
+})),
+  "totals": zod.object({
+  "actual": zod.number().int(),
+  "plus": zod.number().int(),
+  "total": zod.number().int(),
+  "cartons": zod.number().int(),
+  "dozens": zod.number()
+})
+})),
+  "problems": zod.array(zod.string()).describe('Must be fixed before submitting')
+}),zod.null()]).describe('Present on single-document responses')
+})
+export const ListDocumentsAwaitingApprovalResponse = zod.array(ListDocumentsAwaitingApprovalResponseItem)
+
+
+/**
+ * @summary Set the order's responsible merchandiser (administrators and deputies)
+ */
+export const SetOrderResponsibleParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const SetOrderResponsibleBody = zod.object({
+  "userId": zod.string().nullable()
+})
+
+export const SetOrderResponsibleResponse = zod.void()
+
+
+/**
+ * @summary Letterhead used on documents (administrators and deputies)
+ */
+export const getCompanyProfileResponseNameMax = 120;
+
+export const getCompanyProfileResponseTaglineLinesItemMax = 160;
+
+export const getCompanyProfileResponseTaglineLinesMax = 4;
+
+export const getCompanyProfileResponseAddressMax = 300;
+
+
+
+export const GetCompanyProfileResponse = zod.object({
+  "name": zod.string().max(getCompanyProfileResponseNameMax),
+  "taglineLines": zod.array(zod.string().max(getCompanyProfileResponseTaglineLinesItemMax)).max(getCompanyProfileResponseTaglineLinesMax),
+  "address": zod.string().max(getCompanyProfileResponseAddressMax)
+})
+
+
+/**
+ * @summary Update the letterhead (affects new drafts and approvals; approved documents keep theirs)
+ */
+export const saveCompanyProfileBodyNameMax = 120;
+
+export const saveCompanyProfileBodyTaglineLinesItemMax = 160;
+
+export const saveCompanyProfileBodyTaglineLinesMax = 4;
+
+export const saveCompanyProfileBodyAddressMax = 300;
+
+
+
+export const SaveCompanyProfileBody = zod.object({
+  "name": zod.string().max(saveCompanyProfileBodyNameMax),
+  "taglineLines": zod.array(zod.string().max(saveCompanyProfileBodyTaglineLinesItemMax)).max(saveCompanyProfileBodyTaglineLinesMax),
+  "address": zod.string().max(saveCompanyProfileBodyAddressMax)
+})
+
+export const saveCompanyProfileResponseNameMax = 120;
+
+export const saveCompanyProfileResponseTaglineLinesItemMax = 160;
+
+export const saveCompanyProfileResponseTaglineLinesMax = 4;
+
+export const saveCompanyProfileResponseAddressMax = 300;
+
+
+
+export const SaveCompanyProfileResponse = zod.object({
+  "name": zod.string().max(saveCompanyProfileResponseNameMax),
+  "taglineLines": zod.array(zod.string().max(saveCompanyProfileResponseTaglineLinesItemMax)).max(saveCompanyProfileResponseTaglineLinesMax),
+  "address": zod.string().max(saveCompanyProfileResponseAddressMax)
+})
+
+
+/**
  * @summary List buyers and their invoice abbreviations
  */
 export const GetBuyersResponseItem = zod.object({
@@ -1148,6 +2210,9 @@ export const SetOrderInvoiceNumberResponse = zod.object({
   "shipVia": zod.string().nullable(),
   "countryOfOrigin": zod.string().nullable(),
   "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
+  "responsibleUserId": zod.string().nullish().describe('Merchandiser responsible for the order (may approve its documents)'),
+  "pcsPerCarton": zod.number().int().nullish().describe('Pieces per export carton (from the PO packing method'),
+  "garmentDescription": zod.string().nullish().describe('Garment description used on documents'),
   "agencyName": zod.string().nullable(),
   "previousOrderReference": zod.string().nullable(),
   "orderValue": zod.number().nullable(),
@@ -1181,7 +2246,7 @@ export const ListUsersResponseItem = zod.object({
   "materials": zod.enum(['none', 'read', 'write']),
   "quality": zod.enum(['none', 'read', 'write'])
 }),
-  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails')),
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run', 'prepare_documents', 'approve_documents']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails; prepare_documents = draft, edit and submit documents; approve_documents = approve or send back documents (as administrator, deputy or the order\'s responsible merchandiser, never one\'s own)')),
   "approvedBy": zod.string().nullable(),
   "approvedAt": zod.coerce.date().nullable(),
   "lastSeenAt": zod.coerce.date().nullable(),
@@ -1202,7 +2267,7 @@ export const GetAccessTemplatesResponseItem = zod.object({
   "materials": zod.enum(['none', 'read', 'write']).optional(),
   "quality": zod.enum(['none', 'read', 'write']).optional()
 }),
-  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails'))
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run', 'prepare_documents', 'approve_documents']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails; prepare_documents = draft, edit and submit documents; approve_documents = approve or send back documents (as administrator, deputy or the order\'s responsible merchandiser, never one\'s own)'))
 })
 export const GetAccessTemplatesResponse = zod.array(GetAccessTemplatesResponseItem)
 
@@ -1228,7 +2293,7 @@ export const UpdateUserAccessBody = zod.object({
   "materials": zod.enum(['none', 'read', 'write']).optional(),
   "quality": zod.enum(['none', 'read', 'write']).optional()
 }).optional(),
-  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails')).optional()
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run', 'prepare_documents', 'approve_documents']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails; prepare_documents = draft, edit and submit documents; approve_documents = approve or send back documents (as administrator, deputy or the order\'s responsible merchandiser, never one\'s own)')).optional()
 })
 
 export const UpdateUserAccessResponse = zod.object({
@@ -1245,7 +2310,7 @@ export const UpdateUserAccessResponse = zod.object({
   "materials": zod.enum(['none', 'read', 'write']),
   "quality": zod.enum(['none', 'read', 'write'])
 }),
-  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails')),
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run', 'prepare_documents', 'approve_documents']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails; prepare_documents = draft, edit and submit documents; approve_documents = approve or send back documents (as administrator, deputy or the order\'s responsible merchandiser, never one\'s own)')),
   "approvedBy": zod.string().nullable(),
   "approvedAt": zod.coerce.date().nullable(),
   "lastSeenAt": zod.coerce.date().nullable(),
@@ -1282,7 +2347,7 @@ export const SetUserRoleResponse = zod.object({
   "materials": zod.enum(['none', 'read', 'write']),
   "quality": zod.enum(['none', 'read', 'write'])
 }),
-  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails')),
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run', 'prepare_documents', 'approve_documents']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails; prepare_documents = draft, edit and submit documents; approve_documents = approve or send back documents (as administrator, deputy or the order\'s responsible merchandiser, never one\'s own)')),
   "approvedBy": zod.string().nullable(),
   "approvedAt": zod.coerce.date().nullable(),
   "lastSeenAt": zod.coerce.date().nullable(),
@@ -1319,7 +2384,7 @@ export const TransferAdminResponse = zod.object({
   "materials": zod.enum(['none', 'read', 'write']),
   "quality": zod.enum(['none', 'read', 'write'])
 }),
-  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails')),
+  "permissions": zod.array(zod.enum(['invoice_override', 'commercial_edit', 'intake_run', 'prepare_documents', 'approve_documents']).describe('invoice_override = change the invoice counter or an order\'s BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails; prepare_documents = draft, edit and submit documents; approve_documents = approve or send back documents (as administrator, deputy or the order\'s responsible merchandiser, never one\'s own)')),
   "approvedBy": zod.string().nullable(),
   "approvedAt": zod.coerce.date().nullable(),
   "lastSeenAt": zod.coerce.date().nullable(),

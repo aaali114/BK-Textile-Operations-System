@@ -72,6 +72,7 @@ requests to seed a database. Real data is approved only for PO 36572 (BK Inv.
     administrator role" (`useTransferAdmin`, body `{confirm: true}`, behind a
     typed confirmation). Show server error messages as returned (e.g. you
     cannot change your own access).
+- **API 0.9.0 — documents (frontend to build):** see the "Documents" brief below.
 - **API 0.8.0 — customisable dashboards (frontend to build):** see the
   "Dashboards" brief below.
 - Not yet: manual import of a missed email, staff editing of
@@ -323,3 +324,46 @@ library (e.g. Recharts) and a draggable/resizable grid (e.g. react-grid-layout,
    their access allows.
 5. Keep the existing summary cards working until the new dashboard replaces
    them; the old `useGetDashboardSummary` stays available.
+
+
+## Brief: documents — cutting programs and packing lists (API 0.9.0)
+
+Build in `artifacts/bk-textile` only, using the generated hooks.
+
+1. **Order page → new "Documents" tab** (`useListOrderDocuments`): one card per
+   type (Cutting program, Packing list) showing the latest revision with a
+   status badge (Draft, In review, Changes requested, Approved, Superseded),
+   revision number, prepared by, approved by/at, and an **"Out of date"**
+   warning when `outOfDate` is true ("order data changed since approval —
+   create a new revision"). Older revisions in a collapsible history list.
+   Buttons: "Create" / "New revision" (`useCreateOrderDocument`, only with
+   the `prepare_documents` permission), "Open", and "Download Excel" /
+   "Download PDF" (`downloadOrderDocumentFile` with format `xlsx` / `pdf`;
+   drafts are watermarked).
+2. **Document page** (`useGetOrderDocument`): render `data` as on paper —
+   letterhead (`data.company`), document number, and one section per finish:
+   cutting program = table Style / Colour / Size / Actual / +allowance / Total
+   with totals; packing list = description lines, Total pcs / dozens /
+   cartons, and table Carton # (from–to) / PO / Style / Colour / Size /
+   Actual qty ("-" when null) / Cartons / Qty per carton / Total pcs.
+   Show `problems` as a red list (they block "Send for approval").
+3. **Editing a draft** (when `canEdit`): allowance % (default 5), pieces per
+   carton, previous reference, remarks, and per finish: description lines and
+   quality line (`useUpdateOrderDocument`). Live preview refreshes from the
+   response. "Send for approval" (`useSubmitOrderDocument`) when `canSubmit`.
+4. **Reviewing** (status In review): if `approvalBlocker` is null show
+   "Approve" (optional note; `useApproveOrderDocument`) and "Request changes"
+   (required note; `useRequestOrderDocumentChanges`); otherwise show the
+   blocker text (e.g. "You prepared or edited this document…"). Confirm
+   before approving: "Approved documents are permanent and cannot be edited".
+5. **"Awaiting my approval"** (`useListDocumentsAwaitingApproval`): a list
+   (and a badge in the navigation) linking to each document.
+6. **Order page:** "Responsible merchandiser" picker for
+   administrators/deputies (`useSetOrderResponsible`, active users), and the
+   new order fields **Pieces per carton** and **Garment description**
+   (editable with merchandising write).
+7. **Company profile** (administrators/deputies, e.g. on Users & access):
+   name, up to 4 tagline lines, address (`useGetCompanyProfile`,
+   `useSaveCompanyProfile`).
+8. Users & access: the two new permissions **Prepare documents** and
+   **Approve documents** appear with the other special permissions.

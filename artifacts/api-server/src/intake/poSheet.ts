@@ -16,6 +16,8 @@ export type PoSheetData = {
   shipVia: string | null;
   countryOfOrigin: string | null;
   overShipTolerancePct: number | null;
+  /** Pieces per export carton from the packing method, when stated. */
+  pcsPerCarton: number | null;
   lines: PoLine[];
   grandTotalQty: number | null;
   grandTotalAmount: number | null;
@@ -67,6 +69,31 @@ const textOrNull = (c: Cell) => {
   const t = cellText(c);
   return isPlaceholder(t) ? null : t;
 };
+
+/**
+ * Pieces per export carton from the packing method text, e.g.
+ * "... 2 blisters in an export master 9 ply carton ... (24 pcs)",
+ * "10 pcs per carton", "72 pieces in each carton", "carton of 36 pcs",
+ * or "12 pieces ... in a blister bag / 2 blisters in ... carton" (12 x 2).
+ */
+export function piecesPerCarton(grid: Grid): number | null {
+  const texts = grid.flat().map((c) => cellText(c ?? null)).filter((t) => /carton|ctn/i.test(t) && /pcs|pieces|pc\b/i.test(t));
+  for (const t of texts) {
+    const patterns = [
+      /(?:carton|ctn)s?\b[^.]{0,80}?\((\d{1,4})\s*(?:pcs|pieces|pc)\)/i,
+      /(\d{1,4})\s*(?:pcs|pieces|pc)\.?\s*(?:per|\/|in\s+(?:a|an|each|one|1|every))\s*(?:export\s+)?(?:master\s+)?(?:\d+\s*ply\s+)?(?:carton|ctn)/i,
+      /(?:carton|ctn)s?\s*(?:of|with|contains?|containing|:)\s*(\d{1,4})\s*(?:pcs|pieces|pc)/i,
+    ];
+    for (const re of patterns) {
+      const m = t.match(re);
+      if (m && Number(m[1]) > 0) return Number(m[1]);
+    }
+    const perBag = t.match(/(\d{1,4})\s*(?:pcs|pieces|pc)\b[^.]{0,40}?(?:blister|bag|pack|inner)/i);
+    const bags = t.match(/(\d{1,3})\s*(?:blisters|bags|packs|inners)\b[^.]{0,60}?(?:carton|ctn)/i);
+    if (perBag && bags) return Number(perBag[1]) * Number(bags[1]);
+  }
+  return null;
+}
 
 /** Recognises a buyer purchase-order sheet: a PO number label and a colour x size grid. */
 export function extractPoSheet(sheets: Sheet[]): PoSheetData | null {
@@ -220,6 +247,7 @@ function parse(grid: Grid, poNumber: string, gridHeader: Pos): PoSheetData {
     shipVia: textOrNull(labelValue(grid, "Ship Via:", "Ship Via", "Shipment Mode:")),
     countryOfOrigin: textOrNull(labelValue(grid, "Country of Origin:", "Country of Origin")),
     overShipTolerancePct: pct ? Number(pct[1]) : null,
+    pcsPerCarton: piecesPerCarton(grid),
     lines,
     grandTotalQty,
     grandTotalAmount,
