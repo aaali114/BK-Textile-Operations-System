@@ -52,6 +52,12 @@ export const ordersTable = pgTable(
     // from an older email never overwrites a newer one. Plain uuid (no FK) to
     // avoid an import cycle with sourceEmails; cleared by the intake if gone.
     headerSourceEmailId: uuid("header_source_email_id"),
+    // Merchandiser responsible for the order; may approve its documents (four-eyes still applies).
+    responsibleUserId: text("responsible_user_id"),
+    // Packing method from the PO or emails, e.g. 24 pieces per export carton.
+    pcsPerCarton: integer("pcs_per_carton"),
+    // Garment description for documents, e.g. "MEN'S L/S CREWNECK SWEATSHIRT WITH 2X1 LYCRA RIB".
+    garmentDescription: text("garment_description"),
     // Ship date on the PO.
     deliveryDate: date("delivery_date", { mode: "string" }).notNull(),
     status: text("status").notNull().default("development"),
@@ -62,6 +68,7 @@ export const ordersTable = pgTable(
   (t) => [
     index("bk_orders_po_number_idx").on(t.poNumber),
     unique("bk_orders_buyer_po_unique").on(t.buyerId, t.poNumber),
+    check("bk_orders_pcs_per_carton_positive", sql`${t.pcsPerCarton} IS NULL OR ${t.pcsPerCarton} > 0`),
     check(
       "bk_orders_invoice_ref_format",
       sql`${t.invoiceRef} IS NULL OR ${t.invoiceRef} ~ '^[0-9]+/BK-[A-Z]{2,5}/[0-9]{4}$'`,

@@ -160,6 +160,8 @@ router.patch("/orders/:orderId", async (req, res): Promise<void> => {
     "shipVia",
     "countryOfOrigin",
     "overShipTolerancePct",
+    "pcsPerCarton",
+    "garmentDescription",
     "agencyName",
     "previousOrderReference",
     "orderValue",
@@ -178,7 +180,7 @@ router.patch("/orders/:orderId", async (req, res): Promise<void> => {
   if (typeof update.previousOrderReference === "string") update.previousOrderReference = update.previousOrderReference.trim() || null;
   if (typeof update.poNumber === "string") update.poNumber = update.poNumber.trim() || null;
   if (typeof update.description === "string") update.description = update.description.trim() || null;
-  for (const key of ["endCustomer", "priceTerms", "paymentTerms", "shipVia", "countryOfOrigin"] as const) {
+  for (const key of ["endCustomer", "priceTerms", "paymentTerms", "shipVia", "countryOfOrigin", "garmentDescription"] as const) {
     if (typeof update[key] === "string") update[key] = (update[key] as string).trim() || null;
   }
   if (data.poIssueDate !== undefined) update.poIssueDate = data.poIssueDate === null ? null : asDateString(data.poIssueDate);
@@ -208,6 +210,8 @@ router.patch("/orders/:orderId", async (req, res): Promise<void> => {
         ["paymentTerms", "Payment terms", before.paymentTerms ?? "", order.paymentTerms ?? ""],
         ["shipVia", "Ship via", before.shipVia ?? "", order.shipVia ?? ""],
         ["countryOfOrigin", "Country of origin", before.countryOfOrigin ?? "", order.countryOfOrigin ?? ""],
+      ["pcsPerCarton", "Pieces per carton", before.pcsPerCarton === null ? "" : String(before.pcsPerCarton), order.pcsPerCarton === null ? "" : String(order.pcsPerCarton)],
+      ["garmentDescription", "Garment description", before.garmentDescription ?? "", order.garmentDescription ?? ""],
         ["overShipTolerancePct", "Over-shipment allowance %", before.overShipTolerancePct === null ? "" : String(before.overShipTolerancePct), order.overShipTolerancePct === null ? "" : String(order.overShipTolerancePct)],
         ["style", "Style", before.style, order.style],
         ["description", "Order notes", before.description ?? "", order.description ?? ""],

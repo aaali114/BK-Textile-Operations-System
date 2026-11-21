@@ -61,6 +61,15 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 - **Enforced on the server:** every API route has a rule in `artifacts/api-server/src/lib/access.ts` (`RULES`); anything without a rule is refused. When adding a route, add its rule. Activity feeds are filtered by what the user may see.
 - Every access change is logged in `bk_activity` (entity `user`).
 
+## Documents (cutting programs, packing lists)
+
+- Code: `artifacts/api-server/src/documents/` (compute, render, service). One document per order and type, numbered with the order's BK invoice (no sub-invoices); one section per priced line (finish).
+- **Cutting program:** per colour × size, buyer quantity + allowance (default **5%**, always, regardless of PO tolerance), rounded to whole pieces, halves up, in exact integer arithmetic.
+- **Packing list:** the cutting totals packed in full cartons of the order's **pieces per carton** (read from the PO's packing method, editable on the order or per draft) plus one part carton per size; carton numbers run on; totals in pieces, dozens and cartons. Verified row-for-row against the owner's PO 36572 workbook.
+- **Lifecycle:** draft → in review → approved; "changes requested" sends it back. Drafts download with a DRAFT watermark and are never stored. **Approval** renders the final Excel + PDF, stores them with SHA-256 fingerprints and freezes the data; a database trigger (migration 0010) forbids changing or deleting approved/superseded documents. Corrections are new revisions; approving one supersedes the previous. An approved document whose order data has changed is flagged **out of date**.
+- **Who:** `prepare_documents` drafts/edits/submits; `approve_documents` approves or sends back, only as an administrator, deputy or the order's **responsible merchandiser**, and **never** someone who prepared, edited or submitted that document (four-eyes). Viewing follows merchandising access.
+- Letterhead: `/api/admin/company-profile` (administrators/deputies). Email notifications from orders@ need its SMTP settings (next step).
+
 ## Dashboards
 
 - **Data sources** (`artifacts/api-server/src/lib/dashboardSources.ts`): each has an area, allowed visualisations and options, and returns a table (`columns`, `rows`, `labelKey`, `valueKeys`). Users only see and query sources in areas they can read. To add a source, add it there (no other change needed).
@@ -111,6 +120,7 @@ The business coordinates merchandising, sampling, outsourced yarn/knitting/dyein
 
 ## Gotchas
 
+- `pdfkit` and `exceljs` are bundled as externals (they read their own font/template files at runtime) and are direct dependencies of `@workspace/api-server`.
 - `artifacts/api-server/build.mjs` has an `external` list of packages left out of the server bundle. A package listed there must be a direct dependency of `@workspace/api-server`, or the server crashes on start (502 everywhere). After adding a library, build and start `dist/index.mjs` once to check.
 - Never run `push` / `push-force` against the database: it holds real PO 36572 data. Schema changes go through `lib/db/migrations`, reviewed in a PR and applied by `migrate` after merge.
 - `lib/db/migrations/0000_baseline.sql` is hand-edited to be idempotent (it matches the tables that `push` created before migrations existed). Do not regenerate or edit it.

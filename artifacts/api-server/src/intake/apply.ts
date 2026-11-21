@@ -68,6 +68,7 @@ export async function applyPoSheet(tx: Tx, ctx: ApplyContext, po: PoSheetData): 
       shipVia: po.shipVia ?? undefined,
       countryOfOrigin: po.countryOfOrigin ?? undefined,
       overShipTolerancePct: po.overShipTolerancePct ?? undefined,
+      pcsPerCarton: po.pcsPerCarton ?? undefined,
       quantity: quantity > 0 ? quantity : undefined,
       style: styles || undefined,
       orderValue: po.grandTotalAmount !== null && currency ? Math.round(po.grandTotalAmount * 100) / 100 : undefined,

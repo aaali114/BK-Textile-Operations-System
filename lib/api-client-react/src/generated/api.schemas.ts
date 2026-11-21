@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.8.0
+ * OpenAPI spec version: 0.9.0
  */
 export interface HealthStatus {
   status: string;
@@ -134,6 +134,21 @@ export interface Order {
      * @nullable
      */
   overShipTolerancePct: number | null;
+  /**
+     * Merchandiser responsible for the order (may approve its documents)
+     * @nullable
+     */
+  responsibleUserId?: string | null;
+  /**
+     * Pieces per export carton (from the PO packing method
+     * @nullable
+     */
+  pcsPerCarton?: number | null;
+  /**
+     * Garment description used on documents
+     * @nullable
+     */
+  garmentDescription?: string | null;
   /** @nullable */
   agencyName: string | null;
   /** @nullable */
@@ -198,6 +213,17 @@ export interface OrderInput {
  * The buyer and BK invoice cannot be changed here (invoice changes go through the admin endpoint).
  */
 export interface OrderUpdate {
+  /**
+     * @minimum 1
+     * @maximum 10000
+     * @nullable
+     */
+  pcsPerCarton?: number | null;
+  /**
+     * @maxLength 300
+     * @nullable
+     */
+  garmentDescription?: string | null;
   /** @nullable */
   poIssueDate?: string | null;
   /** @nullable */
@@ -336,6 +362,254 @@ export interface OrderFileUploadRequest {
 export interface OrderFileUploadResponse {
   fileId: string;
   uploadURL: string;
+}
+
+export type DocumentStatus = typeof DocumentStatus[keyof typeof DocumentStatus];
+
+
+export const DocumentStatus = {
+  draft: 'draft',
+  in_review: 'in_review',
+  changes_requested: 'changes_requested',
+  approved: 'approved',
+  superseded: 'superseded',
+} as const;
+
+export type DocumentType = typeof DocumentType[keyof typeof DocumentType];
+
+
+export const DocumentType = {
+  cutting_program: 'cutting_program',
+  packing_list: 'packing_list',
+} as const;
+
+/**
+ * Per priced line (key = line id) text overrides
+ */
+export type OrderDocumentSettingsSections = {[key: string]: {
+  /**
+     * Description of goods (one line per row)
+     * @nullable
+     */
+  description?: string | null;
+  /**
+     * Quality line on the cutting program
+     * @nullable
+     */
+  quality?: string | null;
+}};
+
+export interface OrderDocumentSettings {
+  /** Cutting/packing margin over buyer quantity (default 5) */
+  allowancePct: number;
+  /**
+     * Overrides the order's pieces per carton
+     * @nullable
+     */
+  pcsPerCarton: number | null;
+  /** @nullable */
+  previousReference: string | null;
+  /** @nullable */
+  remarks: string | null;
+  /** Per priced line (key = line id) text overrides */
+  sections: OrderDocumentSettingsSections;
+}
+
+export type OrderDocumentSettingsUpdateSections = {[key: string]: {
+  /**
+     * @maxLength 600
+     * @nullable
+     */
+  description?: string | null;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  quality?: string | null;
+}};
+
+export interface OrderDocumentSettingsUpdate {
+  /**
+     * @minimum 0
+     * @maximum 50
+     */
+  allowancePct?: number;
+  /**
+     * @minimum 1
+     * @maximum 10000
+     * @nullable
+     */
+  pcsPerCarton?: number | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  previousReference?: string | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  remarks?: string | null;
+  sections?: OrderDocumentSettingsUpdateSections;
+}
+
+export type DocumentSectionCuttingRowsItem = {
+  style: string;
+  colour: string;
+  size: string;
+  actual: number;
+  plus: number;
+  total: number;
+};
+
+export type DocumentSectionPackingRowsItem = {
+  cartonFrom: number;
+  cartonTo: number;
+  po: string;
+  style: string;
+  colour: string;
+  size: string;
+  /**
+     * Buyer quantity on the first row of a size; null on part-carton rows
+     * @nullable
+     */
+  actualQty: number | null;
+  cartons: number;
+  perCarton: number;
+  totalPcs: number;
+};
+
+export type DocumentSectionTotals = {
+  actual: number;
+  plus: number;
+  total: number;
+  cartons: number;
+  dozens: number;
+};
+
+export interface DocumentSection {
+  lineId: string;
+  finish: string;
+  styleNumber: string;
+  lineQty: number;
+  descriptionLines: string[];
+  /** @nullable */
+  quality: string | null;
+  sizes: string[];
+  cuttingRows: DocumentSectionCuttingRowsItem[];
+  packingRows: DocumentSectionPackingRowsItem[];
+  totals: DocumentSectionTotals;
+}
+
+export type DocumentDataOrder = {
+  id: string;
+  /** @nullable */
+  poNumber: string | null;
+  buyer: string;
+  style: string;
+  /** @nullable */
+  invoiceRef: string | null;
+};
+
+export interface CompanyProfile {
+  /** @maxLength 120 */
+  name: string;
+  /**
+     * @maxItems 4
+     * @items.maxLength 160
+     */
+  taglineLines: string[];
+  /** @maxLength 300 */
+  address: string;
+}
+
+export interface DocumentData {
+  type: DocumentType;
+  docNumber: string;
+  company: CompanyProfile;
+  order: DocumentDataOrder;
+  allowancePct: number;
+  /** @nullable */
+  pcsPerCarton: number | null;
+  /** @nullable */
+  previousReference: string | null;
+  /** @nullable */
+  remarks: string | null;
+  sections: DocumentSection[];
+  /** Must be fixed before submitting */
+  problems: string[];
+}
+
+/**
+ * @nullable
+ */
+export type OrderDocumentFiles = {
+  /** @nullable */
+  xlsxSha256?: string | null;
+  /** @nullable */
+  pdfSha256?: string | null;
+} | null;
+
+export interface OrderDocument {
+  id: string;
+  orderId: string;
+  type: DocumentType;
+  title: string;
+  revision: number;
+  status: DocumentStatus;
+  docNumber: string;
+  settings: OrderDocumentSettings;
+  templateVersion: string;
+  preparedBy: string;
+  contributors: string[];
+  /** @nullable */
+  submittedBy: string | null;
+  /** @nullable */
+  submittedAt: string | null;
+  /** @nullable */
+  reviewedBy: string | null;
+  /** @nullable */
+  reviewedAt: string | null;
+  /** @nullable */
+  reviewNote: string | null;
+  problems: string[];
+  /** Approved, but the order's data has changed since; offer a new revision */
+  outOfDate: boolean;
+  canEdit: boolean;
+  canSubmit: boolean;
+  /**
+     * In review: null when the signed-in user may approve, otherwise why not
+     * @nullable
+     */
+  approvalBlocker: string | null;
+  /** @nullable */
+  files: OrderDocumentFiles;
+  createdAt: string;
+  updatedAt: string;
+  /** Present on single-document responses */
+  data: DocumentData | null;
+}
+
+export interface OrderDocumentCreate {
+  type: DocumentType;
+}
+
+export interface DocumentReviewNote {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  note: string;
+}
+
+export interface DocumentApproval {
+  /** @maxLength 1000 */
+  note?: string;
+}
+
+export interface OrderResponsibleUpdate {
+  /** @nullable */
+  userId: string | null;
 }
 
 export type Visualization = typeof Visualization[keyof typeof Visualization];
@@ -564,7 +838,7 @@ export interface AreaAccess {
 }
 
 /**
- * invoice_override = change the invoice counter or an order's BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails
+ * invoice_override = change the invoice counter or an order's BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails; prepare_documents = draft, edit and submit documents; approve_documents = approve or send back documents (as administrator, deputy or the order's responsible merchandiser, never one's own)
  */
 export type Permission = typeof Permission[keyof typeof Permission];
 
@@ -573,6 +847,8 @@ export const Permission = {
   invoice_override: 'invoice_override',
   commercial_edit: 'commercial_edit',
   intake_run: 'intake_run',
+  prepare_documents: 'prepare_documents',
+  approve_documents: 'approve_documents',
 } as const;
 
 export interface CurrentUser {

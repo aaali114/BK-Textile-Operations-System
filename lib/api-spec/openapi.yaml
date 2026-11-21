@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.8.0
+  version: 0.9.0
   description: B.K. Textile operations API
 servers:
   - url: /api
@@ -18,6 +18,8 @@ tags:
     description: Private documents and garment images attached to orders
   - name: dashboards
     description: Customisable dashboards (data sources, saved layouts, department templates)
+  - name: documents
+    description: Generated documents (cutting programs, packing lists) with review and approval
   - name: buyers
     description: Buyers and sourcing agents that issue POs
   - name: order-detail
@@ -389,6 +391,208 @@ paths:
       responses:
         "204": { description: Deleted }
         "404": { description: No template for that department }
+  /orders/{orderId}/documents:
+    get:
+      operationId: listOrderDocuments
+      tags: [documents]
+      summary: An order's documents, all revisions (newest first per type)
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OrderDocument" }
+        "404": { description: Order not found }
+    post:
+      operationId: createOrderDocument
+      tags: [documents]
+      summary: Start a draft (or a new revision after approval) of a document type
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderDocumentCreate" }
+      responses:
+        "201":
+          description: The new draft, with its computed data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderDocument" }
+        "409": { description: A document of that type is already in progress }
+  /orders/{orderId}/documents/{documentId}:
+    get:
+      operationId: getOrderDocument
+      tags: [documents]
+      summary: One document with its data (live for drafts, frozen for approved)
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200":
+          description: Document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderDocument" }
+        "404": { description: Not found }
+    patch:
+      operationId: updateOrderDocument
+      tags: [documents]
+      summary: Edit a draft's settings (allowance, pieces per carton, texts)
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderDocumentSettingsUpdate" }
+      responses:
+        "200":
+          description: Updated draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderDocument" }
+        "409": { description: "Not editable (in review, approved or superseded)" }
+  /orders/{orderId}/documents/{documentId}/submit:
+    post:
+      operationId: submitOrderDocument
+      tags: [documents]
+      summary: Send a draft for approval
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200":
+          description: In review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderDocument" }
+        "409": { description: "Not a draft, or problems must be fixed first" }
+  /orders/{orderId}/documents/{documentId}/request-changes:
+    post:
+      operationId: requestOrderDocumentChanges
+      tags: [documents]
+      summary: Send a document in review back with a note (approvers only)
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DocumentReviewNote" }
+      responses:
+        "200":
+          description: Changes requested
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderDocument" }
+        "403": { description: Not allowed to review this document }
+  /orders/{orderId}/documents/{documentId}/approve:
+    post:
+      operationId: approveOrderDocument
+      tags: [documents]
+      summary: Approve and freeze a document (four-eyes)
+      description: >-
+        Approvers: administrators, deputies or the order's responsible
+        merchandiser, holding the approve_documents permission, who did not
+        prepare, edit or submit the document. Approval renders the final Excel
+        and PDF, stores them with SHA-256 fingerprints and freezes the data;
+        the document can never be changed or deleted afterwards. The previous
+        approved revision becomes superseded.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DocumentApproval" }
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderDocument" }
+        "403": { description: Not allowed to approve this document }
+  /orders/{orderId}/documents/{documentId}/files/{format}:
+    get:
+      operationId: downloadOrderDocumentFile
+      tags: [documents]
+      summary: Download as Excel or PDF (drafts carry a DRAFT watermark; approved files are the stored originals)
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/DocumentId"
+        - name: format
+          in: path
+          required: true
+          schema: { type: string, enum: [xlsx, pdf] }
+      responses:
+        "200":
+          description: File
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+  /documents/awaiting-approval:
+    get:
+      operationId: listDocumentsAwaitingApproval
+      tags: [documents]
+      summary: Documents in review that the signed-in user may approve
+      responses:
+        "200":
+          description: Documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OrderDocument" }
+  /orders/{orderId}/responsible:
+    put:
+      operationId: setOrderResponsible
+      tags: [documents]
+      summary: Set the order's responsible merchandiser (administrators and deputies)
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderResponsibleUpdate" }
+      responses:
+        "204": { description: Saved }
+        "400": { description: Not an approved user }
+  /admin/company-profile:
+    get:
+      operationId: getCompanyProfile
+      tags: [documents]
+      summary: Letterhead used on documents (administrators and deputies)
+      responses:
+        "200":
+          description: Company profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanyProfile" }
+    put:
+      operationId: saveCompanyProfile
+      tags: [documents]
+      summary: Update the letterhead (affects new drafts and approvals; approved documents keep theirs)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanyProfile" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanyProfile" }
   /buyers:
     get:
       operationId: getBuyers
@@ -822,6 +1026,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     DashboardId:
       name: dashboardId
       in: path
@@ -890,6 +1099,9 @@ components:
         shipVia: { type: ["string", "null"] }
         countryOfOrigin: { type: ["string", "null"] }
         overShipTolerancePct: { type: ["number", "null"], description: "e.g. 3 for 3% over PO quantity allowed" }
+        responsibleUserId: { type: ["string", "null"], description: Merchandiser responsible for the order (may approve its documents) }
+        pcsPerCarton: { type: ["integer", "null"], description: Pieces per export carton (from the PO packing method, or entered) }
+        garmentDescription: { type: ["string", "null"], description: Garment description used on documents }
         agencyName: { type: ["string", "null"] }
         previousOrderReference: { type: ["string", "null"] }
         orderValue: { type: ["number", "null"] }
@@ -932,6 +1144,8 @@ components:
       type: object
       description: The buyer and BK invoice cannot be changed here (invoice changes go through the admin endpoint).
       properties:
+        pcsPerCarton: { type: ["integer", "null"], minimum: 1, maximum: 10000 }
+        garmentDescription: { type: ["string", "null"], maxLength: 300 }
         poIssueDate: { type: ["string", "null"], format: date }
         endCustomer: { type: ["string", "null"] }
         priceTerms: { type: ["string", "null"] }
@@ -997,6 +1211,175 @@ components:
       properties:
         fileId: { type: string, format: uuid }
         uploadURL: { type: string, format: uri }
+    DocumentStatus:
+      type: string
+      enum: [draft, in_review, changes_requested, approved, superseded]
+    DocumentType:
+      type: string
+      enum: [cutting_program, packing_list]
+    OrderDocumentSettings:
+      type: object
+      required: [allowancePct, pcsPerCarton, previousReference, remarks, sections]
+      properties:
+        allowancePct: { type: number, description: Cutting/packing margin over buyer quantity (default 5) }
+        pcsPerCarton: { type: ["integer", "null"], description: Overrides the order's pieces per carton }
+        previousReference: { type: ["string", "null"] }
+        remarks: { type: ["string", "null"] }
+        sections:
+          type: object
+          description: Per priced line (key = line id) text overrides
+          additionalProperties:
+            type: object
+            properties:
+              description: { type: ["string", "null"], description: Description of goods (one line per row) }
+              quality: { type: ["string", "null"], description: Quality line on the cutting program }
+    OrderDocumentSettingsUpdate:
+      type: object
+      properties:
+        allowancePct: { type: number, minimum: 0, maximum: 50 }
+        pcsPerCarton: { type: ["integer", "null"], minimum: 1, maximum: 10000 }
+        previousReference: { type: ["string", "null"], maxLength: 120 }
+        remarks: { type: ["string", "null"], maxLength: 500 }
+        sections:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              description: { type: ["string", "null"], maxLength: 600 }
+              quality: { type: ["string", "null"], maxLength: 200 }
+    DocumentSection:
+      type: object
+      required: [lineId, finish, styleNumber, lineQty, descriptionLines, quality, sizes, cuttingRows, packingRows, totals]
+      properties:
+        lineId: { type: string }
+        finish: { type: string }
+        styleNumber: { type: string }
+        lineQty: { type: integer }
+        descriptionLines: { type: array, items: { type: string } }
+        quality: { type: ["string", "null"] }
+        sizes: { type: array, items: { type: string } }
+        cuttingRows:
+          type: array
+          items:
+            type: object
+            required: [style, colour, size, actual, plus, total]
+            properties:
+              style: { type: string }
+              colour: { type: string }
+              size: { type: string }
+              actual: { type: integer }
+              plus: { type: integer }
+              total: { type: integer }
+        packingRows:
+          type: array
+          items:
+            type: object
+            required: [cartonFrom, cartonTo, po, style, colour, size, actualQty, cartons, perCarton, totalPcs]
+            properties:
+              cartonFrom: { type: integer }
+              cartonTo: { type: integer }
+              po: { type: string }
+              style: { type: string }
+              colour: { type: string }
+              size: { type: string }
+              actualQty: { type: ["integer", "null"], description: Buyer quantity on the first row of a size; null on part-carton rows }
+              cartons: { type: integer }
+              perCarton: { type: integer }
+              totalPcs: { type: integer }
+        totals:
+          type: object
+          required: [actual, plus, total, cartons, dozens]
+          properties:
+            actual: { type: integer }
+            plus: { type: integer }
+            total: { type: integer }
+            cartons: { type: integer }
+            dozens: { type: number }
+    DocumentData:
+      type: object
+      required: [type, docNumber, company, order, allowancePct, pcsPerCarton, previousReference, remarks, sections, problems]
+      properties:
+        type: { $ref: "#/components/schemas/DocumentType" }
+        docNumber: { type: string }
+        company: { $ref: "#/components/schemas/CompanyProfile" }
+        order:
+          type: object
+          required: [id, poNumber, buyer, style, invoiceRef]
+          properties:
+            id: { type: string }
+            poNumber: { type: ["string", "null"] }
+            buyer: { type: string }
+            style: { type: string }
+            invoiceRef: { type: ["string", "null"] }
+        allowancePct: { type: number }
+        pcsPerCarton: { type: ["integer", "null"] }
+        previousReference: { type: ["string", "null"] }
+        remarks: { type: ["string", "null"] }
+        sections: { type: array, items: { $ref: "#/components/schemas/DocumentSection" } }
+        problems: { type: array, items: { type: string }, description: Must be fixed before submitting }
+    OrderDocument:
+      type: object
+      required: [id, orderId, type, title, revision, status, docNumber, settings, templateVersion, preparedBy, contributors, submittedBy, submittedAt, reviewedBy, reviewedAt, reviewNote, problems, outOfDate, canEdit, canSubmit, approvalBlocker, files, createdAt, updatedAt, data]
+      properties:
+        id: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        type: { $ref: "#/components/schemas/DocumentType" }
+        title: { type: string }
+        revision: { type: integer }
+        status: { $ref: "#/components/schemas/DocumentStatus" }
+        docNumber: { type: string }
+        settings: { $ref: "#/components/schemas/OrderDocumentSettings" }
+        templateVersion: { type: string }
+        preparedBy: { type: string }
+        contributors: { type: array, items: { type: string } }
+        submittedBy: { type: ["string", "null"] }
+        submittedAt: { type: ["string", "null"], format: date-time }
+        reviewedBy: { type: ["string", "null"] }
+        reviewedAt: { type: ["string", "null"], format: date-time }
+        reviewNote: { type: ["string", "null"] }
+        problems: { type: array, items: { type: string } }
+        outOfDate: { type: boolean, description: "Approved, but the order's data has changed since; offer a new revision" }
+        canEdit: { type: boolean }
+        canSubmit: { type: boolean }
+        approvalBlocker: { type: ["string", "null"], description: "In review: null when the signed-in user may approve, otherwise why not" }
+        files:
+          type: ["object", "null"]
+          properties:
+            xlsxSha256: { type: ["string", "null"] }
+            pdfSha256: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        data:
+          description: Present on single-document responses
+          oneOf:
+            - { $ref: "#/components/schemas/DocumentData" }
+            - { type: "null" }
+    OrderDocumentCreate:
+      type: object
+      required: [type]
+      properties:
+        type: { $ref: "#/components/schemas/DocumentType" }
+    DocumentReviewNote:
+      type: object
+      required: [note]
+      properties:
+        note: { type: string, minLength: 1, maxLength: 1000 }
+    DocumentApproval:
+      type: object
+      properties:
+        note: { type: string, maxLength: 1000 }
+    OrderResponsibleUpdate:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: ["string", "null"] }
+    CompanyProfile:
+      type: object
+      required: [name, taglineLines, address]
+      properties:
+        name: { type: string, maxLength: 120 }
+        taglineLines: { type: array, maxItems: 4, items: { type: string, maxLength: 160 } }
+        address: { type: string, maxLength: 300 }
     Visualization:
       type: string
       enum: [kpi, table, bar, line, pie]
@@ -1150,8 +1533,10 @@ components:
       description: >-
         invoice_override = change the invoice counter or an order's BK invoice;
         commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates;
-        intake_run = read the mailbox and re-apply emails
-      enum: [invoice_override, commercial_edit, intake_run]
+        intake_run = read the mailbox and re-apply emails;
+        prepare_documents = draft, edit and submit documents;
+        approve_documents = approve or send back documents (as administrator, deputy or the order's responsible merchandiser, never one's own)
+      enum: [invoice_override, commercial_edit, intake_run, prepare_documents, approve_documents]
     AreaAccess:
       type: object
       required: [dashboard, merchandising, department_work, materials, quality]
