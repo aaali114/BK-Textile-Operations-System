@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.8.0
+ * OpenAPI spec version: 0.9.0
  */
 import type { OrderStatus } from './orderStatus';
 import type { Priority } from './priority';
@@ -12,6 +12,17 @@ import type { Priority } from './priority';
  * The buyer and BK invoice cannot be changed here (invoice changes go through the admin endpoint).
  */
 export interface OrderUpdate {
+  /**
+     * @minimum 1
+     * @maximum 10000
+     * @nullable
+     */
+  pcsPerCarton?: number | null;
+  /**
+     * @maxLength 300
+     * @nullable
+     */
+  garmentDescription?: string | null;
   /** @nullable */
   poIssueDate?: Date | null;
   /** @nullable */

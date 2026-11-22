@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.8.0
+ * OpenAPI spec version: 0.9.0
  */
 import type { OrderStatus } from './orderStatus';
 import type { Priority } from './priority';
@@ -43,6 +43,21 @@ export interface Order {
      * @nullable
      */
   overShipTolerancePct: number | null;
+  /**
+     * Merchandiser responsible for the order (may approve its documents)
+     * @nullable
+     */
+  responsibleUserId?: string | null;
+  /**
+     * Pieces per export carton (from the PO packing method
+     * @nullable
+     */
+  pcsPerCarton?: number | null;
+  /**
+     * Garment description used on documents
+     * @nullable
+     */
+  garmentDescription?: string | null;
   /** @nullable */
   agencyName: string | null;
   /** @nullable */

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.8.0
+ * OpenAPI spec version: 0.9.0
  */
 import {
   useMutation,
@@ -27,6 +27,7 @@ import type {
 import type {
   AccessTemplate,
   Buyer,
+  CompanyProfile,
   CurrentUser,
   Dashboard,
   DashboardData,
@@ -37,6 +38,8 @@ import type {
   DashboardSummary,
   DashboardTemplateInput,
   DashboardUpdate,
+  DocumentApproval,
+  DocumentReviewNote,
   GetOrdersParams,
   GetWorkItemsParams,
   HealthStatus,
@@ -51,6 +54,9 @@ import type {
   Order,
   OrderActivity,
   OrderBreakdown,
+  OrderDocument,
+  OrderDocumentCreate,
+  OrderDocumentSettingsUpdate,
   OrderEmail,
   OrderEmailDetail,
   OrderEmailUpdate,
@@ -60,6 +66,7 @@ import type {
   OrderFileUploadResponse,
   OrderInput,
   OrderInvoiceUpdate,
+  OrderResponsibleUpdate,
   OrderTrim,
   OrderUpdate,
   ReapplyReport,
@@ -2181,6 +2188,1151 @@ export const useDeleteDashboardTemplate = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDeleteDashboardTemplateMutationOptions(options), queryClient);
+    }
+
+export const getListOrderDocumentsUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/documents`
+}
+
+/**
+ * @summary An order's documents, all revisions (newest first per type)
+ */
+export const listOrderDocuments = async (orderId: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocument[]> => {
+
+  return customFetch<OrderDocument[]>(getListOrderDocumentsUrl(orderId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOrderDocumentsQueryKey = (orderId: string,) => {
+    return [
+    `/api/orders/${orderId}/documents`
+    ] as const;
+    }
+
+
+export const getListOrderDocumentsQueryOptions = <TData = Awaited<ReturnType<typeof listOrderDocuments>>, TError = ErrorType<void>>(orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOrderDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOrderDocumentsQueryKey(orderId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrderDocuments>>> = ({ signal }) => listOrderDocuments(orderId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: orderId !== null && orderId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOrderDocuments>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOrderDocumentsQueryResult = NonNullable<Awaited<ReturnType<typeof listOrderDocuments>>>
+export type ListOrderDocumentsQueryError = ErrorType<void>
+
+
+export function useListOrderDocuments<TData = Awaited<ReturnType<typeof listOrderDocuments>>, TError = ErrorType<void>>(
+ orderId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOrderDocuments>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOrderDocuments>>,
+          TError,
+          Awaited<ReturnType<typeof listOrderDocuments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOrderDocuments<TData = Awaited<ReturnType<typeof listOrderDocuments>>, TError = ErrorType<void>>(
+ orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOrderDocuments>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOrderDocuments>>,
+          TError,
+          Awaited<ReturnType<typeof listOrderDocuments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOrderDocuments<TData = Awaited<ReturnType<typeof listOrderDocuments>>, TError = ErrorType<void>>(
+ orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOrderDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary An order's documents, all revisions (newest first per type)
+ */
+
+export function useListOrderDocuments<TData = Awaited<ReturnType<typeof listOrderDocuments>>, TError = ErrorType<void>>(
+ orderId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOrderDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOrderDocumentsQueryOptions(orderId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateOrderDocumentUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/documents`
+}
+
+/**
+ * @summary Start a draft (or a new revision after approval) of a document type
+ */
+export const createOrderDocument = async (orderId: string,
+    orderDocumentCreate: OrderDocumentCreate, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocument> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderDocument>(getCreateOrderDocumentUrl(orderId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderDocumentCreate)
+  }
+);}
+
+
+
+
+
+export const getCreateOrderDocumentMutationKey = () => ['createOrderDocument'] as const;
+
+export const getCreateOrderDocumentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderDocument>>, TError,CreateOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOrderDocument>>, TError,CreateOrderDocumentMutationVariables, TContext> => {
+
+const mutationKey = getCreateOrderDocumentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOrderDocument>>, CreateOrderDocumentMutationVariables> = (props) => {
+          const {orderId,data} = props ?? {};
+
+          return  createOrderDocument(orderId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOrderDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof createOrderDocument>>>
+    export type CreateOrderDocumentMutationBody = BodyType<OrderDocumentCreate>
+    export type CreateOrderDocumentMutationError = ErrorType<void>
+    export type CreateOrderDocumentMutationVariables = {orderId: string;data: BodyType<OrderDocumentCreate>}
+
+    /**
+ * @summary Start a draft (or a new revision after approval) of a document type
+ */
+export const useCreateOrderDocument = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOrderDocument>>, TError,CreateOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createOrderDocument>>,
+        TError,
+        CreateOrderDocumentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateOrderDocumentMutationOptions(options), queryClient);
+    }
+
+export const getGetOrderDocumentUrl = (orderId: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/documents/${documentId}`
+}
+
+/**
+ * @summary One document with its data (live for drafts, frozen for approved)
+ */
+export const getOrderDocument = async (orderId: string,
+    documentId: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocument> => {
+
+  return customFetch<OrderDocument>(getGetOrderDocumentUrl(orderId,documentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOrderDocumentQueryKey = (orderId: string,
+    documentId: string,) => {
+    return [
+    `/api/orders/${orderId}/documents/${documentId}`
+    ] as const;
+    }
+
+
+export const getGetOrderDocumentQueryOptions = <TData = Awaited<ReturnType<typeof getOrderDocument>>, TError = ErrorType<void>>(orderId: string,
+    documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderDocument>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOrderDocumentQueryKey(orderId,documentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrderDocument>>> = ({ signal }) => getOrderDocument(orderId,documentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: orderId !== null && orderId !== undefined && documentId !== null && documentId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOrderDocument>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOrderDocumentQueryResult = NonNullable<Awaited<ReturnType<typeof getOrderDocument>>>
+export type GetOrderDocumentQueryError = ErrorType<void>
+
+
+export function useGetOrderDocument<TData = Awaited<ReturnType<typeof getOrderDocument>>, TError = ErrorType<void>>(
+ orderId: string,
+    documentId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderDocument>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOrderDocument>>,
+          TError,
+          Awaited<ReturnType<typeof getOrderDocument>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOrderDocument<TData = Awaited<ReturnType<typeof getOrderDocument>>, TError = ErrorType<void>>(
+ orderId: string,
+    documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderDocument>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOrderDocument>>,
+          TError,
+          Awaited<ReturnType<typeof getOrderDocument>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOrderDocument<TData = Awaited<ReturnType<typeof getOrderDocument>>, TError = ErrorType<void>>(
+ orderId: string,
+    documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderDocument>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary One document with its data (live for drafts, frozen for approved)
+ */
+
+export function useGetOrderDocument<TData = Awaited<ReturnType<typeof getOrderDocument>>, TError = ErrorType<void>>(
+ orderId: string,
+    documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrderDocument>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOrderDocumentQueryOptions(orderId,documentId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateOrderDocumentUrl = (orderId: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/documents/${documentId}`
+}
+
+/**
+ * @summary Edit a draft's settings (allowance, pieces per carton, texts)
+ */
+export const updateOrderDocument = async (orderId: string,
+    documentId: string,
+    orderDocumentSettingsUpdate: OrderDocumentSettingsUpdate, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocument> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderDocument>(getUpdateOrderDocumentUrl(orderId,documentId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderDocumentSettingsUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateOrderDocumentMutationKey = () => ['updateOrderDocument'] as const;
+
+export const getUpdateOrderDocumentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrderDocument>>, TError,UpdateOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOrderDocument>>, TError,UpdateOrderDocumentMutationVariables, TContext> => {
+
+const mutationKey = getUpdateOrderDocumentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOrderDocument>>, UpdateOrderDocumentMutationVariables> = (props) => {
+          const {orderId,documentId,data} = props ?? {};
+
+          return  updateOrderDocument(orderId,documentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOrderDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof updateOrderDocument>>>
+    export type UpdateOrderDocumentMutationBody = BodyType<OrderDocumentSettingsUpdate>
+    export type UpdateOrderDocumentMutationError = ErrorType<void>
+    export type UpdateOrderDocumentMutationVariables = {orderId: string;documentId: string;data: BodyType<OrderDocumentSettingsUpdate>}
+
+    /**
+ * @summary Edit a draft's settings (allowance, pieces per carton, texts)
+ */
+export const useUpdateOrderDocument = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOrderDocument>>, TError,UpdateOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateOrderDocument>>,
+        TError,
+        UpdateOrderDocumentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateOrderDocumentMutationOptions(options), queryClient);
+    }
+
+export const getSubmitOrderDocumentUrl = (orderId: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/documents/${documentId}/submit`
+}
+
+/**
+ * @summary Send a draft for approval
+ */
+export const submitOrderDocument = async (orderId: string,
+    documentId: string, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocument> => {
+
+  return customFetch<OrderDocument>(getSubmitOrderDocumentUrl(orderId,documentId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSubmitOrderDocumentMutationKey = () => ['submitOrderDocument'] as const;
+
+export const getSubmitOrderDocumentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitOrderDocument>>, TError,SubmitOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitOrderDocument>>, TError,SubmitOrderDocumentMutationVariables, TContext> => {
+
+const mutationKey = getSubmitOrderDocumentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitOrderDocument>>, SubmitOrderDocumentMutationVariables> = (props) => {
+          const {orderId,documentId} = props ?? {};
+
+          return  submitOrderDocument(orderId,documentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitOrderDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof submitOrderDocument>>>
+
+    export type SubmitOrderDocumentMutationError = ErrorType<void>
+    export type SubmitOrderDocumentMutationVariables = {orderId: string;documentId: string}
+
+    /**
+ * @summary Send a draft for approval
+ */
+export const useSubmitOrderDocument = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitOrderDocument>>, TError,SubmitOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof submitOrderDocument>>,
+        TError,
+        SubmitOrderDocumentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubmitOrderDocumentMutationOptions(options), queryClient);
+    }
+
+export const getRequestOrderDocumentChangesUrl = (orderId: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/documents/${documentId}/request-changes`
+}
+
+/**
+ * @summary Send a document in review back with a note (approvers only)
+ */
+export const requestOrderDocumentChanges = async (orderId: string,
+    documentId: string,
+    documentReviewNote: DocumentReviewNote, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocument> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderDocument>(getRequestOrderDocumentChangesUrl(orderId,documentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(documentReviewNote)
+  }
+);}
+
+
+
+
+
+export const getRequestOrderDocumentChangesMutationKey = () => ['requestOrderDocumentChanges'] as const;
+
+export const getRequestOrderDocumentChangesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestOrderDocumentChanges>>, TError,RequestOrderDocumentChangesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestOrderDocumentChanges>>, TError,RequestOrderDocumentChangesMutationVariables, TContext> => {
+
+const mutationKey = getRequestOrderDocumentChangesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestOrderDocumentChanges>>, RequestOrderDocumentChangesMutationVariables> = (props) => {
+          const {orderId,documentId,data} = props ?? {};
+
+          return  requestOrderDocumentChanges(orderId,documentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestOrderDocumentChangesMutationResult = NonNullable<Awaited<ReturnType<typeof requestOrderDocumentChanges>>>
+    export type RequestOrderDocumentChangesMutationBody = BodyType<DocumentReviewNote>
+    export type RequestOrderDocumentChangesMutationError = ErrorType<void>
+    export type RequestOrderDocumentChangesMutationVariables = {orderId: string;documentId: string;data: BodyType<DocumentReviewNote>}
+
+    /**
+ * @summary Send a document in review back with a note (approvers only)
+ */
+export const useRequestOrderDocumentChanges = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestOrderDocumentChanges>>, TError,RequestOrderDocumentChangesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof requestOrderDocumentChanges>>,
+        TError,
+        RequestOrderDocumentChangesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestOrderDocumentChangesMutationOptions(options), queryClient);
+    }
+
+export const getApproveOrderDocumentUrl = (orderId: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/documents/${documentId}/approve`
+}
+
+/**
+ * Approvers: administrators, deputies or the order's responsible merchandiser, holding the approve_documents permission, who did not prepare, edit or submit the document. Approval renders the final Excel and PDF, stores them with SHA-256 fingerprints and freezes the data; the document can never be changed or deleted afterwards. The previous approved revision becomes superseded.
+ * @summary Approve and freeze a document (four-eyes)
+ */
+export const approveOrderDocument = async (orderId: string,
+    documentId: string,
+    documentApproval?: DocumentApproval, options?: Parameters<typeof customFetch>[1]): Promise<OrderDocument> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OrderDocument>(getApproveOrderDocumentUrl(orderId,documentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(documentApproval)
+  }
+);}
+
+
+
+
+
+export const getApproveOrderDocumentMutationKey = () => ['approveOrderDocument'] as const;
+
+export const getApproveOrderDocumentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveOrderDocument>>, TError,ApproveOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveOrderDocument>>, TError,ApproveOrderDocumentMutationVariables, TContext> => {
+
+const mutationKey = getApproveOrderDocumentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveOrderDocument>>, ApproveOrderDocumentMutationVariables> = (props) => {
+          const {orderId,documentId,data} = props ?? {};
+
+          return  approveOrderDocument(orderId,documentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveOrderDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof approveOrderDocument>>>
+    export type ApproveOrderDocumentMutationBody = BodyType<DocumentApproval> | undefined
+    export type ApproveOrderDocumentMutationError = ErrorType<void>
+    export type ApproveOrderDocumentMutationVariables = {orderId: string;documentId: string;data?: BodyType<DocumentApproval>}
+
+    /**
+ * @summary Approve and freeze a document (four-eyes)
+ */
+export const useApproveOrderDocument = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveOrderDocument>>, TError,ApproveOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof approveOrderDocument>>,
+        TError,
+        ApproveOrderDocumentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getApproveOrderDocumentMutationOptions(options), queryClient);
+    }
+
+export const getDownloadOrderDocumentFileUrl = (orderId: string,
+    documentId: string,
+    format: 'xlsx' | 'pdf',) => {
+
+
+
+
+  return `/api/orders/${orderId}/documents/${documentId}/files/${format}`
+}
+
+/**
+ * @summary Download as Excel or PDF (drafts carry a DRAFT watermark; approved files are the stored originals)
+ */
+export const downloadOrderDocumentFile = async (orderId: string,
+    documentId: string,
+    format: 'xlsx' | 'pdf', options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadOrderDocumentFileUrl(orderId,documentId,format),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadOrderDocumentFileQueryKey = (orderId: string,
+    documentId: string,
+    format: 'xlsx' | 'pdf',) => {
+    return [
+    `/api/orders/${orderId}/documents/${documentId}/files/${format}`
+    ] as const;
+    }
+
+
+export const getDownloadOrderDocumentFileQueryOptions = <TData = Awaited<ReturnType<typeof downloadOrderDocumentFile>>, TError = ErrorType<unknown>>(orderId: string,
+    documentId: string,
+    format: 'xlsx' | 'pdf', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadOrderDocumentFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadOrderDocumentFileQueryKey(orderId,documentId,format);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadOrderDocumentFile>>> = ({ signal }) => downloadOrderDocumentFile(orderId,documentId,format, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: orderId !== null && orderId !== undefined && documentId !== null && documentId !== undefined && format !== null && format !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadOrderDocumentFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type DownloadOrderDocumentFileQueryResult = NonNullable<Awaited<ReturnType<typeof downloadOrderDocumentFile>>>
+export type DownloadOrderDocumentFileQueryError = ErrorType<unknown>
+
+
+export function useDownloadOrderDocumentFile<TData = Awaited<ReturnType<typeof downloadOrderDocumentFile>>, TError = ErrorType<unknown>>(
+ orderId: string,
+    documentId: string,
+    format: 'xlsx' | 'pdf', options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadOrderDocumentFile>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadOrderDocumentFile>>,
+          TError,
+          Awaited<ReturnType<typeof downloadOrderDocumentFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDownloadOrderDocumentFile<TData = Awaited<ReturnType<typeof downloadOrderDocumentFile>>, TError = ErrorType<unknown>>(
+ orderId: string,
+    documentId: string,
+    format: 'xlsx' | 'pdf', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadOrderDocumentFile>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadOrderDocumentFile>>,
+          TError,
+          Awaited<ReturnType<typeof downloadOrderDocumentFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDownloadOrderDocumentFile<TData = Awaited<ReturnType<typeof downloadOrderDocumentFile>>, TError = ErrorType<unknown>>(
+ orderId: string,
+    documentId: string,
+    format: 'xlsx' | 'pdf', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadOrderDocumentFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Download as Excel or PDF (drafts carry a DRAFT watermark; approved files are the stored originals)
+ */
+
+export function useDownloadOrderDocumentFile<TData = Awaited<ReturnType<typeof downloadOrderDocumentFile>>, TError = ErrorType<unknown>>(
+ orderId: string,
+    documentId: string,
+    format: 'xlsx' | 'pdf', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadOrderDocumentFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getDownloadOrderDocumentFileQueryOptions(orderId,documentId,format,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListDocumentsAwaitingApprovalUrl = () => {
+
+
+
+
+  return `/api/documents/awaiting-approval`
+}
+
+/**
+ * @summary Documents in review that the signed-in user may approve
+ */
+export const listDocumentsAwaitingApproval = async ( options?: Parameters<typeof customFetch>[1]): Promise<OrderDocument[]> => {
+
+  return customFetch<OrderDocument[]>(getListDocumentsAwaitingApprovalUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDocumentsAwaitingApprovalQueryKey = () => {
+    return [
+    `/api/documents/awaiting-approval`
+    ] as const;
+    }
+
+
+export const getListDocumentsAwaitingApprovalQueryOptions = <TData = Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDocumentsAwaitingApprovalQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>> = ({ signal }) => listDocumentsAwaitingApproval({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListDocumentsAwaitingApprovalQueryResult = NonNullable<Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>>
+export type ListDocumentsAwaitingApprovalQueryError = ErrorType<unknown>
+
+
+export function useListDocumentsAwaitingApproval<TData = Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>,
+          TError,
+          Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDocumentsAwaitingApproval<TData = Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>,
+          TError,
+          Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDocumentsAwaitingApproval<TData = Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Documents in review that the signed-in user may approve
+ */
+
+export function useListDocumentsAwaitingApproval<TData = Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDocumentsAwaitingApproval>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListDocumentsAwaitingApprovalQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetOrderResponsibleUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/responsible`
+}
+
+/**
+ * @summary Set the order's responsible merchandiser (administrators and deputies)
+ */
+export const setOrderResponsible = async (orderId: string,
+    orderResponsibleUpdate: OrderResponsibleUpdate, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getSetOrderResponsibleUrl(orderId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(orderResponsibleUpdate)
+  }
+);}
+
+
+
+
+
+export const getSetOrderResponsibleMutationKey = () => ['setOrderResponsible'] as const;
+
+export const getSetOrderResponsibleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setOrderResponsible>>, TError,SetOrderResponsibleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setOrderResponsible>>, TError,SetOrderResponsibleMutationVariables, TContext> => {
+
+const mutationKey = getSetOrderResponsibleMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setOrderResponsible>>, SetOrderResponsibleMutationVariables> = (props) => {
+          const {orderId,data} = props ?? {};
+
+          return  setOrderResponsible(orderId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetOrderResponsibleMutationResult = NonNullable<Awaited<ReturnType<typeof setOrderResponsible>>>
+    export type SetOrderResponsibleMutationBody = BodyType<OrderResponsibleUpdate>
+    export type SetOrderResponsibleMutationError = ErrorType<void>
+    export type SetOrderResponsibleMutationVariables = {orderId: string;data: BodyType<OrderResponsibleUpdate>}
+
+    /**
+ * @summary Set the order's responsible merchandiser (administrators and deputies)
+ */
+export const useSetOrderResponsible = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setOrderResponsible>>, TError,SetOrderResponsibleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setOrderResponsible>>,
+        TError,
+        SetOrderResponsibleMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetOrderResponsibleMutationOptions(options), queryClient);
+    }
+
+export const getGetCompanyProfileUrl = () => {
+
+
+
+
+  return `/api/admin/company-profile`
+}
+
+/**
+ * @summary Letterhead used on documents (administrators and deputies)
+ */
+export const getCompanyProfile = async ( options?: Parameters<typeof customFetch>[1]): Promise<CompanyProfile> => {
+
+  return customFetch<CompanyProfile>(getGetCompanyProfileUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompanyProfileQueryKey = () => {
+    return [
+    `/api/admin/company-profile`
+    ] as const;
+    }
+
+
+export const getGetCompanyProfileQueryOptions = <TData = Awaited<ReturnType<typeof getCompanyProfile>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompanyProfile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompanyProfileQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompanyProfile>>> = ({ signal }) => getCompanyProfile({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompanyProfile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCompanyProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getCompanyProfile>>>
+export type GetCompanyProfileQueryError = ErrorType<unknown>
+
+
+export function useGetCompanyProfile<TData = Awaited<ReturnType<typeof getCompanyProfile>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompanyProfile>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompanyProfile>>,
+          TError,
+          Awaited<ReturnType<typeof getCompanyProfile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompanyProfile<TData = Awaited<ReturnType<typeof getCompanyProfile>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompanyProfile>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompanyProfile>>,
+          TError,
+          Awaited<ReturnType<typeof getCompanyProfile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompanyProfile<TData = Awaited<ReturnType<typeof getCompanyProfile>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompanyProfile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Letterhead used on documents (administrators and deputies)
+ */
+
+export function useGetCompanyProfile<TData = Awaited<ReturnType<typeof getCompanyProfile>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompanyProfile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCompanyProfileQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSaveCompanyProfileUrl = () => {
+
+
+
+
+  return `/api/admin/company-profile`
+}
+
+/**
+ * @summary Update the letterhead (affects new drafts and approvals; approved documents keep theirs)
+ */
+export const saveCompanyProfile = async (companyProfile: CompanyProfile, options?: Parameters<typeof customFetch>[1]): Promise<CompanyProfile> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CompanyProfile>(getSaveCompanyProfileUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(companyProfile)
+  }
+);}
+
+
+
+
+
+export const getSaveCompanyProfileMutationKey = () => ['saveCompanyProfile'] as const;
+
+export const getSaveCompanyProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCompanyProfile>>, TError,SaveCompanyProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveCompanyProfile>>, TError,SaveCompanyProfileMutationVariables, TContext> => {
+
+const mutationKey = getSaveCompanyProfileMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveCompanyProfile>>, SaveCompanyProfileMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveCompanyProfile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveCompanyProfileMutationResult = NonNullable<Awaited<ReturnType<typeof saveCompanyProfile>>>
+    export type SaveCompanyProfileMutationBody = BodyType<CompanyProfile>
+    export type SaveCompanyProfileMutationError = ErrorType<unknown>
+    export type SaveCompanyProfileMutationVariables = {data: BodyType<CompanyProfile>}
+
+    /**
+ * @summary Update the letterhead (affects new drafts and approvals; approved documents keep theirs)
+ */
+export const useSaveCompanyProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCompanyProfile>>, TError,SaveCompanyProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof saveCompanyProfile>>,
+        TError,
+        SaveCompanyProfileMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveCompanyProfileMutationOptions(options), queryClient);
     }
 
 export const getGetBuyersUrl = () => {

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.8.0
+ * OpenAPI spec version: 0.9.0
  */
 
 export * from './accessLevel';
@@ -16,6 +16,7 @@ export * from './attentionItem';
 export * from './attentionItemSeverity';
 export * from './buyer';
 export * from './colourway';
+export * from './companyProfile';
 export * from './currentUser';
 export * from './dashboard';
 export * from './dashboardData';
@@ -39,6 +40,16 @@ export * from './dashboardWidget';
 export * from './dashboardWidgetParams';
 export * from './department';
 export * from './departmentCount';
+export * from './documentApproval';
+export * from './documentData';
+export * from './documentDataOrder';
+export * from './documentReviewNote';
+export * from './documentSection';
+export * from './documentSectionCuttingRowsItem';
+export * from './documentSectionPackingRowsItem';
+export * from './documentSectionTotals';
+export * from './documentStatus';
+export * from './documentType';
 export * from './emailAttachment';
 export * from './emailAttachmentExtractStatus';
 export * from './emailCategory';
@@ -67,6 +78,13 @@ export * from './order';
 export * from './orderActivity';
 export * from './orderActivityDetails';
 export * from './orderBreakdown';
+export * from './orderDocument';
+export * from './orderDocumentCreate';
+export * from './orderDocumentFiles';
+export * from './orderDocumentSettings';
+export * from './orderDocumentSettingsSections';
+export * from './orderDocumentSettingsUpdate';
+export * from './orderDocumentSettingsUpdateSections';
 export * from './orderEmail';
 export * from './orderEmailDetail';
 export * from './orderEmailParseStatus';
@@ -81,6 +99,7 @@ export * from './orderFileUploadResponse';
 export * from './orderInput';
 export * from './orderInvoiceUpdate';
 export * from './orderLine';
+export * from './orderResponsibleUpdate';
 export * from './orderStatus';
 export * from './orderTrim';
 export * from './orderUpdate';

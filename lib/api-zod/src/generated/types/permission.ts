@@ -3,11 +3,11 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.8.0
+ * OpenAPI spec version: 0.9.0
  */
 
 /**
- * invoice_override = change the invoice counter or an order's BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails
+ * invoice_override = change the invoice counter or an order's BK invoice; commercial_edit = create orders and edit buyer, PO, value, terms, quantity and dates; intake_run = read the mailbox and re-apply emails; prepare_documents = draft, edit and submit documents; approve_documents = approve or send back documents (as administrator, deputy or the order's responsible merchandiser, never one's own)
  */
 export type Permission = typeof Permission[keyof typeof Permission];
 
@@ -16,4 +16,6 @@ export const Permission = {
   invoice_override: 'invoice_override',
   commercial_edit: 'commercial_edit',
   intake_run: 'intake_run',
+  prepare_documents: 'prepare_documents',
+  approve_documents: 'approve_documents',
 } as const;
