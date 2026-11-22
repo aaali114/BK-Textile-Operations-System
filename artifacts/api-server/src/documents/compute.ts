@@ -5,7 +5,8 @@ import { getOrderBreakdown } from "../lib/orderDetail";
 
 export const DOCUMENT_TYPES = ["cutting_program", "packing_list"] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
-export const TEMPLATE_VERSION: Record<DocumentType, string> = { cutting_program: "cutting_program/1", packing_list: "packing_list/1" };
+// version 2: the factory layouts (Times New Roman, centred, same rows/widths/borders as the floor sheets)
+export const TEMPLATE_VERSION: Record<DocumentType, string> = { cutting_program: "cutting_program/2", packing_list: "packing_list/2" };
 export const TYPE_TITLE: Record<DocumentType, string> = { cutting_program: "Cutting program", packing_list: "Packing list" };
 
 export type CompanyProfile = { name: string; taglineLines: string[]; address: string };
