@@ -347,6 +347,11 @@ Build in `artifacts/bk-textile` only, using the generated hooks.
    cartons, and table Carton # (from–to) / PO / Style / Colour / Size /
    Actual qty ("-" when null) / Cartons / Qty per carton / Total pcs.
    Show `problems` as a red list (they block "Send for approval").
+   Use the floor's size names on screen, as on paper: cutting program
+   2XL → "2X", 3XL → "3X"; packing list S → "SMALL", M → "MEDIUM",
+   L → "LARGE", 2XL → "2X". The downloaded Excel/PDF are the official
+   layout (Times New Roman, centred, the factory's existing format); the
+   on-screen view only needs to be a clear, faithful preview.
 3. **Editing a draft** (when `canEdit`): allowance % (default 5), pieces per
    carton, previous reference, remarks, and per finish: description lines and
    quality line (`useUpdateOrderDocument`). Live preview refreshes from the
