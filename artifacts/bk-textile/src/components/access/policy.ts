@@ -29,7 +29,7 @@ export function firstAllowedPath(user: CurrentUser) {
 export function permittedOrderUpdate(data: OrderUpdate, commercial: boolean): OrderUpdate {
   if (commercial) return data;
   const result: OrderUpdate = {};
-  for (const key of ['style', 'description', 'status', 'priority'] as const) {
+  for (const key of ['style', 'description', 'status', 'priority', 'pcsPerCarton', 'garmentDescription'] as const) {
     if (data[key] !== undefined) Object.assign(result, { [key]: data[key] });
   }
   return result;

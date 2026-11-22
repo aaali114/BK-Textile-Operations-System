@@ -1,0 +1,69 @@
+.doc-card .panel-head { gap: 12px }
+.doc-empty { padding: 22px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 12px; color: #6c7977 }
+.doc-empty p { margin: 0 }
+.doc-body { padding: 16px 20px 18px; display: grid; gap: 14px }
+.doc-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 16px; margin: 0 }
+.doc-facts dt { font: 9px var(--app-font-mono); letter-spacing: .1em; text-transform: uppercase; color: #788582 }
+.doc-facts dd { margin: 4px 0 0; font-size: 12px; color: #34464a; font-weight: 600; overflow-wrap: anywhere }
+.doc-facts.stack { grid-template-columns: 1fr; padding: 16px 18px }
+.doc-hash { font-size: 10px; font-weight: 400; color: #5d706c }
+.doc-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
+.doc-btn { min-height: 34px; padding: 7px 11px; font-size: 11px }
+.doc-btn:disabled, .btn:disabled { opacity: .55; cursor: not-allowed; transform: none }
+.doc-warning { display: flex; gap: 10px; align-items: flex-start; padding: 11px 13px; border: 1px solid #e7cf9f; background: #f7eedb; color: #7b5a1d; border-radius: 5px; font-size: 12px; margin-bottom: 14px }
+.doc-body .doc-warning { margin: 0 }
+.doc-note { margin: 0; font-size: 12px; color: #7b5a1d; background: #faf4e6; padding: 9px 12px; border-radius: 4px }
+.doc-history { border-top: 1px solid #eeeae1; padding-top: 10px }
+.doc-history-toggle { display: inline-flex; gap: 6px; align-items: center; background: none; border: 0; padding: 4px 0; font: 600 11px var(--app-font-sans); color: #4b6b6c; cursor: pointer }
+.doc-history-toggle .rot { transform: rotate(180deg) }
+.doc-history-toggle:focus-visible { outline: 2px solid #4b7f83; outline-offset: 2px }
+.doc-history ul { list-style: none; margin: 8px 0 0; padding: 0 }
+.doc-history li { display: grid; grid-template-columns: 60px auto 1fr auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px dashed #e8e3d9; font-size: 11px }
+.doc-hist-meta { color: #7b8984; font-size: 11px }
+.doc-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start }
+.doc-main, .doc-side { display: grid; gap: 16px; min-width: 0 }
+.doc-problems { border: 1px solid #e3b9ad; background: #f8e7e2; color: #8f3a2f; border-radius: 6px; padding: 12px 16px; font-size: 12px }
+.doc-problems ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.6 }
+.doc-blocker { margin: 0; font-size: 12px; color: #6a5a3a; background: #f4efe3; border-left: 3px solid #d5a44f; padding: 10px 12px; line-height: 1.5 }
+.doc-confirm { font-size: 13px; color: #4a5d5f; line-height: 1.6; margin: 0 0 14px }
+.doc-editor fieldset { border: 0; margin: 0; min-width: 0 }
+.doc-editor-body { padding: 16px 18px }
+.doc-editor .form-grid { grid-template-columns: 1fr 1fr }
+.doc-editor-section { margin-top: 6px }
+/* Paper rendering: a printed sheet on the desk */
+.paper { position: relative; background: #fffdf7; border: 1px solid #d9d2c2; border-radius: 3px; padding: 30px 32px 34px; box-shadow: 0 1px 0 #e9e3d5, 0 12px 30px #22343b12; color: #1f2d31; overflow: hidden }
+.paper.draft:after { content: "DRAFT"; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-24deg); font: 800 110px var(--app-font-serif); color: #a9453d12; letter-spacing: .1em; pointer-events: none }
+.paper-letterhead { text-align: center; border-bottom: 2px solid #22343b; padding-bottom: 12px }
+.paper-company { font: 800 22px var(--app-font-serif); letter-spacing: .06em; text-transform: uppercase }
+.paper-tagline { font-size: 11px; color: #4f5f60 }
+.paper-address { font: 10px var(--app-font-mono); color: #5f6e6c; margin-top: 5px }
+.paper-titlebar { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 16px 0 10px; flex-wrap: wrap }
+.paper-titlebar h2 { margin: 0; font: 700 17px var(--app-font-serif); text-transform: uppercase; letter-spacing: .08em }
+.paper-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid #cfc8b8; margin: 0 0 16px }
+.paper-meta div { padding: 7px 10px; border-right: 1px solid #e4ded0; border-bottom: 1px solid #e4ded0 }
+.paper-meta dt { font: 9px var(--app-font-mono); text-transform: uppercase; color: #77847f; letter-spacing: .08em }
+.paper-meta dd { margin: 2px 0 0; font-size: 12px; font-weight: 600 }
+.paper-section { margin-top: 18px }
+.paper-section-head { display: flex; justify-content: space-between; gap: 10px; background: #22343b; color: #f4f1e9; padding: 7px 10px; font-size: 12px; flex-wrap: wrap }
+.paper-desc { font-size: 11px; padding: 8px 10px; border: 1px solid #e0d9ca; border-top: 0; line-height: 1.5 }
+.paper-quality { font-size: 11px; padding: 6px 10px; border: 1px solid #e0d9ca; border-top: 0; font-style: italic }
+.paper-totals { display: flex; gap: 22px; padding: 8px 10px; font-size: 11px; border: 1px solid #e0d9ca; border-top: 0; flex-wrap: wrap }
+.paper-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px }
+.paper-table th { text-align: left; font: 9px var(--app-font-mono); text-transform: uppercase; letter-spacing: .06em; padding: 6px 8px; border: 1px solid #cfc8b8; background: #f1ede2; white-space: nowrap }
+.paper-table td { padding: 5px 8px; border: 1px solid #e0d9ca }
+.paper-table .num { text-align: right; font-family: var(--app-font-mono) }
+.paper-table tfoot td { font-weight: 700; background: #f6f2e8 }
+.paper-remarks { margin-top: 18px; font-size: 11px; border-top: 1px solid #cfc8b8; padding-top: 10px }
+.paper-remarks p { margin: 4px 0 0; white-space: pre-wrap }
+.paper-empty { font-size: 12px; color: #7b8984 }
+.nav-count { margin-left: auto; background: #d7ad5e; color: #22343b; font: 700 10px var(--app-font-mono); padding: 2px 7px; border-radius: 9px }
+.company-profile { margin-top: 18px }
+@media (max-width: 1100px) { .doc-layout { grid-template-columns: 1fr } }
+@media (max-width: 760px) {
+  .doc-facts { grid-template-columns: 1fr 1fr }
+  .paper { padding: 18px 14px }
+  .paper-meta { grid-template-columns: 1fr 1fr }
+  .paper-table { min-width: 560px }
+  .doc-history li { grid-template-columns: auto auto; }
+  .doc-editor .form-grid { grid-template-columns: 1fr }
+}

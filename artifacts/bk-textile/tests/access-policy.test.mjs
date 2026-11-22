@@ -53,10 +53,29 @@ test('operational saves omit every commercial field rather than resending locked
     previousOrderReference: null, endCustomer: null, priceTerms: null, paymentTerms: null,
     shipVia: null, countryOfOrigin: null, overShipTolerancePct: 0,
     style: 'Demo style', description: null, priority: 'normal', status: 'draft',
+    pcsPerCarton: 24, garmentDescription: 'Fictional cotton garment',
   };
   assert.deepEqual(plain(policy.permittedOrderUpdate(update, false)), {
     style: 'Demo style', description: null, priority: 'normal', status: 'draft',
+    pcsPerCarton: 24, garmentDescription: 'Fictional cotton garment',
   });
   assert.deepEqual(plain(policy.permittedOrderUpdate(update, true)), update);
   assert.deepEqual(plain(policy.permittedOrderUpdate({ style: 'Only style' }, false)), { style: 'Only style' });
+  assert.deepEqual(plain(policy.permittedOrderUpdate({ pcsPerCarton: null, garmentDescription: null }, false)), {
+    pcsPerCarton: null, garmentDescription: null,
+  });
+});
+
+test('preparing and approving documents require separate explicit permissions', () => {
+  const preparer = user({ permissions: ['prepare_documents'] });
+  assert.equal(policy.hasPermission(preparer, 'prepare_documents'), true);
+  assert.equal(policy.hasPermission(preparer, 'approve_documents'), false);
+  const approver = user({ permissions: ['approve_documents'] });
+  assert.equal(policy.hasPermission(approver, 'approve_documents'), true);
+  assert.equal(policy.hasPermission(approver, 'prepare_documents'), false);
+  for (const status of ['pending', 'disabled']) {
+    const inactive = user({ status, permissions: ['prepare_documents', 'approve_documents'] });
+    assert.equal(policy.hasPermission(inactive, 'prepare_documents'), false);
+    assert.equal(policy.hasPermission(inactive, 'approve_documents'), false);
+  }
 });

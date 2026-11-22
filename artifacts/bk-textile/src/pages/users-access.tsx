@@ -10,6 +10,7 @@ import type { AccessLevel, AccessTemplate, AreaAccess, CurrentUser, UserAccessUp
 import { Form, FormField } from '@/components/ui/form';
 import { useAccess } from '../components/access/AccessProvider';
 import { UserRoleActions } from '../components/access/UserRoleActions';
+import { CompanyProfilePanel } from '../components/documents/CompanyProfilePanel';
 import { DashboardTemplatesPanel } from '../components/dashboards/dashboard-templates';
 import { AREA_LABELS, type Area } from '../components/access/policy';
 import { apiErrorInfo, dateTimeText, humanize } from '../components/orders/helpers';
@@ -22,6 +23,8 @@ const PERMISSIONS: { key: Permission; label: string; note: string }[] = [
   { key: Permission.invoice_override, label: 'Invoice override', note: 'Change the invoice counter or an order\u2019s BK invoice.' },
   { key: Permission.commercial_edit, label: 'Commercial edit', note: 'Create orders and edit buyer, PO, value, terms, quantity and dates.' },
   { key: Permission.intake_run, label: 'Intake run', note: 'Read the orders mailbox and re-apply emails.' },
+  { key: Permission.prepare_documents, label: 'Prepare documents', note: 'Draft, edit and submit cutting programs and packing lists.' },
+  { key: Permission.approve_documents, label: 'Approve documents', note: 'Approve or send back documents as administrator, deputy or the order\u2019s responsible merchandiser; never one\u2019s own.' },
 ];
 
 type AccessForm = { status: UserStatus; department: string; areas: AreaAccess; permissions: Permission[] };
@@ -268,7 +271,7 @@ export default function UsersAccessPage() {
   return <main className="page-wrap" data-testid="page-users-access">
     <div className="page-title-row"><div><div className="eyebrow">Administration · Access control</div><h1 className="page-title">Users &amp; access</h1>
       <p className="page-subtitle">Approve new sign-ins and decide, area by area, who can see and change orders, floor work, lots and inspections.</p></div></div>
-    {user && canManageUsers ? <><UsersWorkspace actor={user} /><DashboardTemplatesPanel /></>
+    {user && canManageUsers ? <><UsersWorkspace actor={user} /><CompanyProfilePanel /><DashboardTemplatesPanel /></>
       : <section className="panel"><div className="blank-state" data-testid="state-users-forbidden"><div className="blank-icon"><Lock size={18} /></div><p className="blank-title">Only the administrator or deputy can manage users</p><p style={{ fontSize: 12 }}>Ask them if your access needs to change.</p></div></section>}
   </main>;
 }

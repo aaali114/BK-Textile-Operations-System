@@ -8,6 +8,7 @@ import { permittedOrderUpdate } from '../access/policy';
 
 export type OrderFormResult = { kind: 'create'; data: OrderInput } | { kind: 'update'; data: OrderUpdate };
 
+const MERCH_FIELDS: string[] = ['style', 'pcsPerCarton', 'garmentDescription'];
 const d = (v?: string | null) => (v ? v.slice(0, 10) : '');
 
 export function OrderForm({ onSubmit, busy, initial, onCancel, error }: { onSubmit: (r: OrderFormResult) => void; busy: boolean; initial?: Order; onCancel?: () => void; error?: string | null }) {
@@ -24,6 +25,7 @@ export function OrderForm({ onSubmit, busy, initial, onCancel, error }: { onSubm
     poIssueDate: d(initial?.poIssueDate), endCustomer: initial?.endCustomer ?? '', priceTerms: initial?.priceTerms ?? '',
     paymentTerms: initial?.paymentTerms ?? '', shipVia: initial?.shipVia ?? '', countryOfOrigin: initial?.countryOfOrigin ?? '',
     overShipTolerancePct: initial?.overShipTolerancePct != null ? String(initial.overShipTolerancePct) : '',
+    pcsPerCarton: initial?.pcsPerCarton != null ? String(initial.pcsPerCarton) : '', garmentDescription: initial?.garmentDescription ?? '',
   });
   const set = (key: keyof typeof form, value: string) => setForm((p) => ({ ...p, [key]: value }));
   const [localError, setLocalError] = useState<string | null>(null);
@@ -51,6 +53,9 @@ export function OrderForm({ onSubmit, busy, initial, onCancel, error }: { onSubm
       return;
     }
     const n = (v: string) => (t(v) ? t(v) : null);
+    const pcs = t(form.pcsPerCarton);
+    if (pcs && (!Number.isInteger(Number(pcs)) || Number(pcs) < 1 || Number(pcs) > 10000)) { setLocalError('Pieces per carton must be a whole number from 1 to 10,000.'); return; }
+    if (t(form.garmentDescription).length > 300) { setLocalError('Garment description can be at most 300 characters.'); return; }
     const data: OrderUpdate = {
       ...(form.buyer.trim() !== initial.buyer ? { buyer: t(form.buyer) } : {}),
       agencyName: n(form.agencyName), previousOrderReference: n(form.previousOrderReference), poNumber: n(form.poNumber),
@@ -58,6 +63,7 @@ export function OrderForm({ onSubmit, busy, initial, onCancel, error }: { onSubm
       priority: form.priority, orderValue: t(form.orderValue) ? Number(form.orderValue) : null, currencyCode: currency || null,
       poIssueDate: n(form.poIssueDate), endCustomer: n(form.endCustomer), priceTerms: n(form.priceTerms), paymentTerms: n(form.paymentTerms),
       shipVia: n(form.shipVia), countryOfOrigin: n(form.countryOfOrigin), overShipTolerancePct: tol ? Number(tol) : null,
+      pcsPerCarton: t(form.pcsPerCarton) ? Number(form.pcsPerCarton) : null, garmentDescription: n(form.garmentDescription),
     };
     onSubmit({ kind: 'update', data: permittedOrderUpdate(data, commercial) });
   };
@@ -66,13 +72,13 @@ export function OrderForm({ onSubmit, busy, initial, onCancel, error }: { onSubm
   const field = (id: keyof typeof form, label: string, opts: { required?: boolean; type?: string; optional?: boolean; full?: boolean; min?: string; max?: string; step?: string } = {}) => (
     <div className={`form-field${opts.full ? ' full' : ''}`}>
       <label htmlFor={`order-${id}`}>{label}{opts.required && ' *'}{opts.optional && <span className="optional-label">Optional</span>}</label>
-      <input id={`order-${id}`} className="field" type={opts.type ?? 'text'} required={opts.required} disabled={!writable || (editing && !commercial && id !== 'style')} min={opts.min} max={opts.max} step={opts.step} value={form[id]} onChange={(e) => set(id, e.target.value)} data-testid={`input-order-${id}`} />
+      <input id={`order-${id}`} className="field" type={opts.type ?? 'text'} required={opts.required} disabled={!writable || (editing && !commercial && !MERCH_FIELDS.includes(id))} min={opts.min} max={opts.max} step={opts.step} value={form[id]} onChange={(e) => set(id, e.target.value)} data-testid={`input-order-${id}`} />
     </div>
   );
 
   return <form onSubmit={submit} noValidate={false}>
     {shownError && <div role="alert" className="feedback error" data-testid="text-order-form-error">{shownError}</div>}
-    {editing && !commercial && <p className="support-note">You can edit style, order notes and priority. Commercial details are read-only with your current access.</p>}
+    {editing && !commercial && <p className="support-note">You can edit style, pieces per carton, garment description, order notes and priority. Commercial details are read-only with your current access.</p>}
     <div className="form-section-label">Buyer & PO</div>
     <div className="form-grid">
       <div className="form-field">
@@ -96,6 +102,8 @@ export function OrderForm({ onSubmit, busy, initial, onCancel, error }: { onSubm
       {field('style', 'Style', { required: true })}
       {field('quantity', 'Quantity', { required: true, type: 'number', min: '1', step: '1' })}
       {field('deliveryDate', 'Ship date', { required: true, type: 'date' })}
+      {editing && field('pcsPerCarton', 'Pieces per carton', { type: 'number', min: '1', max: '10000', step: '1', optional: true })}
+      {editing && <div className="form-field full"><label htmlFor="order-garmentDescription">Garment description <span className="optional-label">Used on documents</span></label><input id="order-garmentDescription" className="field" maxLength={300} disabled={!writable} value={form.garmentDescription} onChange={(e) => set('garmentDescription', e.target.value)} data-testid="input-order-garmentDescription" /></div>}
       <div className="form-field"><label htmlFor="order-priority">Priority</label><select id="order-priority" className="select" disabled={!writable} value={form.priority} onChange={(e) => set('priority', e.target.value)}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
     </div>
     <div className="form-section-label">Commercial terms</div>

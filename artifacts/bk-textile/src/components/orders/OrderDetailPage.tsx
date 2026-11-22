@@ -14,9 +14,11 @@ import { ActivityTimeline } from './ActivityTimeline';
 import { OverrideInvoiceAction } from './AdminInvoice';
 import { apiErrorInfo, invoiceDisplay, moneyText, orderSaveErrorText, refreshOrderCore } from './helpers';
 import { useAccess } from '../access/AccessProvider';
+import { DocumentsTab } from '../documents/DocumentsTab';
+import { ResponsiblePicker } from '../documents/ResponsiblePicker';
 
-type Tab = 'overview' | 'breakdown' | 'specs' | 'emails' | 'activity';
-const TABS: [Tab, string][] = [['overview', 'Overview'], ['breakdown', 'Breakdown'], ['specs', 'Fabrics & trims'], ['emails', 'Emails'], ['activity', 'Change log']];
+type Tab = 'overview' | 'breakdown' | 'specs' | 'documents' | 'emails' | 'activity';
+const TABS: [Tab, string][] = [['overview', 'Overview'], ['breakdown', 'Breakdown'], ['specs', 'Fabrics & trims'], ['documents', 'Documents'], ['emails', 'Emails'], ['activity', 'Change log']];
 
 export function OrderDetails() {
   const access = useAccess();
@@ -65,6 +67,7 @@ export function OrderDetails() {
             ['Price terms', order.priceTerms || notProvided], ['Payment terms', order.paymentTerms || notProvided], ['Ship via', order.shipVia || notProvided],
             ['Country of origin', order.countryOfOrigin || notProvided], ['Over-shipment tolerance', order.overShipTolerancePct != null ? `${order.overShipTolerancePct}%` : notProvided], ['Quantity', numberText(order.quantity)],
             ['Style', order.style], ['Previous order', order.previousOrderReference || notProvided], ['Last updated', dateText(order.updatedAt)],
+            ['Pieces per carton', order.pcsPerCarton != null ? numberText(order.pcsPerCarton) : notProvided], ['Garment description', order.garmentDescription || notProvided],
           ] as [string, string][]).map(([label, value]) => <div className="detail-cell" key={label}><div className="detail-label">{label}</div><div className={`detail-value${value === notProvided ? ' muted-copy' : ''}`}>{value}</div></div>)}
         </div>
       </section>
@@ -74,7 +77,7 @@ export function OrderDetails() {
       <div role="tabpanel" id={`tabpanel-${tab}`} aria-labelledby={`tab-${tab}`} className="tab-body">
         {tab === 'overview' && <>
           <section className="panel" style={{ marginBottom: 18 }}><div className="panel-head"><div><p className="panel-kicker">Production control</p><h2 className="panel-title">Order status & priority</h2></div><StatusPill status={order.status} /></div>
-            <div style={{ padding: 20, display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'end' }}><div className="form-field"><label htmlFor="detail-status">Status</label>{writable ? <select id="detail-status" className="select status-select" value={order.status} disabled={update.isPending} onChange={(e) => changeStatus(e.target.value)}>{['draft', 'development', 'in_production', 'ready_to_ship', 'shipped'].map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}</select> : <span>{statusLabel(order.status)}</span>}</div><div className="form-field"><label>Priority</label><div className={`priority-marker ${order.priority}`}>{order.priority}</div></div><div className="form-field"><label>Created</label><div style={{ fontSize: 12, color: '#5d706c' }}>{dateText(order.createdAt)}</div></div></div>
+            <div style={{ padding: 20, display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'end' }}><div className="form-field"><label htmlFor="detail-status">Status</label>{writable ? <select id="detail-status" className="select status-select" value={order.status} disabled={update.isPending} onChange={(e) => changeStatus(e.target.value)}>{['draft', 'development', 'in_production', 'ready_to_ship', 'shipped'].map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}</select> : <span>{statusLabel(order.status)}</span>}</div><div className="form-field"><label>Priority</label><div className={`priority-marker ${order.priority}`}>{order.priority}</div></div><ResponsiblePicker order={order} /><div className="form-field"><label>Created</label><div style={{ fontSize: 12, color: '#5d706c' }}>{dateText(order.createdAt)}</div></div></div>
           </section>
           <OverrideInvoiceAction order={order} />
           {editing && writable && <section className="panel" style={{ marginBottom: 18 }}><div className="panel-head"><div><p className="panel-kicker">Editable fields follow your access · BK invoice is locked</p><h2 className="panel-title">Update order information</h2></div></div><div style={{ padding: 22 }}><OrderForm initial={order} onSubmit={save} busy={update.isPending} error={formError} onCancel={() => setEditing(false)} /></div></section>}
@@ -83,6 +86,7 @@ export function OrderDetails() {
         </>}
         {tab === 'breakdown' && <BreakdownSection orderId={orderId} />}
         {tab === 'specs' && <div className="spec-stack"><FabricsSection orderId={orderId} onOpenEmail={openEmail} /><TrimsSection orderId={orderId} onOpenEmail={openEmail} /></div>}
+        {tab === 'documents' && <DocumentsTab orderId={orderId} />}
         {tab === 'emails' && <EmailsPanel orderId={orderId} selectedId={emailId} onSelect={setEmailId} />}
         {tab === 'activity' && <ActivityTimeline orderId={orderId} onOpenEmail={openEmail} />}
       </div>
