@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.9.0
+ * OpenAPI spec version: 0.10.0
  */
 import type { OrderStatus } from './orderStatus';
 import type { Priority } from './priority';
@@ -77,4 +77,13 @@ export interface Order {
   priority: Priority;
   createdAt: Date;
   updatedAt: Date;
+  /**
+     * Set while the order is in the Bin
+     * @nullable
+     */
+  archivedAt?: Date | null;
+  /** @nullable */
+  archivedBy?: string | null;
+  /** @nullable */
+  archiveReason?: string | null;
 }

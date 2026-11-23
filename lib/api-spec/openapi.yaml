@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.9.0
+  version: 0.10.0
   description: B.K. Textile operations API
 servers:
   - url: /api
@@ -26,6 +26,8 @@ tags:
     description: Order lines, colour x size grid, fabrics and trims
   - name: order-emails
     description: Source emails and attachments linked to an order
+  - name: bin
+    description: "The Bin: deleted orders, files, emails and documents. Restorable; only an administrator can empty it"
   - name: admin
     description: Restricted operations (ADMIN_USER_IDS only)
   - name: work
@@ -199,6 +201,80 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/OrderFile" }
         "404": { description: Order or pending file not found }
+  /orders/{orderId}/archive:
+    post:
+      operationId: archiveOrder
+      tags: [bin]
+      summary: Delete an order (moves it to the Bin; restorable)
+      description: >-
+        The order disappears from lists and dashboards and cannot be changed
+        until restored. It keeps its BK invoice number. Needs Write access to
+        merchandising.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArchiveRequest" }
+      responses:
+        "200":
+          description: The order, now in the Bin
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "404": { description: Order not found }
+        "409": { description: Already in the Bin }
+  /orders/{orderId}/restore:
+    post:
+      operationId: restoreOrder
+      tags: [bin]
+      summary: Restore an order from the Bin
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: The restored order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "404": { description: Order not found }
+        "409": { description: Not in the Bin }
+  /orders/{orderId}/files/{fileId}/archive:
+    post:
+      operationId: archiveOrderFile
+      tags: [bin]
+      summary: Delete an image or file from an order (moves it to the Bin)
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArchiveRequest" }
+      responses:
+        "204": { description: Moved to the Bin }
+        "404": { description: File not found }
+        "409": { description: Already in the Bin }
+  /orders/{orderId}/files/{fileId}/restore:
+    post:
+      operationId: restoreOrderFile
+      tags: [bin]
+      summary: Restore an image or file from the Bin
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Restored }
+        "404": { description: File not found }
+        "409": { description: Not in the Bin }
   /orders/{orderId}/files/{fileId}/content:
     get:
       operationId: downloadOrderFile
@@ -521,6 +597,43 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/OrderDocument" }
         "403": { description: Not allowed to approve this document }
+  /orders/{orderId}/documents/{documentId}/archive:
+    post:
+      operationId: archiveOrderDocument
+      tags: [bin]
+      summary: Delete a document (moves it to the Bin)
+      description: >-
+        Drafts and documents in review: anyone with Write access to
+        merchandising. Approved or superseded documents: administrators only.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArchiveRequest" }
+      responses:
+        "204": { description: Moved to the Bin }
+        "403": { description: Approved document and not an administrator }
+        "404": { description: Document not found }
+        "409": { description: Already in the Bin }
+  /orders/{orderId}/documents/{documentId}/restore:
+    post:
+      operationId: restoreOrderDocument
+      tags: [bin]
+      summary: Restore a document from the Bin
+      description: >-
+        An approved document can only be restored by an administrator. If
+        another revision is in progress a draft cannot be restored (409).
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "204": { description: Restored }
+        "403": { description: Approved document and not an administrator }
+        "404": { description: Document not found }
+        "409": { description: Not in the Bin or another revision is in progress }
   /orders/{orderId}/documents/{documentId}/files/{format}:
     get:
       operationId: downloadOrderDocumentFile
@@ -668,6 +781,68 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/OrderEmail" }
         "404": { description: Order not found }
+    post:
+      operationId: uploadOrderEmail
+      tags: [order-emails]
+      summary: Add an email to an order by uploading it (.eml)
+      description: >-
+        For an email that did not reach orders@ (or was not matched). The email
+        is linked to this order and the order is rebuilt from all its emails in
+        date order (PO and trims sheets applied). Maximum 25 MB.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EmailUpload" }
+      responses:
+        "200":
+          description: The email was added and the order rebuilt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailUploadResult" }
+        "400": { description: Not a readable .eml file or too large }
+        "409": { description: Already on the order or the order is in the Bin }
+  /orders/{orderId}/emails/{emailId}/archive:
+    post:
+      operationId: archiveOrderEmail
+      tags: [order-emails]
+      summary: Remove an email from an order (moves it to the Bin) and rebuild the order
+      description: >-
+        Data that came only from this email (sizes, trims, lines...) is cleared
+        and the remaining emails are applied again in date order. Values typed
+        in by hand are kept.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/EmailId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArchiveRequest" }
+      responses:
+        "200":
+          description: How the order was rebuilt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RebuildReport" }
+        "404": { description: Email not linked to this order }
+  /orders/{orderId}/emails/{emailId}/restore:
+    post:
+      operationId: restoreOrderEmail
+      tags: [order-emails]
+      summary: Put a removed email back on the order (or confirm a needs-review one) and rebuild the order
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/EmailId"
+      responses:
+        "200":
+          description: How the order was rebuilt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RebuildReport" }
+        "404": { description: Email not linked to this order }
   /orders/{orderId}/emails/{emailId}:
     get:
       operationId: getOrderEmail
@@ -773,6 +948,43 @@ paths:
         "403": { description: Not an admin }
         "404": { description: Order not found }
         "409": { description: "Invoice number already used by another order, or order has no buyer" }
+  /bin:
+    get:
+      operationId: listBin
+      tags: [bin]
+      summary: Everything in the Bin, newest first
+      responses:
+        "200":
+          description: Items in the Bin
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BinItem" }
+  /admin/bin/{kind}/{orderId}/{itemId}:
+    delete:
+      operationId: purgeBinItem
+      tags: [bin]
+      summary: Permanently delete one item from the Bin (administrators only)
+      description: >-
+        Removes the item and its stored files for good. Purging an order also
+        removes its lines, files, documents and the emails that belong only to
+        it; its BK invoice number is retired and never reused.
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/BinItemKind" }
+        - $ref: "#/components/parameters/OrderId"
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Deleted for good }
+        "403": { description: Not an administrator }
+        "404": { description: Not found }
+        "409": { description: Not in the Bin }
   /admin/users:
     get:
       operationId: listUsers
@@ -1115,6 +1327,9 @@ components:
         priority: { $ref: "#/components/schemas/Priority" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        archivedAt: { type: ["string", "null"], format: date-time, description: "Set while the order is in the Bin" }
+        archivedBy: { type: ["string", "null"] }
+        archiveReason: { type: ["string", "null"] }
     OrderInput:
       type: object
       description: Creating an order assigns the next BK invoice number. A PO number is required. Give buyerId, or a buyer name/abbreviation that matches a known buyer.
@@ -1349,6 +1564,7 @@ components:
             pdfSha256: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        archivedAt: { type: ["string", "null"], format: date-time, description: "Set while the document is in the Bin" }
         data:
           description: Present on single-document responses
           oneOf:
@@ -1714,7 +1930,7 @@ components:
       enum: [matched, needs_review, ignored]
     EmailMatchMethod:
       type: string
-      enum: [po_subject, invoice_ref, thread, po_body_only, manual]
+      enum: [po_subject, invoice_ref, thread, po_body_only, manual, uploaded]
     EmailAttachment:
       type: object
       required: [id, filename, contentType, sizeBytes, isInline, extractStatus, orderFileId]
@@ -1807,6 +2023,59 @@ components:
                     changes: { type: integer }
                     warnings: { type: array, items: { type: string } }
                     skipped: { type: ["string", "null"] }
+    RebuildReport:
+      allOf:
+        - $ref: "#/components/schemas/ReapplyReport"
+        - type: object
+          required: [cleared]
+          properties:
+            cleared:
+              type: object
+              description: What was cleared because it came only from emails no longer on the order
+              required: [sizes, trims, fabrics, colours, lines, header]
+              properties:
+                sizes: { type: integer }
+                trims: { type: integer }
+                fabrics: { type: integer }
+                colours: { type: integer }
+                lines: { type: integer }
+                header: { type: boolean, description: "The order header had come from a removed email" }
+    ArchiveRequest:
+      type: object
+      properties:
+        reason: { type: ["string", "null"], maxLength: 500, description: Optional note shown in the Bin }
+    EmailUpload:
+      type: object
+      required: [contentBase64]
+      properties:
+        filename: { type: string, description: "Original file name, e.g. PO 36572.eml" }
+        contentBase64: { type: string, description: The .eml file encoded as base64 }
+    EmailUploadResult:
+      type: object
+      required: [emailId, warnings, rebuild]
+      properties:
+        emailId: { type: string, format: uuid }
+        warnings: { type: array, items: { type: string } }
+        rebuild: { $ref: "#/components/schemas/RebuildReport" }
+    BinItemKind:
+      type: string
+      enum: [order, file, email, document]
+    BinItem:
+      type: object
+      required: [kind, id, orderId, orderRef, poNumber, title, detail, archivedAt, archivedBy, reason, canRestore, canPurge]
+      properties:
+        kind: { $ref: "#/components/schemas/BinItemKind" }
+        id: { type: string, format: uuid, description: "The order, file, email or document id" }
+        orderId: { type: string, format: uuid }
+        orderRef: { type: string, description: "BK invoice reference, or the order reference" }
+        poNumber: { type: ["string", "null"] }
+        title: { type: string }
+        detail: { type: ["string", "null"] }
+        archivedAt: { type: string, format: date-time }
+        archivedBy: { type: ["string", "null"] }
+        reason: { type: ["string", "null"] }
+        canRestore: { type: boolean }
+        canPurge: { type: boolean, description: Only administrators can empty the Bin }
     IntakeRunRequest:
       type: object
       required: [dryRun]

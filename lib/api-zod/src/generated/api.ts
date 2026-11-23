@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.9.0
+ * OpenAPI spec version: 0.10.0
  */
 import * as zod from 'zod';
 
@@ -88,7 +88,10 @@ export const GetOrdersResponseItem = zod.object({
   "status": zod.enum(['draft', 'development', 'in_production', 'ready_to_ship', 'shipped']),
   "priority": zod.enum(['low', 'normal', 'high', 'urgent']),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the order is in the Bin'),
+  "archivedBy": zod.string().nullish(),
+  "archiveReason": zod.string().nullish()
 })
 export const GetOrdersResponse = zod.array(GetOrdersResponseItem)
 
@@ -162,7 +165,10 @@ export const CreateOrderResponse = zod.object({
   "status": zod.enum(['draft', 'development', 'in_production', 'ready_to_ship', 'shipped']),
   "priority": zod.enum(['low', 'normal', 'high', 'urgent']),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the order is in the Bin'),
+  "archivedBy": zod.string().nullish(),
+  "archiveReason": zod.string().nullish()
 })
 
 
@@ -203,7 +209,10 @@ export const GetOrderResponse = zod.object({
   "status": zod.enum(['draft', 'development', 'in_production', 'ready_to_ship', 'shipped']),
   "priority": zod.enum(['low', 'normal', 'high', 'urgent']),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the order is in the Bin'),
+  "archivedBy": zod.string().nullish(),
+  "archiveReason": zod.string().nullish()
 })
 
 
@@ -285,7 +294,10 @@ export const UpdateOrderResponse = zod.object({
   "status": zod.enum(['draft', 'development', 'in_production', 'ready_to_ship', 'shipped']),
   "priority": zod.enum(['low', 'normal', 'high', 'urgent']),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the order is in the Bin'),
+  "archivedBy": zod.string().nullish(),
+  "archiveReason": zod.string().nullish()
 })
 
 
@@ -378,6 +390,133 @@ export const CompleteOrderFileUploadResponse = zod.object({
   "uploadedByName": zod.string(),
   "uploadedAt": zod.coerce.date()
 })
+
+
+/**
+ * The order disappears from lists and dashboards and cannot be changed until restored. It keeps its BK invoice number. Needs Write access to merchandising.
+ * @summary Delete an order (moves it to the Bin; restorable)
+ */
+export const ArchiveOrderParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const archiveOrderBodyReasonMax = 500;
+
+
+
+export const ArchiveOrderBody = zod.object({
+  "reason": zod.string().max(archiveOrderBodyReasonMax).nullish().describe('Optional note shown in the Bin')
+})
+
+export const ArchiveOrderResponse = zod.object({
+  "id": zod.string().uuid(),
+  "reference": zod.string(),
+  "buyer": zod.string(),
+  "buyerId": zod.string().uuid().nullable(),
+  "invoiceNumber": zod.number().int().nullable().describe('BK invoice number, e.g. 4040'),
+  "invoiceRef": zod.string().nullable().describe('BK invoice reference, e.g. 4040/BK-SAS/2026'),
+  "poReceivedAt": zod.coerce.date().nullable(),
+  "poIssueDate": zod.coerce.date().nullable(),
+  "endCustomer": zod.string().nullable(),
+  "priceTerms": zod.string().nullable(),
+  "paymentTerms": zod.string().nullable(),
+  "shipVia": zod.string().nullable(),
+  "countryOfOrigin": zod.string().nullable(),
+  "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
+  "responsibleUserId": zod.string().nullish().describe('Merchandiser responsible for the order (may approve its documents)'),
+  "pcsPerCarton": zod.number().int().nullish().describe('Pieces per export carton (from the PO packing method'),
+  "garmentDescription": zod.string().nullish().describe('Garment description used on documents'),
+  "agencyName": zod.string().nullable(),
+  "previousOrderReference": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "currencyCode": zod.string().nullable(),
+  "poNumber": zod.string().nullish(),
+  "style": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number().int(),
+  "deliveryDate": zod.coerce.date(),
+  "status": zod.enum(['draft', 'development', 'in_production', 'ready_to_ship', 'shipped']),
+  "priority": zod.enum(['low', 'normal', 'high', 'urgent']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the order is in the Bin'),
+  "archivedBy": zod.string().nullish(),
+  "archiveReason": zod.string().nullish()
+})
+
+
+/**
+ * @summary Restore an order from the Bin
+ */
+export const RestoreOrderParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const RestoreOrderResponse = zod.object({
+  "id": zod.string().uuid(),
+  "reference": zod.string(),
+  "buyer": zod.string(),
+  "buyerId": zod.string().uuid().nullable(),
+  "invoiceNumber": zod.number().int().nullable().describe('BK invoice number, e.g. 4040'),
+  "invoiceRef": zod.string().nullable().describe('BK invoice reference, e.g. 4040/BK-SAS/2026'),
+  "poReceivedAt": zod.coerce.date().nullable(),
+  "poIssueDate": zod.coerce.date().nullable(),
+  "endCustomer": zod.string().nullable(),
+  "priceTerms": zod.string().nullable(),
+  "paymentTerms": zod.string().nullable(),
+  "shipVia": zod.string().nullable(),
+  "countryOfOrigin": zod.string().nullable(),
+  "overShipTolerancePct": zod.number().nullable().describe('e.g. 3 for 3% over PO quantity allowed'),
+  "responsibleUserId": zod.string().nullish().describe('Merchandiser responsible for the order (may approve its documents)'),
+  "pcsPerCarton": zod.number().int().nullish().describe('Pieces per export carton (from the PO packing method'),
+  "garmentDescription": zod.string().nullish().describe('Garment description used on documents'),
+  "agencyName": zod.string().nullable(),
+  "previousOrderReference": zod.string().nullable(),
+  "orderValue": zod.number().nullable(),
+  "currencyCode": zod.string().nullable(),
+  "poNumber": zod.string().nullish(),
+  "style": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number().int(),
+  "deliveryDate": zod.coerce.date(),
+  "status": zod.enum(['draft', 'development', 'in_production', 'ready_to_ship', 'shipped']),
+  "priority": zod.enum(['low', 'normal', 'high', 'urgent']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the order is in the Bin'),
+  "archivedBy": zod.string().nullish(),
+  "archiveReason": zod.string().nullish()
+})
+
+
+/**
+ * @summary Delete an image or file from an order (moves it to the Bin)
+ */
+export const ArchiveOrderFileParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "fileId": zod.coerce.string().uuid()
+})
+
+export const archiveOrderFileBodyReasonMax = 500;
+
+
+
+export const ArchiveOrderFileBody = zod.object({
+  "reason": zod.string().max(archiveOrderFileBodyReasonMax).nullish().describe('Optional note shown in the Bin')
+})
+
+export const ArchiveOrderFileResponse = zod.void()
+
+
+/**
+ * @summary Restore an image or file from the Bin
+ */
+export const RestoreOrderFileParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "fileId": zod.coerce.string().uuid()
+})
+
+export const RestoreOrderFileResponse = zod.void()
 
 
 /**
@@ -911,6 +1050,7 @@ export const ListOrderDocumentsResponseItem = zod.object({
 }).nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the document is in the Bin'),
   "data": zod.union([zod.object({
   "type": zod.enum(['cutting_program', 'packing_list']),
   "docNumber": zod.string(),
@@ -1030,6 +1170,7 @@ export const CreateOrderDocumentResponse = zod.object({
 }).nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the document is in the Bin'),
   "data": zod.union([zod.object({
   "type": zod.enum(['cutting_program', 'packing_list']),
   "docNumber": zod.string(),
@@ -1145,6 +1286,7 @@ export const GetOrderDocumentResponse = zod.object({
 }).nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the document is in the Bin'),
   "data": zod.union([zod.object({
   "type": zod.enum(['cutting_program', 'packing_list']),
   "docNumber": zod.string(),
@@ -1286,6 +1428,7 @@ export const UpdateOrderDocumentResponse = zod.object({
 }).nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the document is in the Bin'),
   "data": zod.union([zod.object({
   "type": zod.enum(['cutting_program', 'packing_list']),
   "docNumber": zod.string(),
@@ -1401,6 +1544,7 @@ export const SubmitOrderDocumentResponse = zod.object({
 }).nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the document is in the Bin'),
   "data": zod.union([zod.object({
   "type": zod.enum(['cutting_program', 'packing_list']),
   "docNumber": zod.string(),
@@ -1524,6 +1668,7 @@ export const RequestOrderDocumentChangesResponse = zod.object({
 }).nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the document is in the Bin'),
   "data": zod.union([zod.object({
   "type": zod.enum(['cutting_program', 'packing_list']),
   "docNumber": zod.string(),
@@ -1648,6 +1793,7 @@ export const ApproveOrderDocumentResponse = zod.object({
 }).nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the document is in the Bin'),
   "data": zod.union([zod.object({
   "type": zod.enum(['cutting_program', 'packing_list']),
   "docNumber": zod.string(),
@@ -1706,6 +1852,38 @@ export const ApproveOrderDocumentResponse = zod.object({
   "problems": zod.array(zod.string()).describe('Must be fixed before submitting')
 }),zod.null()]).describe('Present on single-document responses')
 })
+
+
+/**
+ * Drafts and documents in review: anyone with Write access to merchandising. Approved or superseded documents: administrators only.
+ * @summary Delete a document (moves it to the Bin)
+ */
+export const ArchiveOrderDocumentParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "documentId": zod.coerce.string().uuid()
+})
+
+export const archiveOrderDocumentBodyReasonMax = 500;
+
+
+
+export const ArchiveOrderDocumentBody = zod.object({
+  "reason": zod.string().max(archiveOrderDocumentBodyReasonMax).nullish().describe('Optional note shown in the Bin')
+})
+
+export const ArchiveOrderDocumentResponse = zod.void()
+
+
+/**
+ * An approved document can only be restored by an administrator. If another revision is in progress a draft cannot be restored (409).
+ * @summary Restore a document from the Bin
+ */
+export const RestoreOrderDocumentParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "documentId": zod.coerce.string().uuid()
+})
+
+export const RestoreOrderDocumentResponse = zod.void()
 
 
 /**
@@ -1770,6 +1948,7 @@ export const ListDocumentsAwaitingApprovalResponseItem = zod.object({
 }).nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the document is in the Bin'),
   "data": zod.union([zod.object({
   "type": zod.enum(['cutting_program', 'packing_list']),
   "docNumber": zod.string(),
@@ -2040,7 +2219,7 @@ export const GetOrderEmailsResponseItem = zod.object({
   "category": zod.enum(['order_details', 'tech_pack', 'trims_accessories', 'sample_requirements', 'packaging', 'amendment', 'other', 'unclassified']),
   "parseStatus": zod.enum(['pending', 'parsed', 'partial', 'failed']),
   "matchStatus": zod.enum(['matched', 'needs_review', 'ignored']),
-  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual']),
+  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual', 'uploaded']),
   "matchReason": zod.string().nullable(),
   "matchedAt": zod.coerce.date(),
   "attachments": zod.array(zod.object({
@@ -2054,6 +2233,129 @@ export const GetOrderEmailsResponseItem = zod.object({
 }))
 })
 export const GetOrderEmailsResponse = zod.array(GetOrderEmailsResponseItem)
+
+
+/**
+ * For an email that did not reach orders@ (or was not matched). The email is linked to this order and the order is rebuilt from all its emails in date order (PO and trims sheets applied). Maximum 25 MB.
+ * @summary Add an email to an order by uploading it (.eml)
+ */
+export const UploadOrderEmailParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const UploadOrderEmailBody = zod.object({
+  "filename": zod.string().optional().describe('Original file name, e.g. PO 36572.eml'),
+  "contentBase64": zod.string().describe('The .eml file encoded as base64')
+})
+
+export const UploadOrderEmailResponse = zod.object({
+  "emailId": zod.string().uuid(),
+  "warnings": zod.array(zod.string()),
+  "rebuild": zod.object({
+  "orderId": zod.string().uuid(),
+  "emails": zod.array(zod.object({
+  "emailId": zod.string().uuid(),
+  "subject": zod.string(),
+  "previousDate": zod.coerce.date().nullable(),
+  "originalDate": zod.coerce.date().nullable(),
+  "attachments": zod.array(zod.object({
+  "filename": zod.string(),
+  "kind": zod.string(),
+  "changes": zod.number().int(),
+  "warnings": zod.array(zod.string()),
+  "skipped": zod.string().nullable()
+}))
+}))
+}).and(zod.object({
+  "cleared": zod.object({
+  "sizes": zod.number().int(),
+  "trims": zod.number().int(),
+  "fabrics": zod.number().int(),
+  "colours": zod.number().int(),
+  "lines": zod.number().int(),
+  "header": zod.boolean().describe('The order header had come from a removed email')
+}).describe('What was cleared because it came only from emails no longer on the order')
+}))
+})
+
+
+/**
+ * Data that came only from this email (sizes, trims, lines...) is cleared and the remaining emails are applied again in date order. Values typed in by hand are kept.
+ * @summary Remove an email from an order (moves it to the Bin) and rebuild the order
+ */
+export const ArchiveOrderEmailParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "emailId": zod.coerce.string().uuid()
+})
+
+export const archiveOrderEmailBodyReasonMax = 500;
+
+
+
+export const ArchiveOrderEmailBody = zod.object({
+  "reason": zod.string().max(archiveOrderEmailBodyReasonMax).nullish().describe('Optional note shown in the Bin')
+})
+
+export const ArchiveOrderEmailResponse = zod.object({
+  "orderId": zod.string().uuid(),
+  "emails": zod.array(zod.object({
+  "emailId": zod.string().uuid(),
+  "subject": zod.string(),
+  "previousDate": zod.coerce.date().nullable(),
+  "originalDate": zod.coerce.date().nullable(),
+  "attachments": zod.array(zod.object({
+  "filename": zod.string(),
+  "kind": zod.string(),
+  "changes": zod.number().int(),
+  "warnings": zod.array(zod.string()),
+  "skipped": zod.string().nullable()
+}))
+}))
+}).and(zod.object({
+  "cleared": zod.object({
+  "sizes": zod.number().int(),
+  "trims": zod.number().int(),
+  "fabrics": zod.number().int(),
+  "colours": zod.number().int(),
+  "lines": zod.number().int(),
+  "header": zod.boolean().describe('The order header had come from a removed email')
+}).describe('What was cleared because it came only from emails no longer on the order')
+}))
+
+
+/**
+ * @summary Put a removed email back on the order (or confirm a needs-review one) and rebuild the order
+ */
+export const RestoreOrderEmailParams = zod.object({
+  "orderId": zod.coerce.string().uuid(),
+  "emailId": zod.coerce.string().uuid()
+})
+
+export const RestoreOrderEmailResponse = zod.object({
+  "orderId": zod.string().uuid(),
+  "emails": zod.array(zod.object({
+  "emailId": zod.string().uuid(),
+  "subject": zod.string(),
+  "previousDate": zod.coerce.date().nullable(),
+  "originalDate": zod.coerce.date().nullable(),
+  "attachments": zod.array(zod.object({
+  "filename": zod.string(),
+  "kind": zod.string(),
+  "changes": zod.number().int(),
+  "warnings": zod.array(zod.string()),
+  "skipped": zod.string().nullable()
+}))
+}))
+}).and(zod.object({
+  "cleared": zod.object({
+  "sizes": zod.number().int(),
+  "trims": zod.number().int(),
+  "fabrics": zod.number().int(),
+  "colours": zod.number().int(),
+  "lines": zod.number().int(),
+  "header": zod.boolean().describe('The order header had come from a removed email')
+}).describe('What was cleared because it came only from emails no longer on the order')
+}))
 
 
 /**
@@ -2074,7 +2376,7 @@ export const GetOrderEmailResponse = zod.object({
   "category": zod.enum(['order_details', 'tech_pack', 'trims_accessories', 'sample_requirements', 'packaging', 'amendment', 'other', 'unclassified']),
   "parseStatus": zod.enum(['pending', 'parsed', 'partial', 'failed']),
   "matchStatus": zod.enum(['matched', 'needs_review', 'ignored']),
-  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual']),
+  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual', 'uploaded']),
   "matchReason": zod.string().nullable(),
   "matchedAt": zod.coerce.date(),
   "attachments": zod.array(zod.object({
@@ -2117,7 +2419,7 @@ export const UpdateOrderEmailResponse = zod.object({
   "category": zod.enum(['order_details', 'tech_pack', 'trims_accessories', 'sample_requirements', 'packaging', 'amendment', 'other', 'unclassified']),
   "parseStatus": zod.enum(['pending', 'parsed', 'partial', 'failed']),
   "matchStatus": zod.enum(['matched', 'needs_review', 'ignored']),
-  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual']),
+  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual', 'uploaded']),
   "matchReason": zod.string().nullable(),
   "matchedAt": zod.coerce.date(),
   "attachments": zod.array(zod.object({
@@ -2225,8 +2527,44 @@ export const SetOrderInvoiceNumberResponse = zod.object({
   "status": zod.enum(['draft', 'development', 'in_production', 'ready_to_ship', 'shipped']),
   "priority": zod.enum(['low', 'normal', 'high', 'urgent']),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "archivedAt": zod.coerce.date().nullish().describe('Set while the order is in the Bin'),
+  "archivedBy": zod.string().nullish(),
+  "archiveReason": zod.string().nullish()
 })
+
+
+/**
+ * @summary Everything in the Bin, newest first
+ */
+export const ListBinResponseItem = zod.object({
+  "kind": zod.enum(['order', 'file', 'email', 'document']),
+  "id": zod.string().uuid().describe('The order, file, email or document id'),
+  "orderId": zod.string().uuid(),
+  "orderRef": zod.string().describe('BK invoice reference, or the order reference'),
+  "poNumber": zod.string().nullable(),
+  "title": zod.string(),
+  "detail": zod.string().nullable(),
+  "archivedAt": zod.coerce.date(),
+  "archivedBy": zod.string().nullable(),
+  "reason": zod.string().nullable(),
+  "canRestore": zod.boolean(),
+  "canPurge": zod.boolean().describe('Only administrators can empty the Bin')
+})
+export const ListBinResponse = zod.array(ListBinResponseItem)
+
+
+/**
+ * Removes the item and its stored files for good. Purging an order also removes its lines, files, documents and the emails that belong only to it; its BK invoice number is retired and never reused.
+ * @summary Permanently delete one item from the Bin (administrators only)
+ */
+export const PurgeBinItemParams = zod.object({
+  "kind": zod.enum(['order', 'file', 'email', 'document']),
+  "orderId": zod.coerce.string().uuid(),
+  "itemId": zod.coerce.string().uuid()
+})
+
+export const PurgeBinItemResponse = zod.void()
 
 
 /**

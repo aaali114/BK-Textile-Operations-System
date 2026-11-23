@@ -44,6 +44,10 @@ export const documentsTable = pgTable(
     xlsxSha256: text("xlsx_sha256"),
     pdfSha256: text("pdf_sha256"),
     supersedesId: uuid("supersedes_id"),
+    // Archive ("Bin"): hidden from normal lists, restorable; only an administrator can purge it for good.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedBy: text("archived_by"),
+    archiveReason: text("archive_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
   },
@@ -52,7 +56,7 @@ export const documentsTable = pgTable(
     // at most one document in progress per order and type
     uniqueIndex("bk_documents_one_open_per_type")
       .on(t.orderId, t.type)
-      .where(sql`${t.status} IN ('draft', 'in_review', 'changes_requested')`),
+      .where(sql`${t.status} IN ('draft', 'in_review', 'changes_requested') AND ${t.archivedAt} IS NULL`),
     index("bk_documents_status_idx").on(t.status),
   ],
 );

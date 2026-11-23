@@ -43,6 +43,10 @@ export interface BlobStore {
 export interface BlobReader {
   get(objectPath: string): Promise<Buffer>;
 }
+/** Removes stored files when something is purged from the Bin. Missing files are not an error. */
+export interface BlobRemover {
+  remove(objectPath: string): Promise<void>;
+}
 
 type AttachmentPlan = {
   filename: string;

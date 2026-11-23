@@ -11,10 +11,11 @@ import orderEmailsRouter from "./orderEmails";
 import adminRouter from "./admin";
 import dashboardsRouter from "./dashboards";
 import { createDocumentsRouter } from "./documents";
-import type { BlobReader, BlobStore } from "../intake/run";
+import { createArchiveRouter } from "./archive";
+import type { BlobReader, BlobRemover, BlobStore } from "../intake/run";
 
 /** The API, behind the access guard (default deny; see RULES in lib/access.ts). */
-export function createApiRouter(opts: { getUserId?: (req: import("express").Request) => string | null; lookup?: ProfileLookup; blobs?: BlobStore & BlobReader } = {}): IRouter {
+export function createApiRouter(opts: { getUserId?: (req: import("express").Request) => string | null; lookup?: ProfileLookup; blobs?: BlobStore & BlobReader & BlobRemover } = {}): IRouter {
   const router: IRouter = Router();
   router.use(accessGuard(opts));
   router.use(healthRouter);
@@ -25,6 +26,7 @@ export function createApiRouter(opts: { getUserId?: (req: import("express").Requ
   router.use(orderDetailRouter);
   router.use(orderEmailsRouter);
   router.use(createDocumentsRouter(opts.blobs));
+  router.use(createArchiveRouter(opts.blobs));
   router.use(adminRouter);
   router.use(workRouter);
   router.use(materialsRouter);

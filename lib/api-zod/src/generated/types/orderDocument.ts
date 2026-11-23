@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.9.0
+ * OpenAPI spec version: 0.10.0
  */
 import type { DocumentData } from './documentData';
 import type { DocumentStatus } from './documentStatus';
@@ -47,6 +47,11 @@ export interface OrderDocument {
   files: OrderDocumentFiles;
   createdAt: Date;
   updatedAt: Date;
+  /**
+     * Set while the document is in the Bin
+     * @nullable
+     */
+  archivedAt?: Date | null;
   /** Present on single-document responses */
   data: DocumentData | null;
 }

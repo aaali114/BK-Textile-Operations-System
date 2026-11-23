@@ -21,8 +21,9 @@ export const sourceEmailsTable = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     mailbox: text("mailbox").notNull(),
     imapFolder: text("imap_folder").notNull(),
-    imapUidvalidity: bigint("imap_uidvalidity", { mode: "number" }).notNull(),
-    imapUid: bigint("imap_uid", { mode: "number" }).notNull(),
+    // Null for an email a staff member uploaded (.eml) instead of the mailbox reader fetching it.
+    imapUidvalidity: bigint("imap_uidvalidity", { mode: "number" }),
+    imapUid: bigint("imap_uid", { mode: "number" }),
     // RFC 5322 Message-ID. Unique so the same email forwarded from both
     // primary mailboxes is stored once.
     messageId: text("message_id").notNull().unique(),
@@ -71,9 +72,9 @@ export const sourceEmailOrdersTable = pgTable(
     orderId: uuid("order_id")
       .notNull()
       .references(() => ordersTable.id, { onDelete: "cascade" }),
-    // matched | needs_review | ignored
+    // matched | needs_review | ignored (removed from the order by staff)
     matchStatus: text("match_status").notNull(),
-    // po_subject | invoice_ref | thread | po_body_only | manual
+    // po_subject | invoice_ref | thread | po_body_only | manual | uploaded
     matchMethod: text("match_method").notNull(),
     // Human-readable evidence, e.g. 'subject: "PO# 36572"'.
     matchReason: text("match_reason"),
@@ -81,6 +82,10 @@ export const sourceEmailOrdersTable = pgTable(
     // Set when staff confirm or override a needs_review link.
     reviewedBy: text("reviewed_by"),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    // matchStatus "ignored" = removed from the order (in the Bin); restoring sets it back to "matched".
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedBy: text("archived_by"),
+    archiveReason: text("archive_reason"),
   },
   (t) => [
     unique("bk_source_email_orders_email_order_unique").on(t.emailId, t.orderId),

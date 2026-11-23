@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.9.0
+ * OpenAPI spec version: 0.10.0
  */
 
 export type DocumentDataOrder = {

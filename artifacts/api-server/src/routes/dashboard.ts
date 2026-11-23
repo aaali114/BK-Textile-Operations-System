@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, ne } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, ne } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import { GetDashboardSummaryResponse } from "@workspace/api-zod";
 import { activityTable, db, materialLotsTable, ordersTable, workItemsTable } from "@workspace/db";
@@ -9,7 +9,7 @@ const router: IRouter = Router();
 router.get("/dashboard/summary", async (_req, res): Promise<void> => {
   const access = accessFrom(res)!;
   const [orders, workItems, materials, activity] = await Promise.all([
-    db.select().from(ordersTable),
+    db.select().from(ordersTable).where(isNull(ordersTable.archivedAt)),
     db
       .select({
         id: workItemsTable.id,
@@ -20,7 +20,9 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
         status: workItemsTable.status,
         priority: workItemsTable.priority,
       })
-      .from(workItemsTable),
+      .from(workItemsTable)
+      .innerJoin(ordersTable, eq(ordersTable.id, workItemsTable.orderId))
+      .where(isNull(ordersTable.archivedAt)),
     db.select().from(materialLotsTable),
     db.select().from(activityTable).orderBy(desc(activityTable.occurredAt)).limit(100),
   ]);

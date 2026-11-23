@@ -372,3 +372,60 @@ Build in `artifacts/bk-textile` only, using the generated hooks.
    `useSaveCompanyProfile`).
 8. Users & access: the two new permissions **Prepare documents** and
    **Approve documents** appear with the other special permissions.
+
+## Brief: delete buttons, the Bin and email upload (API 0.10.0)
+
+Backend is merged; regenerate nothing (generated clients are already in the
+repo). Frontend only (`artifacts/bk-textile`). "Delete" everywhere means
+**move to the Bin** (restorable); say so in the confirm dialog: "Move to the
+Bin? You can restore it from the Bin." Ask for an optional reason (≤500
+characters) in the same dialog.
+
+1. **Order page:** "Delete order" button (merchandising Write;
+   `useArchiveOrder`). When `order.archivedAt` is set (order opened from the
+   Bin or by link), show a banner "This order is in the Bin — deleted by
+   {archivedBy} on {archivedAt}{: reason}" with a "Restore" button
+   (`useRestoreOrder`) and hide/disable all editing, uploads and document
+   actions (the API refuses them with 409).
+2. **Images and files** (order files panel): a delete (trash) icon on each
+   file and image card (`useArchiveOrderFile`). Deleted files disappear from
+   the list.
+3. **Emails tab:**
+   - "Remove from order" on each email (`useArchiveOrderEmail`). Confirm text:
+     "Remove this email from the order? Details that came only from this
+     email (sizes, trims, prices…) will be removed and the order rebuilt from
+     its other emails. Values typed in by hand are kept." Afterwards refetch
+     the order, breakdown, trims, fabrics, emails and activity, and show a
+     short summary from the response `cleared` (e.g. "Removed 5 trims").
+   - "Add email" button: file picker for **.eml** files (≤ 25 MB), read as
+     base64 and send `{ filename, contentBase64 }` (`useUploadOrderEmail`).
+     Show `warnings` (e.g. "The email does not mention PO 36572") and refetch
+     as above. Show the API's error text on 400/409 (e.g. .msg not supported,
+     already on the order). Help text: "Save the email from your mail program
+     as .eml (Gmail: ⋮ → Download message; Outlook on the web/Thunderbird/
+     Apple Mail: drag the email to your desktop or Save As). Or simply
+     forward it to orders@bktextile.com."
+   - Emails with `matchStatus` `needs_review`: "Confirm" now uses
+     `useRestoreOrderEmail` (confirms and applies the email's data);
+     "Not this order" uses `useArchiveOrderEmail`.
+4. **Documents:** a delete action on drafts / in-review / changes-requested
+   documents (`useArchiveOrderDocument`). On approved or superseded documents
+   show it **only to administrators** (`me.role === "admin"`), with the extra
+   warning "This is an approved document. It will be removed from the order
+   but kept in the Bin." Deleted documents disappear from the list.
+5. **Bin page** (navigation item "Bin", visible with merchandising Write;
+   `useListBin`): table of items newest first — type icon (order, image/file,
+   email, document), title, detail, order (`orderRef` linking to the order,
+   PO number), deleted by / when, reason. Actions:
+   - "Restore" when `canRestore` (order → `useRestoreOrder`, file →
+     `useRestoreOrderFile`, document → `useRestoreOrderDocument`, email →
+     `useRestoreOrderEmail`, each with `orderId` and `id`).
+   - "Delete permanently" only when `canPurge` (administrators;
+     `usePurgeBinItem` with `kind`, `orderId`, `itemId = id`). Strong confirm:
+     type the order reference / file name to confirm; for orders add "Its
+     invoice number {orderRef} is retired and will not be reused. This cannot
+     be undone."
+   - Show the API error text on 403/409 (e.g. "Revision 2 is already in
+     progress…").
+   Items inside a deleted order are not listed separately; restoring the
+   order brings them back with it.
