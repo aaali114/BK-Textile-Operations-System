@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
-import { AlertTriangle, ChevronDown, FileSpreadsheet, FileText, Plus } from 'lucide-react';
-import { getListOrderDocumentsQueryKey, useCreateOrderDocument, useListOrderDocuments } from '@workspace/api-client-react';
+import { AlertTriangle, ChevronDown, FileSpreadsheet, FileText, Plus, Trash2 } from 'lucide-react';
+import { getListOrderDocumentsQueryKey, useArchiveOrderDocument, useCreateOrderDocument, useListOrderDocuments } from '@workspace/api-client-react';
 import type { DocumentType, OrderDocument } from '@workspace/api-client-react';
 import { Notice, QueryError, SkeletonRows } from '../orders/ui';
 import { apiErrorInfo, dateTimeText } from '../orders/helpers';
@@ -10,6 +10,9 @@ import { useAccess } from '../access/AccessProvider';
 import { DOC_TYPE_LABELS, canStartRevision, groupDocuments } from './doc-helpers';
 import { refreshDocuments } from './docs-cache';
 import { DocStatusBadge, DownloadButtons } from './ui';
+import { MoveToBinDialog } from '../bin/MoveToBinDialog';
+import { APPROVED_DOC_WARNING, archiveBody, canDeleteDocument, isFinalDocument } from '../bin/bin-helpers';
+import { refreshAfterBinChange } from '../bin/bin-cache';
 import './documents.css';
 
 function Facts({ doc }: { doc: OrderDocument }) {
@@ -30,6 +33,27 @@ export function DocumentsTab({ orderId }: { orderId: string }) {
   const [, setLocation] = useLocation();
   const [notice, setNotice] = useState<{ message: string; error?: boolean } | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const writable = access.canWrite('merchandising');
+  const role = access.user?.role;
+  const archiveDoc = useArchiveOrderDocument();
+  const [binTarget, setBinTarget] = useState<OrderDocument | null>(null);
+  const [binError, setBinError] = useState<string | null>(null);
+  const deletable = (d: OrderDocument) => canDeleteDocument(d.status, writable, role);
+  const askDelete = (d: OrderDocument) => { setBinError(null); setBinTarget(d); };
+  const moveToBin = (reason: string) => {
+    if (!binTarget) return;
+    const d = binTarget;
+    setBinError(null);
+    archiveDoc.mutate({ orderId, documentId: d.id, data: archiveBody(reason) }, {
+      onSuccess: () => {
+        client.setQueryData<OrderDocument[]>(getListOrderDocumentsQueryKey(orderId), (old) => old?.filter((x) => x.id !== d.id));
+        refreshAfterBinChange(client, orderId);
+        setBinTarget(null);
+        setNotice({ message: `${DOC_TYPE_LABELS[d.type]} revision ${d.revision} moved to the Bin.` });
+      },
+      onError: (err) => setBinError(apiErrorInfo(err).message),
+    });
+  };
   const start = (type: DocumentType) => {
     setNotice(null);
     create.mutate({ orderId, data: { type } }, {
@@ -56,7 +80,8 @@ export function DocumentsTab({ orderId }: { orderId: string }) {
             {doc.status === 'changes_requested' && doc.reviewNote && <p className="doc-note"><strong>Review note:</strong> {doc.reviewNote}</p>}
             <div className="doc-actions">
               <Link href={`/orders/${orderId}/documents/${doc.id}`} className="btn btn-primary doc-btn" data-testid={`link-open-document-${doc.id}`}>Open</Link>
-              <DownloadButtons doc={doc} onError={(m) => setNotice({ message: m, error: true })} />
+              {!access.locked && <DownloadButtons doc={doc} onError={(m) => setNotice({ message: m, error: true })} />}
+              {deletable(doc) && <button type="button" className="btn btn-danger-quiet doc-btn" onClick={() => askDelete(doc)} data-testid={`button-delete-document-${doc.id}`}><Trash2 size={13} />Delete</button>}
               {startable && <button type="button" className="btn btn-quiet doc-btn" disabled={create.isPending} onClick={() => start(g.type)} data-testid={`button-new-revision-${g.type}`}><Plus size={13} />{create.isPending ? 'Creating…' : 'New revision'}</button>}
             </div>
             {g.history.length > 0 && <div className="doc-history">
@@ -65,10 +90,12 @@ export function DocumentsTab({ orderId }: { orderId: string }) {
                 <span className="mono">Rev {h.revision}</span><DocStatusBadge status={h.status} />
                 <span className="doc-hist-meta">{h.preparedBy}{h.reviewedAt ? ` · ${dateTimeText(h.reviewedAt)}` : ` · ${dateTimeText(h.createdAt)}`}</span>
                 <Link href={`/orders/${orderId}/documents/${h.id}`} className="ref-link">Open</Link>
+                {deletable(h) && <button type="button" className="trash-btn doc-hist-delete" onClick={() => askDelete(h)} aria-label={`Delete revision ${h.revision}`} title="Move to the Bin" data-testid={`button-delete-document-${h.id}`}><Trash2 size={13} /></button>}
               </li>)}</ul>}
             </div>}
           </div>}
       </section>;
     })}
+    {binTarget && <MoveToBinDialog testId="dialog-delete-document" title="Delete this document?" subject={<>{DOC_TYPE_LABELS[binTarget.type]} · <span className="mono">{binTarget.docNumber}</span> · Revision {binTarget.revision}</>} warning={isFinalDocument(binTarget.status) ? APPROVED_DOC_WARNING : undefined} busy={archiveDoc.isPending} error={binError} onConfirm={moveToBin} onClose={() => setBinTarget(null)} />}
   </div>;
 }

@@ -10,7 +10,7 @@ import NotFound from '@/pages/not-found';
 import { Link, Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import {
   Activity, AlertCircle, ArrowLeft, ArrowRight, Boxes, Check, ClipboardCheck, Clock3, Factory, LayoutDashboard, LogIn, LogOut, Menu, PackageCheck,
-  Plus, Shirt, Stamp, UsersRound, X,
+  Plus, Shirt, Stamp, Trash2, UsersRound, X,
 } from 'lucide-react';
 import {
   getGetDashboardSummaryQueryKey, getGetInspectionsQueryKey, getGetMaterialsQueryKey,
@@ -135,6 +135,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <nav aria-label="Main navigation">
         {visibleNav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href !== '/' && location.startsWith(href)) ? 'active' : ''}`} data-testid={`link-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={17} strokeWidth={1.8} /><span>{label}</span></Link>)}
       </nav>
+      {access.canWrite('merchandising') && <nav aria-label="Bin"><Link href="/bin" className={`nav-link ${location === '/bin' ? 'active' : ''}`} data-testid="link-bin"><Trash2 size={17} strokeWidth={1.8} /><span>Bin</span></Link></nav>}
       {approver && <nav aria-label="Approvals"><Link href="/approvals" className={`nav-link ${location === '/approvals' ? 'active' : ''}`} data-testid="link-approvals"><Stamp size={17} strokeWidth={1.8} /><span>Awaiting my approval</span><span className="nav-count" data-testid="badge-approvals" aria-label={`${queueCount} documents awaiting approval`}>{queueCount}</span></Link></nav>}
       <div className="sidebar-foot"><span className="status-pill blue"><span className="severity-dot info" />{health.isLoading ? 'Checking service' : health.isError ? 'Service unavailable' : 'Operations service ready'}</span><div style={{ marginTop: 12 }}>Shared daily view for orders, floor work, material lots and quality control.</div></div>
       {access.canManageUsers && <nav aria-label="Administration"><Link href="/users" className={`nav-link ${location === '/users' ? 'active' : ''}`} data-testid="link-users-access"><UsersRound size={17} /><span>Users & access</span><span className="status-pill warn" data-testid="badge-pending-users" aria-label={`${pendingCount} pending users`}>{pendingCount}</span></Link></nav>}
@@ -149,7 +150,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
           <SignOutAction />
         </div>
       </header>
-      {menuOpen && <div className="mobile-nav">{visibleNav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''} onClick={() => setMenuOpen(false)}><Icon size={18} />{label}</Link>)}{approver && <Link href="/approvals" onClick={() => setMenuOpen(false)} data-testid="link-mobile-approvals"><Stamp size={18} />Approvals ({queueCount})</Link>}{access.canManageUsers && <Link href="/users" onClick={() => setMenuOpen(false)} data-testid="link-mobile-users-access"><UsersRound size={18} />Users & access ({pendingCount})</Link>}</div>}
+      {menuOpen && <div className="mobile-nav">{visibleNav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''} onClick={() => setMenuOpen(false)}><Icon size={18} />{label}</Link>)}{access.canWrite('merchandising') && <Link href="/bin" className={location === '/bin' ? 'active' : ''} onClick={() => setMenuOpen(false)} data-testid="link-mobile-bin"><Trash2 size={18} />Bin</Link>}{approver && <Link href="/approvals" onClick={() => setMenuOpen(false)} data-testid="link-mobile-approvals"><Stamp size={18} />Approvals ({queueCount})</Link>}{access.canManageUsers && <Link href="/users" onClick={() => setMenuOpen(false)} data-testid="link-mobile-users-access"><UsersRound size={18} />Users & access ({pendingCount})</Link>}</div>}
       {children}
     </div>
   </div>;
@@ -160,6 +161,7 @@ import { Orders } from '@/components/orders/OrdersPage';
 import { OrderDetails } from '@/components/orders/OrderDetailPage';
 import { DocumentPage } from '@/components/documents/DocumentPage';
 import { ApprovalQueuePage, useApprovalQueue } from '@/components/documents/ApprovalQueuePage';
+import { BinPage } from '@/components/bin/BinPage';
 
 function PublicHome() {
   return <main className="public-hero">
@@ -426,6 +428,7 @@ function Router() {
         <Route path="/orders" component={() => <ProtectedRoute area="merchandising"><AppShell><Orders /></AppShell></ProtectedRoute>} />
         <Route path="/orders/:orderId/documents/:documentId" component={() => <ProtectedRoute area="merchandising"><AppShell><DocumentPage /></AppShell></ProtectedRoute>} />
         <Route path="/approvals" component={() => <ProtectedRoute area="merchandising"><AppShell><ApprovalQueuePage /></AppShell></ProtectedRoute>} />
+        <Route path="/bin" component={() => <ProtectedRoute area="merchandising"><AppShell><BinPage /></AppShell></ProtectedRoute>} />
         <Route path="/orders/:orderId" component={() => <ProtectedRoute area="merchandising"><AppShell><OrderDetails /></AppShell></ProtectedRoute>} />
         <Route path="/workflows" component={() => <ProtectedRoute area="department_work"><AppShell><Workflows /></AppShell></ProtectedRoute>} />
         <Route path="/materials" component={() => <ProtectedRoute area="materials"><AppShell><Materials /></AppShell></ProtectedRoute>} />

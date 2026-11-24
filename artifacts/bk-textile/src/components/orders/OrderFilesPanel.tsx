@@ -1,10 +1,14 @@
 import { type ChangeEvent, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Download, FilePlus2, Shirt, Upload } from 'lucide-react';
-import { getGetOrderFilesQueryKey, useCompleteOrderFileUpload, useGetOrderFiles, useRequestOrderFileUpload } from '@workspace/api-client-react';
+import { Download, FilePlus2, Shirt, Trash2, Upload } from 'lucide-react';
+import { getGetOrderFilesQueryKey, useArchiveOrderFile, useCompleteOrderFileUpload, useGetOrderFiles, useRequestOrderFileUpload } from '@workspace/api-client-react';
 import type { OrderFile } from '@workspace/api-client-react';
 import { Notice, QueryError, SkeletonRows, errorMessage } from './ui';
 import { useAccess } from '../access/AccessProvider';
+import { apiErrorInfo } from './helpers';
+import { MoveToBinDialog } from '../bin/MoveToBinDialog';
+import { archiveBody } from '../bin/bin-helpers';
+import { refreshAfterBinChange } from '../bin/bin-cache';
 
 export function OrderFilesPanel({ orderId }: { orderId: string }) {
   const writable = useAccess().canWrite('merchandising');
@@ -14,6 +18,24 @@ export function OrderFilesPanel({ orderId }: { orderId: string }) {
   const completeUpload = useCompleteOrderFileUpload();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ message: string; error?: boolean } | null>(null);
+  const archiveFile = useArchiveOrderFile();
+  const [binTarget, setBinTarget] = useState<OrderFile | null>(null);
+  const [binError, setBinError] = useState<string | null>(null);
+  const moveToBin = (reason: string) => {
+    if (!binTarget) return;
+    const name = binTarget.originalName;
+    setBinError(null);
+    archiveFile.mutate({ orderId, fileId: binTarget.id, data: archiveBody(reason) }, {
+      onSuccess: () => {
+        client.setQueryData<OrderFile[]>(getGetOrderFilesQueryKey(orderId), (old) => old?.filter((f) => f.id !== binTarget.id));
+        refreshAfterBinChange(client, orderId);
+        setBinTarget(null);
+        setNotice({ message: `${name} moved to the Bin.` });
+      },
+      onError: (err) => setBinError(apiErrorInfo(err).message),
+    });
+  };
+  const trashButton = (file: OrderFile) => writable && <button type="button" className="trash-btn" onClick={() => { setBinError(null); setBinTarget(file); }} aria-label={`Delete ${file.originalName}`} title="Move to the Bin" data-testid={`button-delete-file-${file.id}`}><Trash2 size={15} /></button>;
   const documentsInput = useRef<HTMLInputElement>(null);
   const imagesInput = useRef<HTMLInputElement>(null);
   const files = filesQuery.data as OrderFile[] | undefined;
@@ -77,6 +99,7 @@ export function OrderFilesPanel({ orderId }: { orderId: string }) {
             <span className="document-icon"><FilePlus2 size={16} /></span>
             <div className="document-copy"><strong>{file.originalName}</strong>{fileDetails(file)}</div>
             <a className="btn btn-quiet file-download" href={`/api/orders/${orderId}/files/${file.id}/content`} aria-label={`Download ${file.originalName}`}><Download size={14} />Download</a>
+            {trashButton(file)}
           </div>) : <p className="support-note">No order documents uploaded. Files are stored privately on this order.</p>}
         </div>}
       </section>
@@ -92,11 +115,12 @@ export function OrderFilesPanel({ orderId }: { orderId: string }) {
               <img src={`/api/orders/${orderId}/files/${file.id}/preview`} alt={file.originalName} loading="lazy" />
             </a>
             <div className="document-copy"><strong>{file.originalName}</strong>{fileDetails(file)}</div>
-            <a className="icon-btn" href={`/api/orders/${orderId}/files/${file.id}/content`} aria-label={`Download ${file.originalName}`}><Download size={15} /></a>
+            <span style={{ display: 'flex', gap: 4 }}><a className="icon-btn" href={`/api/orders/${orderId}/files/${file.id}/content`} aria-label={`Download ${file.originalName}`}><Download size={15} /></a>{trashButton(file)}</span>
           </article>)}
         </div> : <div className="image-unavailable"><Shirt size={24} strokeWidth={1.5} /><strong>No garment pictures uploaded</strong><span>Upload a JPEG, PNG, or WebP image (up to 25 MB) for this order.</span></div>}
       </section>
     </div>
+    {binTarget && <MoveToBinDialog testId="dialog-delete-file" title={binTarget.fileType === 'garment_image' ? 'Delete this picture?' : 'Delete this file?'} subject={binTarget.originalName} busy={archiveFile.isPending} error={binError} onConfirm={moveToBin} onClose={() => setBinTarget(null)} />}
   </>;
 }
 
