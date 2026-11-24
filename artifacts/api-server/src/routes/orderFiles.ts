@@ -114,7 +114,7 @@ router.get("/orders/:orderId/files", async (req, res): Promise<void> => {
     uploadedByName: orderFilesTable.uploadedByName,
     uploadedAt: orderFilesTable.uploadedAt,
   }).from(orderFilesTable)
-    .where(and(eq(orderFilesTable.orderId, params.data.orderId), isNotNull(orderFilesTable.uploadedAt)))
+    .where(and(eq(orderFilesTable.orderId, params.data.orderId), isNotNull(orderFilesTable.uploadedAt), isNull(orderFilesTable.archivedAt)))
     .orderBy(desc(orderFilesTable.uploadedAt));
   res.json(GetOrderFilesResponse.parse(rows));
 });
@@ -131,9 +131,13 @@ router.post("/orders/:orderId/files/upload-url", async (req, res): Promise<void>
     res.status(401).json({ error: "Sign in required" });
     return;
   }
-  const [order] = await db.select({ id: ordersTable.id }).from(ordersTable).where(eq(ordersTable.id, params.data.orderId));
+  const [order] = await db.select({ id: ordersTable.id, archivedAt: ordersTable.archivedAt }).from(ordersTable).where(eq(ordersTable.id, params.data.orderId));
   if (!order) {
     res.status(404).json({ error: "Order not found" });
+    return;
+  }
+  if (order.archivedAt) {
+    res.status(409).json({ error: "This order is in the Bin. Restore it before adding files." });
     return;
   }
 

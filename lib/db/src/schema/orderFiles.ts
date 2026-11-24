@@ -14,6 +14,10 @@ export const orderFilesTable = pgTable("bk_order_files", {
   uploadedByName: text("uploaded_by_name").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }),
+  // Archive ("Bin"): hidden from normal lists, restorable; only an administrator can purge it for good.
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  archivedBy: text("archived_by"),
+  archiveReason: text("archive_reason"),
 });
 
 export const insertOrderFileSchema = createInsertSchema(orderFilesTable).omit({

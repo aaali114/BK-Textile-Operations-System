@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { activityTable, db, documentsTable, ordersTable, settingsTable, usersTable } from "@workspace/db";
 import type { Access } from "../lib/access";
 import type { BlobReader, BlobStore } from "../intake/run";
@@ -29,9 +29,21 @@ async function loadOrder(orderId: string): Promise<Order> {
   if (!o) throw new DocumentError(404, "Order not found");
   return o;
 }
+/** Changes are refused while the order is in the Bin. */
+async function loadActiveOrder(orderId: string): Promise<Order> {
+  const o = await loadOrder(orderId);
+  if (o.archivedAt) throw new DocumentError(409, "This order is in the Bin. Restore it before working on its documents.");
+  return o;
+}
 async function loadDoc(orderId: string, docId: string): Promise<Doc> {
   const [d] = await db.select().from(documentsTable).where(and(eq(documentsTable.id, docId), eq(documentsTable.orderId, orderId)));
   if (!d) throw new DocumentError(404, "Document not found");
+  return d;
+}
+
+async function loadLiveDoc(orderId: string, docId: string): Promise<Doc> {
+  const d = await loadDoc(orderId, docId);
+  if (d.archivedAt) throw new DocumentError(409, "This document is in the Bin. Restore it first.");
   return d;
 }
 
@@ -78,6 +90,7 @@ async function view(doc: Doc, order: Order, a: Access, withData: boolean) {
     files: doc.status === "approved" || doc.status === "superseded" ? { xlsxSha256: doc.xlsxSha256, pdfSha256: doc.pdfSha256 } : null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
+    archivedAt: doc.archivedAt,
     data: withData ? data : null,
   };
 }
@@ -85,7 +98,8 @@ export type DocumentView = Awaited<ReturnType<typeof view>>;
 
 export async function listDocuments(a: Access, orderId: string) {
   const order = await loadOrder(orderId);
-  const docs = await db.select().from(documentsTable).where(eq(documentsTable.orderId, orderId)).orderBy(documentsTable.type, desc(documentsTable.revision));
+  // deleted documents are in the Bin (GET /bin)
+  const docs = await db.select().from(documentsTable).where(and(eq(documentsTable.orderId, orderId), isNull(documentsTable.archivedAt))).orderBy(documentsTable.type, desc(documentsTable.revision));
   return Promise.all(docs.map((d) => view(d, order, a, false)));
 }
 
@@ -95,11 +109,12 @@ export async function getDocument(a: Access, orderId: string, docId: string) {
 
 export async function createDocument(a: Access, orderId: string, type: string) {
   if (!(DOCUMENT_TYPES as readonly string[]).includes(type)) throw new DocumentError(400, `Unknown document type "${type}".`);
-  const order = await loadOrder(orderId);
+  const order = await loadActiveOrder(orderId);
   const existing = await db.select().from(documentsTable).where(and(eq(documentsTable.orderId, orderId), eq(documentsTable.type, type))).orderBy(desc(documentsTable.revision));
-  const open = existing.find((d) => OPEN.includes(d.status));
+  // revision numbers continue past documents in the Bin; those are otherwise ignored here
+  const open = existing.find((d) => OPEN.includes(d.status) && !d.archivedAt);
   if (open) throw new DocumentError(409, `A ${TYPE_TITLE[type as DocumentType].toLowerCase()} is already in progress (revision ${open.revision}).`);
-  const approved = existing.find((d) => d.status === "approved");
+  const approved = existing.find((d) => d.status === "approved" && !d.archivedAt);
   // a new revision starts from the approved one's settings, so corrections are small
   const settings = approved ? (approved.settings as DocumentSettings) : await defaultSettings(orderId);
   const [doc] = await db
@@ -137,7 +152,8 @@ function cleanSettings(current: DocumentSettings, patch: Partial<DocumentSetting
 }
 
 export async function updateDocument(a: Access, orderId: string, docId: string, patch: Partial<DocumentSettings>) {
-  const doc = await loadDoc(orderId, docId);
+  await loadActiveOrder(orderId);
+  const doc = await loadLiveDoc(orderId, docId);
   if (doc.status !== "draft" && doc.status !== "changes_requested") throw new DocumentError(409, doc.status === "in_review" ? "The document is in review; ask the reviewer to send it back to make changes." : "Approved documents cannot be changed; create a new revision.");
   const settings = cleanSettings(doc.settings as DocumentSettings, patch);
   const [updated] = await db
@@ -150,7 +166,8 @@ export async function updateDocument(a: Access, orderId: string, docId: string, 
 }
 
 export async function submitDocument(a: Access, orderId: string, docId: string) {
-  const doc = await loadDoc(orderId, docId);
+  await loadActiveOrder(orderId);
+  const doc = await loadLiveDoc(orderId, docId);
   if (doc.status !== "draft" && doc.status !== "changes_requested") throw new DocumentError(409, "Only drafts can be sent for review.");
   const { data } = await computeDocument(orderId, doc.type as DocumentType, doc.settings as DocumentSettings);
   if (data.problems.length) throw new DocumentError(409, `Fix before sending for review: ${data.problems.join(" ")}`);
@@ -164,7 +181,7 @@ export async function submitDocument(a: Access, orderId: string, docId: string) 
 }
 
 export async function requestChanges(a: Access, orderId: string, docId: string, note: string) {
-  const [doc, order] = [await loadDoc(orderId, docId), await loadOrder(orderId)];
+  const [doc, order] = [await loadLiveDoc(orderId, docId), await loadActiveOrder(orderId)];
   const blocker = approvalBlocker(a, doc, order);
   if (blocker) throw new DocumentError(403, blocker);
   if (!note.trim()) throw new DocumentError(400, "Say what needs to change.");
@@ -175,7 +192,7 @@ export async function requestChanges(a: Access, orderId: string, docId: string, 
 
 /** Approve: render the final files from the current data, store them with their fingerprints, freeze the document, supersede the previous revision. */
 export async function approveDocument(a: Access, orderId: string, docId: string, note: string | null, blobs: BlobStore) {
-  const [doc, order] = [await loadDoc(orderId, docId), await loadOrder(orderId)];
+  const [doc, order] = [await loadLiveDoc(orderId, docId), await loadActiveOrder(orderId)];
   const blocker = approvalBlocker(a, doc, order);
   if (blocker) throw new DocumentError(403, blocker);
   const { data, sourceHash } = await computeDocument(orderId, doc.type as DocumentType, doc.settings as DocumentSettings);
@@ -193,7 +210,7 @@ export async function approveDocument(a: Access, orderId: string, docId: string,
       .where(and(eq(documentsTable.id, docId), eq(documentsTable.status, "in_review")))
       .returning();
     if (!d) throw new DocumentError(409, "The document changed while approving; reload and try again.");
-    await tx.update(documentsTable).set({ status: "superseded" }).where(and(eq(documentsTable.orderId, orderId), eq(documentsTable.type, doc.type), eq(documentsTable.status, "approved"), ne(documentsTable.id, docId)));
+    await tx.update(documentsTable).set({ status: "superseded" }).where(and(eq(documentsTable.orderId, orderId), eq(documentsTable.type, doc.type), eq(documentsTable.status, "approved"), isNull(documentsTable.archivedAt), ne(documentsTable.id, docId)));
     return d;
   });
   await logDoc(a, updated, "document.approved", `${TYPE_TITLE[doc.type as DocumentType]} ${doc.docNumber} rev ${doc.revision} approved`, { xlsxSha256: updated.xlsxSha256, pdfSha256: updated.pdfSha256 });
@@ -218,10 +235,11 @@ export async function documentFile(a: Access, orderId: string, docId: string, fo
 
 /** Documents in review that this user may approve, oldest first. */
 export async function awaitingApproval(a: Access) {
-  const docs = await db.select().from(documentsTable).where(eq(documentsTable.status, "in_review")).orderBy(documentsTable.submittedAt);
+  const docs = await db.select().from(documentsTable).where(and(eq(documentsTable.status, "in_review"), isNull(documentsTable.archivedAt))).orderBy(documentsTable.submittedAt);
   const out = [];
   for (const d of docs) {
     const order = await loadOrder(d.orderId);
+    if (order.archivedAt) continue;
     if (!approvalBlocker(a, d, order)) out.push(await view(d, order, a, false));
   }
   return out;

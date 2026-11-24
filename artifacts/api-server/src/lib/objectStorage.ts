@@ -152,6 +152,16 @@ export class ObjectStorageService {
     return content;
   }
 
+  /** Deletes a private object by its "/objects/..." path; already gone is fine. */
+  async deleteObjectEntity(objectPath: string): Promise<void> {
+    try {
+      await (await this.getObjectEntityFile(objectPath)).delete({ ignoreNotFound: true });
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) return;
+      throw error;
+    }
+  }
+
   async getObjectEntityFile(objectPath: string): Promise<File> {
     if (!objectPath.startsWith('/objects/')) {
       throw new ObjectNotFoundError();

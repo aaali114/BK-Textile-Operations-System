@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
   GetWorkItemsQueryParams,
@@ -18,7 +18,7 @@ router.get("/work-items", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const conditions = [];
+  const conditions = [isNull(ordersTable.archivedAt)];
   if (parsed.data.department) conditions.push(eq(workItemsTable.department, parsed.data.department));
   if (parsed.data.status) conditions.push(eq(workItemsTable.status, parsed.data.status));
   const rows = await db
@@ -36,7 +36,7 @@ router.get("/work-items", async (req, res): Promise<void> => {
     })
     .from(workItemsTable)
     .innerJoin(ordersTable, eq(workItemsTable.orderId, ordersTable.id))
-    .where(conditions.length ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(asc(workItemsTable.dueDate));
   res.json(GetWorkItemsResponse.parse(rows));
 });

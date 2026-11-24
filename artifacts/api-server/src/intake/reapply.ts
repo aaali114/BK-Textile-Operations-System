@@ -1,8 +1,14 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, notInArray, sql, type SQL } from "drizzle-orm";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import {
   activityTable,
+  colourwaysTable,
   db,
+  fabricsTable,
+  orderLinesTable,
   ordersTable,
+  sizeQuantitiesTable,
+  trimsTable,
   sourceEmailAttachmentsTable,
   sourceEmailOrdersTable,
   sourceEmailsTable,
@@ -109,4 +115,64 @@ export async function reapplyOrderEmails(orderId: string, blobs: BlobReader, act
     },
   });
   return report;
+}
+
+export type RebuildReport = ReapplyReport & { cleared: { sizes: number; trims: number; fabrics: number; colours: number; lines: number; header: boolean } };
+
+/**
+ * Rebuilds an order's email data after an email was removed from it (or put
+ * back, or uploaded): first clears what came only from emails that are no
+ * longer linked to the order, then re-applies the remaining linked emails from
+ * oldest to newest so the latest one wins again. Rows staff entered by hand
+ * (no source email) are never touched. Header values the removed email set
+ * stay until a remaining email sets them again; they are then shown as edited
+ * by hand (no source).
+ */
+export async function rebuildOrderFromEmails(orderId: string, blobs: BlobReader, actor: { id: string; label: string }): Promise<RebuildReport> {
+  const cleared = await db.transaction(async (tx) => {
+    await tx.select({ id: ordersTable.id }).from(ordersTable).where(eq(ordersTable.id, orderId)).for("update");
+    const linked = (
+      await tx
+        .select({ id: sourceEmailOrdersTable.emailId })
+        .from(sourceEmailOrdersTable)
+        .where(and(eq(sourceEmailOrdersTable.orderId, orderId), eq(sourceEmailOrdersTable.matchStatus, "matched")))
+    ).map((r) => r.id);
+    const stale = (orderCol: PgColumn, sourceCol: PgColumn): SQL =>
+      and(eq(orderCol, orderId), isNotNull(sourceCol), linked.length ? notInArray(sourceCol, linked) : sql`true`)!;
+
+    const sizes = await tx.delete(sizeQuantitiesTable).where(stale(sizeQuantitiesTable.orderId, sizeQuantitiesTable.sourceEmailId)).returning({ id: sizeQuantitiesTable.id });
+    const trims = await tx.delete(trimsTable).where(stale(trimsTable.orderId, trimsTable.sourceEmailId)).returning({ id: trimsTable.id });
+    const fabrics = await tx.delete(fabricsTable).where(stale(fabricsTable.orderId, fabricsTable.sourceEmailId)).returning({ id: fabricsTable.id });
+
+    // A colour or line from a removed email goes too, unless something still hangs off it (e.g. sizes typed in by hand); then it is kept as hand-entered.
+    let colours = 0;
+    for (const c of await tx.select({ id: colourwaysTable.id }).from(colourwaysTable).where(stale(colourwaysTable.orderId, colourwaysTable.sourceEmailId))) {
+      const inUse =
+        (await tx.select({ id: sizeQuantitiesTable.id }).from(sizeQuantitiesTable).where(eq(sizeQuantitiesTable.colourwayId, c.id)).limit(1)).length +
+        (await tx.select({ id: trimsTable.id }).from(trimsTable).where(eq(trimsTable.colourwayId, c.id)).limit(1)).length +
+        (await tx.select({ id: fabricsTable.id }).from(fabricsTable).where(eq(fabricsTable.colourwayId, c.id)).limit(1)).length;
+      if (inUse > 0) await tx.update(colourwaysTable).set({ sourceEmailId: null, sourceAttachmentId: null }).where(eq(colourwaysTable.id, c.id));
+      else {
+        await tx.delete(colourwaysTable).where(eq(colourwaysTable.id, c.id));
+        colours++;
+      }
+    }
+    let lines = 0;
+    for (const l of await tx.select({ id: orderLinesTable.id }).from(orderLinesTable).where(stale(orderLinesTable.orderId, orderLinesTable.sourceEmailId))) {
+      const [used] = await tx.select({ id: colourwaysTable.id }).from(colourwaysTable).where(eq(colourwaysTable.lineId, l.id)).limit(1);
+      if (used) await tx.update(orderLinesTable).set({ sourceEmailId: null, sourceAttachmentId: null }).where(eq(orderLinesTable.id, l.id));
+      else {
+        await tx.delete(orderLinesTable).where(eq(orderLinesTable.id, l.id));
+        lines++;
+      }
+    }
+    const header = await tx
+      .update(ordersTable)
+      .set({ headerSourceEmailId: null })
+      .where(and(eq(ordersTable.id, orderId), isNotNull(ordersTable.headerSourceEmailId), linked.length ? notInArray(ordersTable.headerSourceEmailId, linked) : sql`true`))
+      .returning({ id: ordersTable.id });
+    return { sizes: sizes.length, trims: trims.length, fabrics: fabrics.length, colours, lines, header: header.length > 0 };
+  });
+  const report = await reapplyOrderEmails(orderId, blobs, actor);
+  return { ...report, cleared };
 }

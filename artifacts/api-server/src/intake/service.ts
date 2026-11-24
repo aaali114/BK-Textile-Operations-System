@@ -1,14 +1,15 @@
 import { readIntakeConfig } from "./config";
 import { ImapMailSource } from "./imap";
-import { runIntake, type BlobReader, type BlobStore } from "./run";
+import { runIntake, type BlobReader, type BlobRemover, type BlobStore } from "./run";
 import { reapplyOrderEmails } from "./reapply";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 
 const storage = new ObjectStorageService();
-export const objectStorageBlobs: BlobStore & BlobReader = {
+export const objectStorageBlobs: BlobStore & BlobReader & BlobRemover = {
   put: (content, contentType) => storage.saveObjectEntity(content, contentType, "intake"),
   get: (objectPath) => storage.readObjectEntity(objectPath),
+  remove: (objectPath) => storage.deleteObjectEntity(objectPath),
 };
 
 export function reapplyOrder(orderId: string, actor: { id: string; label: string }) {

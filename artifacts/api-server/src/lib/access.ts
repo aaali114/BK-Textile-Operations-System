@@ -28,7 +28,8 @@ type Requirement =
   | { anyStatus: true }
   | { area: Area; level: "read" | "write"; permission?: Permission }
   | { permission: Permission }
-  | { manageUsers: true };
+  | { manageUsers: true }
+  | { administrator: true };
 
 /**
  * Every API route and what it needs. Anything not listed is refused
@@ -60,6 +61,12 @@ export const RULES: [method: string, path: RegExp, need: Requirement][] = [
   ["PATCH", /^\/orders\/[^/]+$/, { area: "merchandising", level: "write" }], // commercial fields also need commercial_edit (checked in the route)
   ["PATCH", /^\/orders\/[^/]+\/emails\/[^/]+$/, { area: "merchandising", level: "write" }],
   ["POST", /^\/orders\/[^/]+\/files\/(upload-url|[^/]+\/complete)$/, { area: "merchandising", level: "write" }],
+  // delete = move to the Bin, and restore: Write access to merchandising (approved documents: administrators, checked in lib/archive.ts)
+  ["POST", /^\/orders\/[^/]+\/(archive|restore)$/, { area: "merchandising", level: "write" }],
+  ["POST", /^\/orders\/[^/]+\/(files|documents|emails)\/[^/]+\/(archive|restore)$/, { area: "merchandising", level: "write" }],
+  ["POST", /^\/orders\/[^/]+\/emails$/, { area: "merchandising", level: "write" }],
+  ["GET", /^\/bin$/, { area: "merchandising", level: "write" }],
+  ["DELETE", /^\/admin\/bin\/[^/]+\/[^/]+\/[^/]+$/, { administrator: true }],
   // documents (cutting programs, packing lists): viewing follows merchandising; preparing/approving need permissions
   ["GET", /^\/orders\/[^/]+\/documents$/, { area: "merchandising", level: "read" }],
   ["GET", /^\/orders\/[^/]+\/documents\/[^/]+(\/files\/(xlsx|pdf))?$/, { area: "merchandising", level: "read" }],
@@ -104,6 +111,7 @@ export function allows(a: Access, need: Requirement): boolean {
   if ("public" in need || "anyStatus" in need) return true;
   if (a.status !== "active") return false;
   if ("manageUsers" in need) return a.canManageUsers;
+  if ("administrator" in need) return a.role === "admin";
   if ("area" in need) return hasArea(a, need.area, need.level) && (!need.permission || hasPermission(a, need.permission));
   return hasPermission(a, need.permission);
 }
@@ -222,6 +230,7 @@ export function canSeeActivity(a: Access, entityType: string): boolean {
   switch (entityType) {
     case "order":
     case "source_email":
+    case "order_file":
     case "intake":
     case "document":
       return hasArea(a, "merchandising", "read");
