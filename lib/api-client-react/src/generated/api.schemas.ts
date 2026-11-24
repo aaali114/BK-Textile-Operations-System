@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.9.0
+ * OpenAPI spec version: 0.10.0
  */
 export interface HealthStatus {
   status: string;
@@ -168,6 +168,15 @@ export interface Order {
   priority: Priority;
   createdAt: string;
   updatedAt: string;
+  /**
+     * Set while the order is in the Bin
+     * @nullable
+     */
+  archivedAt?: string | null;
+  /** @nullable */
+  archivedBy?: string | null;
+  /** @nullable */
+  archiveReason?: string | null;
 }
 
 /**
@@ -586,6 +595,11 @@ export interface OrderDocument {
   files: OrderDocumentFiles;
   createdAt: string;
   updatedAt: string;
+  /**
+     * Set while the document is in the Bin
+     * @nullable
+     */
+  archivedAt?: string | null;
   /** Present on single-document responses */
   data: DocumentData | null;
 }
@@ -1100,6 +1114,7 @@ export const EmailMatchMethod = {
   thread: 'thread',
   po_body_only: 'po_body_only',
   manual: 'manual',
+  uploaded: 'uploaded',
 } as const;
 
 export type EmailAttachmentExtractStatus = typeof EmailAttachmentExtractStatus[keyof typeof EmailAttachmentExtractStatus];
@@ -1232,6 +1247,78 @@ export type ReapplyReportEmailsItem = {
 export interface ReapplyReport {
   orderId: string;
   emails: ReapplyReportEmailsItem[];
+}
+
+/**
+ * What was cleared because it came only from emails no longer on the order
+ */
+export type RebuildReportCleared = {
+  sizes: number;
+  trims: number;
+  fabrics: number;
+  colours: number;
+  lines: number;
+  /** The order header had come from a removed email */
+  header: boolean;
+};
+
+export type RebuildReport = ReapplyReport & {
+  /** What was cleared because it came only from emails no longer on the order */
+  cleared: RebuildReportCleared;
+};
+
+export interface ArchiveRequest {
+  /**
+     * Optional note shown in the Bin
+     * @maxLength 500
+     * @nullable
+     */
+  reason?: string | null;
+}
+
+export interface EmailUpload {
+  /** Original file name, e.g. PO 36572.eml */
+  filename?: string;
+  /** The .eml file encoded as base64 */
+  contentBase64: string;
+}
+
+export interface EmailUploadResult {
+  emailId: string;
+  warnings: string[];
+  rebuild: RebuildReport;
+}
+
+export type BinItemKind = typeof BinItemKind[keyof typeof BinItemKind];
+
+
+export const BinItemKind = {
+  order: 'order',
+  file: 'file',
+  email: 'email',
+  document: 'document',
+} as const;
+
+export interface BinItem {
+  kind: BinItemKind;
+  /** The order, file, email or document id */
+  id: string;
+  orderId: string;
+  /** BK invoice reference, or the order reference */
+  orderRef: string;
+  /** @nullable */
+  poNumber: string | null;
+  title: string;
+  /** @nullable */
+  detail: string | null;
+  archivedAt: string;
+  /** @nullable */
+  archivedBy: string | null;
+  /** @nullable */
+  reason: string | null;
+  canRestore: boolean;
+  /** Only administrators can empty the Bin */
+  canPurge: boolean;
 }
 
 export interface IntakeRunRequest {

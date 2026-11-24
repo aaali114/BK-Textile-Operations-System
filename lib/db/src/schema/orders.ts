@@ -62,6 +62,10 @@ export const ordersTable = pgTable(
     deliveryDate: date("delivery_date", { mode: "string" }).notNull(),
     status: text("status").notNull().default("development"),
     priority: text("priority").notNull().default("normal"),
+    // Archive ("Bin"): hidden from normal lists, restorable; only an administrator can purge it for good.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedBy: text("archived_by"),
+    archiveReason: text("archive_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
   },

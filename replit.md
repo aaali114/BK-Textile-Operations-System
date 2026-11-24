@@ -56,7 +56,7 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 - New users are **pending** with no access until the administrator or deputy approves them (`PUT /api/admin/users/:id/access`).
 - **Roles:** up to **2 administrators and 2 deputies** (enforced in `lib/userAdmin.ts` under a lock). All of them approve users, grant access and have full access themselves. Only administrators change roles. Nobody can change another administrator; an administrator can only step down themselves, and only while another administrator remains. Nobody can change their own access; deputies cannot change administrators or other deputies.
 - **Areas** (`dashboard`, `merchandising`, `department_work`, `materials`, `quality`): `none` / `read` / `write` per user. No grant = the area is hidden and its API refuses.
-- **Special permissions:** `invoice_override` (invoice counter and per-order override), `commercial_edit` (create orders; edit buyer, PO, value, terms, quantity, dates), `intake_run` (read the mailbox, re-apply emails).
+- **Special permissions:** `invoice_override` (invoice counter and per-order override), `commercial_edit` (create orders; edit buyer, PO, value, terms, quantity, dates), `intake_run` (read the mailbox, re-apply emails), `prepare_documents`, `approve_documents`. Deleting and the Bin follow merchandising Write; emptying the Bin is administrators only (see "Deleting: the Bin").
 - Department templates (`GET /api/admin/access-templates`) are suggestions only; the administrator applies and adjusts them per person.
 - **Enforced on the server:** every API route has a rule in `artifacts/api-server/src/lib/access.ts` (`RULES`); anything without a rule is refused. When adding a route, add its rule. Activity feeds are filtered by what the user may see.
 - Every access change is logged in `bk_activity` (entity `user`).
@@ -70,6 +70,14 @@ The owner approved this split: Replit Agent owns the staff-facing UI; Claude (Cl
 - **Who:** `prepare_documents` drafts/edits/submits; `approve_documents` approves or sends back, only as an administrator, deputy or the order's **responsible merchandiser**, and **never** someone who prepared, edited or submitted that document (four-eyes). Viewing follows merchandising access.
 - **Layout = the factory's existing formats** (`documents/render.ts`, template version 2): Times New Roman, centred, the same rows, column widths, row heights and borders as the floor sheets (cutting program: thin row lines, medium verticals; packing list: no row lines, vertical dividers only), the floor's size names (2X; SMALL/MEDIUM/LARGE on packing lists). Draft/approval details sit in the print header/footer so the sheet itself is unchanged. Change the layout only together with the owner; approved documents keep the layout they were approved with.
 - Letterhead: `/api/admin/company-profile` (administrators/deputies). Email notifications from orders@ need its SMTP settings (next step).
+
+## Deleting: the Bin
+
+- "Delete" never removes anything straight away: orders, images/files, emails and documents move to the **Bin** (`archived_at` / `archived_by` / `archive_reason` columns; for emails the link's `match_status = ignored`). They vanish from lists and dashboards and can be **restored**. Code: `artifacts/api-server/src/lib/archive.ts`, routes in `routes/archive.ts`.
+- **Who:** anyone with merchandising **Write** deletes and restores. **Approved/superseded documents:** only an **administrator** (role `admin`, not deputies) can delete or restore them. **Emptying the Bin (purge)** is administrators only, and removes the item and its stored files for good.
+- **Orders in the Bin** keep their BK invoice number and cannot be changed (no edits, uploads or documents) until restored. A **purged** order takes its lines, files, documents and the emails that belong only to it; its invoice number is **retired, never reused** (the counter never goes back). The activity log keeps the record.
+- **Emails:** removing one from an order **rebuilds** the order: data that came only from that email (sizes, colours, lines, trims, fabric) is cleared and the remaining emails are re-applied oldest first. Hand-entered values are kept. Restoring or uploading an email rebuilds the same way. Staff can **add an email by uploading the .eml file** (`POST /api/orders/:id/emails`, up to 25 MB; Outlook `.msg` is not supported yet: forward it to orders@ instead).
+- Approved documents stay frozen in the database: the trigger (migrations 0010, 0011) allows only moving them to/from the Bin and approved → superseded; deleting one is refused unless it is already in the Bin.
 
 ## Dashboards
 
@@ -124,6 +132,7 @@ The business coordinates merchandising, sampling, outsourced yarn/knitting/dyein
 - `pdfkit` and `exceljs` are bundled as externals (they read their own font/template files at runtime) and are direct dependencies of `@workspace/api-server`.
 - `artifacts/api-server/build.mjs` has an `external` list of packages left out of the server bundle. A package listed there must be a direct dependency of `@workspace/api-server`, or the server crashes on start (502 everywhere). After adding a library, build and start `dist/index.mjs` once to check.
 - Never run `push` / `push-force` against the database: it holds real PO 36572 data. Schema changes go through `lib/db/migrations`, reviewed in a PR and applied by `migrate` after merge.
+- The global JSON body limit is the Express default (100 KB). Only `POST /api/orders/:id/emails` (email upload) skips it and parses its own body up to 36 MB (`app.ts`, `routes/archive.ts`).
 - `lib/db/migrations/0000_baseline.sql` is hand-edited to be idempotent (it matches the tables that `push` created before migrations existed). Do not regenerate or edit it.
 - DB design for PO 36572 intake: `docs/po-36572-intake-db-plan.md`.
 

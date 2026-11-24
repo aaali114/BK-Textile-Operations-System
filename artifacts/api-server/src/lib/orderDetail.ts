@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm";
 import {
   activityTable,
   colourwaysTable,
@@ -148,7 +148,7 @@ export async function getOrderEmails(orderId: string) {
     .select(emailColumns)
     .from(sourceEmailOrdersTable)
     .innerJoin(sourceEmailsTable, eq(sourceEmailsTable.id, sourceEmailOrdersTable.emailId))
-    .where(eq(sourceEmailOrdersTable.orderId, orderId))
+    .where(and(eq(sourceEmailOrdersTable.orderId, orderId), ne(sourceEmailOrdersTable.matchStatus, "ignored")))
     .orderBy(desc(sourceEmailsTable.receivedAt));
   const attachments = await attachmentsFor(emails.map((e) => e.id));
   return emails.map((e) => ({ ...e, attachments: attachments.get(e.id) ?? [] }));
@@ -215,8 +215,7 @@ export async function updateOrderEmail(
     return true;
   });
   if (!updated) return null;
-  const emails = await getOrderEmails(orderId);
-  return emails.find((e) => e.id === emailId) ?? null;
+  return getOrderEmail(orderId, emailId);
 }
 
 /** The attachment's storage record, only when its email is linked to this order. */

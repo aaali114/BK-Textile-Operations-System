@@ -9,7 +9,10 @@ import {
   UpdateOrderEmailParams,
   UpdateOrderEmailResponse,
 } from "@workspace/api-zod";
+import { accessFrom } from "../lib/access";
+import { ArchiveError, setEmailLink } from "../lib/archive";
 import { getAuditActor } from "../lib/auditActor";
+import { objectStorageBlobs } from "../intake/service";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 import {
   findOrderEmailAttachment,
@@ -56,7 +59,20 @@ router.patch("/orders/:orderId/emails/:emailId", async (req, res): Promise<void>
     res.status(400).json({ error: "Invalid email update" });
     return;
   }
-  const email = await updateOrderEmail(params.data.orderId, params.data.emailId, body.data, getAuditActor(req));
+  // Removing / confirming / restoring a link rebuilds the order's email data (same as the archive and restore routes).
+  const { matchStatus, ...rest } = body.data;
+  if (matchStatus) {
+    try {
+      await setEmailLink(accessFrom(res)!, params.data.orderId, params.data.emailId, matchStatus, null, objectStorageBlobs);
+    } catch (error) {
+      if (error instanceof ArchiveError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      throw error;
+    }
+  }
+  const email = await updateOrderEmail(params.data.orderId, params.data.emailId, rest, getAuditActor(req));
   if (!email) {
     res.status(404).json({ error: "Email not linked to this order" });
     return;

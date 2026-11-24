@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import {
   activityTable,
   db,
@@ -44,7 +44,9 @@ const dept = (access: Access, choice: string) => (choice === "mine" ? access.dep
 const statusParam: Param = { name: "scope", label: "Orders", type: "enum", options: [{ value: "open", label: "Open orders" }, { value: "all", label: "All orders" }], default: "open" };
 const deptParam: Param = { name: "department", label: "Department", type: "enum", options: [{ value: "all", label: "All departments" }, { value: "mine", label: "My department" }], default: "all" };
 const limitParam = (d: number): Param => ({ name: "limit", label: "Rows", type: "integer", min: 1, max: 100, default: d });
-const scopeWhere = (p: Params) => (p.scope === "all" ? undefined : inArray(ordersTable.status, OPEN_STATUSES));
+// orders in the Bin are left out of every dashboard
+const live = isNull(ordersTable.archivedAt);
+const scopeWhere = (p: Params) => (p.scope === "all" ? live : and(live, inArray(ordersTable.status, OPEN_STATUSES)));
 
 export const SOURCES: Source[] = [
   {
@@ -64,7 +66,7 @@ export const SOURCES: Source[] = [
           due30: sql<number>`count(*) filter (where ${ordersTable.deliveryDate} <= ${plusDays(30)})::int`,
         })
         .from(ordersTable)
-        .where(inArray(ordersTable.status, OPEN_STATUSES));
+        .where(and(live, inArray(ordersTable.status, OPEN_STATUSES)));
       return {
         columns: [{ key: "metric", label: "Metric", type: "string" }, { key: "value", label: "Value", type: "number" }],
         rows: [
@@ -88,7 +90,7 @@ export const SOURCES: Source[] = [
     defaultVisualization: "bar",
     params: [],
     async run() {
-      const rows = await db.select({ status: ordersTable.status, orders: sql<number>`count(*)::int` }).from(ordersTable).groupBy(ordersTable.status).orderBy(ordersTable.status);
+      const rows = await db.select({ status: ordersTable.status, orders: sql<number>`count(*)::int` }).from(ordersTable).where(live).groupBy(ordersTable.status).orderBy(ordersTable.status);
       return { columns: [{ key: "status", label: "Status", type: "string" }, { key: "orders", label: "Orders", type: "number" }], rows, labelKey: "status", valueKeys: ["orders"], note: null };
     },
   },
@@ -127,7 +129,7 @@ export const SOURCES: Source[] = [
       const rows = await db
         .select({ month, orders: sql<number>`count(*)::int`, pieces: sql<number>`coalesce(sum(${ordersTable.quantity}),0)::int` })
         .from(ordersTable)
-        .where(and(inArray(ordersTable.status, OPEN_STATUSES), gte(ordersTable.deliveryDate, today().slice(0, 7) + "-01"), lte(ordersTable.deliveryDate, until.toISOString().slice(0, 10))))
+        .where(and(live, inArray(ordersTable.status, OPEN_STATUSES), gte(ordersTable.deliveryDate, today().slice(0, 7) + "-01"), lte(ordersTable.deliveryDate, until.toISOString().slice(0, 10))))
         .groupBy(month)
         .orderBy(month);
       return { columns: [{ key: "month", label: "Ship month", type: "string" }, { key: "orders", label: "Orders", type: "number" }, { key: "pieces", label: "Pieces", type: "number" }], rows, labelKey: "month", valueKeys: ["pieces", "orders"], note: null };
@@ -145,7 +147,7 @@ export const SOURCES: Source[] = [
       const rows = await db
         .select({ invoice: sql<string>`coalesce(${ordersTable.invoiceRef}, ${ordersTable.reference})`, buyer: ordersTable.buyer, po: ordersTable.poNumber, style: ordersTable.style, pieces: ordersTable.quantity, shipDate: ordersTable.deliveryDate, status: ordersTable.status, orderId: ordersTable.id })
         .from(ordersTable)
-        .where(and(inArray(ordersTable.status, OPEN_STATUSES), lte(ordersTable.deliveryDate, plusDays(Number(p.days)))))
+        .where(and(live, inArray(ordersTable.status, OPEN_STATUSES), lte(ordersTable.deliveryDate, plusDays(Number(p.days)))))
         .orderBy(ordersTable.deliveryDate)
         .limit(Number(p.limit));
       return {
@@ -168,7 +170,8 @@ export const SOURCES: Source[] = [
       const rows = await db
         .select({ department: workItemsTable.department, open: sql<number>`count(*)::int`, overdue: sql<number>`count(*) filter (where ${workItemsTable.dueDate} < ${today()})::int` })
         .from(workItemsTable)
-        .where(and(ne(workItemsTable.status, "completed"), d ? eq(workItemsTable.department, d) : undefined))
+        .innerJoin(ordersTable, eq(ordersTable.id, workItemsTable.orderId))
+        .where(and(live, ne(workItemsTable.status, "completed"), d ? eq(workItemsTable.department, d) : undefined))
         .groupBy(workItemsTable.department)
         .orderBy(workItemsTable.department);
       return { columns: [{ key: "department", label: "Department", type: "string" }, { key: "open", label: "Open", type: "number" }, { key: "overdue", label: "Overdue", type: "number" }], rows, labelKey: "department", valueKeys: ["open", "overdue"], note: null };
@@ -189,7 +192,7 @@ export const SOURCES: Source[] = [
         .select({ task: workItemsTable.title, department: workItemsTable.department, order: sql<string>`coalesce(${ordersTable.invoiceRef}, ${ordersTable.reference})`, dueDate: workItemsTable.dueDate, status: workItemsTable.status, assignee: workItemsTable.assignee })
         .from(workItemsTable)
         .leftJoin(ordersTable, eq(ordersTable.id, workItemsTable.orderId))
-        .where(and(ne(workItemsTable.status, "completed"), lt(workItemsTable.dueDate, today()), d ? eq(workItemsTable.department, d) : undefined))
+        .where(and(live, ne(workItemsTable.status, "completed"), lt(workItemsTable.dueDate, today()), d ? eq(workItemsTable.department, d) : undefined))
         .orderBy(workItemsTable.dueDate)
         .limit(Number(p.limit));
       return {
@@ -260,6 +263,7 @@ export const SOURCES: Source[] = [
         .from(sourceEmailOrdersTable)
         .innerJoin(sourceEmailsTable, eq(sourceEmailsTable.id, sourceEmailOrdersTable.emailId))
         .innerJoin(ordersTable, eq(ordersTable.id, sourceEmailOrdersTable.orderId))
+        .where(and(live, ne(sourceEmailOrdersTable.matchStatus, "ignored")))
         .orderBy(desc(sourceEmailsTable.receivedAt))
         .limit(Number(p.limit));
       return {

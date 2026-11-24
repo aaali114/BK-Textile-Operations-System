@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
   CreateOrderBody,
@@ -50,6 +50,7 @@ router.get("/orders", async (req, res): Promise<void> => {
     conditions.push(ilike(ordersTable.poNumber, pattern));
   }
   const where = [
+    isNull(ordersTable.archivedAt), // deleted orders are in the Bin (GET /bin)
     ...(parsed.data.status ? [eq(ordersTable.status, parsed.data.status)] : []),
     ...(conditions.length ? [conditions.reduce((left, right) => sql`(${left} OR ${right})`)] : []),
   ];
@@ -190,6 +191,7 @@ router.patch("/orders/:orderId", async (req, res): Promise<void> => {
     result = await db.transaction(async (tx) => {
       const [before] = await tx.select().from(ordersTable).where(eq(ordersTable.id, params.data.orderId));
       if (!before) return null;
+      if (before.archivedAt) throw new OrderInputError(409, "This order is in the Bin. Restore it before making changes.");
       if (before.buyerId && data.buyer !== undefined && data.buyer.trim() !== before.buyer) {
         throw new OrderInputError(400, "The buyer of an invoiced order cannot be changed.");
       }

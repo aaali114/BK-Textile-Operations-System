@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.9.0
+ * OpenAPI spec version: 0.10.0
  */
 import {
   useMutation,
@@ -26,6 +26,9 @@ import type {
 
 import type {
   AccessTemplate,
+  ArchiveRequest,
+  BinItem,
+  BinItemKind,
   Buyer,
   CompanyProfile,
   CurrentUser,
@@ -40,6 +43,8 @@ import type {
   DashboardUpdate,
   DocumentApproval,
   DocumentReviewNote,
+  EmailUpload,
+  EmailUploadResult,
   GetOrdersParams,
   GetWorkItemsParams,
   HealthStatus,
@@ -70,6 +75,7 @@ import type {
   OrderTrim,
   OrderUpdate,
   ReapplyReport,
+  RebuildReport,
   TransferAdminRequest,
   UserAccessUpdate,
   UserAccount,
@@ -1059,6 +1065,337 @@ export const useCompleteOrderFileUpload = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCompleteOrderFileUploadMutationOptions(options), queryClient);
+    }
+
+export const getArchiveOrderUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/archive`
+}
+
+/**
+ * The order disappears from lists and dashboards and cannot be changed until restored. It keeps its BK invoice number. Needs Write access to merchandising.
+ * @summary Delete an order (moves it to the Bin; restorable)
+ */
+export const archiveOrder = async (orderId: string,
+    archiveRequest?: ArchiveRequest, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Order>(getArchiveOrderUrl(orderId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(archiveRequest)
+  }
+);}
+
+
+
+
+
+export const getArchiveOrderMutationKey = () => ['archiveOrder'] as const;
+
+export const getArchiveOrderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrder>>, TError,ArchiveOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof archiveOrder>>, TError,ArchiveOrderMutationVariables, TContext> => {
+
+const mutationKey = getArchiveOrderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveOrder>>, ArchiveOrderMutationVariables> = (props) => {
+          const {orderId,data} = props ?? {};
+
+          return  archiveOrder(orderId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveOrderMutationResult = NonNullable<Awaited<ReturnType<typeof archiveOrder>>>
+    export type ArchiveOrderMutationBody = BodyType<ArchiveRequest> | undefined
+    export type ArchiveOrderMutationError = ErrorType<void>
+    export type ArchiveOrderMutationVariables = {orderId: string;data?: BodyType<ArchiveRequest>}
+
+    /**
+ * @summary Delete an order (moves it to the Bin; restorable)
+ */
+export const useArchiveOrder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrder>>, TError,ArchiveOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof archiveOrder>>,
+        TError,
+        ArchiveOrderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getArchiveOrderMutationOptions(options), queryClient);
+    }
+
+export const getRestoreOrderUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/restore`
+}
+
+/**
+ * @summary Restore an order from the Bin
+ */
+export const restoreOrder = async (orderId: string, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
+
+  return customFetch<Order>(getRestoreOrderUrl(orderId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRestoreOrderMutationKey = () => ['restoreOrder'] as const;
+
+export const getRestoreOrderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreOrder>>, TError,RestoreOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof restoreOrder>>, TError,RestoreOrderMutationVariables, TContext> => {
+
+const mutationKey = getRestoreOrderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof restoreOrder>>, RestoreOrderMutationVariables> = (props) => {
+          const {orderId} = props ?? {};
+
+          return  restoreOrder(orderId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RestoreOrderMutationResult = NonNullable<Awaited<ReturnType<typeof restoreOrder>>>
+
+    export type RestoreOrderMutationError = ErrorType<void>
+    export type RestoreOrderMutationVariables = {orderId: string}
+
+    /**
+ * @summary Restore an order from the Bin
+ */
+export const useRestoreOrder = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreOrder>>, TError,RestoreOrderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof restoreOrder>>,
+        TError,
+        RestoreOrderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRestoreOrderMutationOptions(options), queryClient);
+    }
+
+export const getArchiveOrderFileUrl = (orderId: string,
+    fileId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/files/${fileId}/archive`
+}
+
+/**
+ * @summary Delete an image or file from an order (moves it to the Bin)
+ */
+export const archiveOrderFile = async (orderId: string,
+    fileId: string,
+    archiveRequest?: ArchiveRequest, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getArchiveOrderFileUrl(orderId,fileId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(archiveRequest)
+  }
+);}
+
+
+
+
+
+export const getArchiveOrderFileMutationKey = () => ['archiveOrderFile'] as const;
+
+export const getArchiveOrderFileMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderFile>>, TError,ArchiveOrderFileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof archiveOrderFile>>, TError,ArchiveOrderFileMutationVariables, TContext> => {
+
+const mutationKey = getArchiveOrderFileMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveOrderFile>>, ArchiveOrderFileMutationVariables> = (props) => {
+          const {orderId,fileId,data} = props ?? {};
+
+          return  archiveOrderFile(orderId,fileId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveOrderFileMutationResult = NonNullable<Awaited<ReturnType<typeof archiveOrderFile>>>
+    export type ArchiveOrderFileMutationBody = BodyType<ArchiveRequest> | undefined
+    export type ArchiveOrderFileMutationError = ErrorType<void>
+    export type ArchiveOrderFileMutationVariables = {orderId: string;fileId: string;data?: BodyType<ArchiveRequest>}
+
+    /**
+ * @summary Delete an image or file from an order (moves it to the Bin)
+ */
+export const useArchiveOrderFile = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderFile>>, TError,ArchiveOrderFileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof archiveOrderFile>>,
+        TError,
+        ArchiveOrderFileMutationVariables,
+        TContext
+      > => {
+      return useMutation(getArchiveOrderFileMutationOptions(options), queryClient);
+    }
+
+export const getRestoreOrderFileUrl = (orderId: string,
+    fileId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/files/${fileId}/restore`
+}
+
+/**
+ * @summary Restore an image or file from the Bin
+ */
+export const restoreOrderFile = async (orderId: string,
+    fileId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRestoreOrderFileUrl(orderId,fileId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRestoreOrderFileMutationKey = () => ['restoreOrderFile'] as const;
+
+export const getRestoreOrderFileMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreOrderFile>>, TError,RestoreOrderFileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof restoreOrderFile>>, TError,RestoreOrderFileMutationVariables, TContext> => {
+
+const mutationKey = getRestoreOrderFileMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof restoreOrderFile>>, RestoreOrderFileMutationVariables> = (props) => {
+          const {orderId,fileId} = props ?? {};
+
+          return  restoreOrderFile(orderId,fileId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RestoreOrderFileMutationResult = NonNullable<Awaited<ReturnType<typeof restoreOrderFile>>>
+
+    export type RestoreOrderFileMutationError = ErrorType<void>
+    export type RestoreOrderFileMutationVariables = {orderId: string;fileId: string}
+
+    /**
+ * @summary Restore an image or file from the Bin
+ */
+export const useRestoreOrderFile = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreOrderFile>>, TError,RestoreOrderFileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof restoreOrderFile>>,
+        TError,
+        RestoreOrderFileMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRestoreOrderFileMutationOptions(options), queryClient);
     }
 
 export const getDownloadOrderFileUrl = (orderId: string,
@@ -2839,6 +3176,175 @@ export const useApproveOrderDocument = <TError = ErrorType<void>,
       return useMutation(getApproveOrderDocumentMutationOptions(options), queryClient);
     }
 
+export const getArchiveOrderDocumentUrl = (orderId: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/documents/${documentId}/archive`
+}
+
+/**
+ * Drafts and documents in review: anyone with Write access to merchandising. Approved or superseded documents: administrators only.
+ * @summary Delete a document (moves it to the Bin)
+ */
+export const archiveOrderDocument = async (orderId: string,
+    documentId: string,
+    archiveRequest?: ArchiveRequest, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getArchiveOrderDocumentUrl(orderId,documentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(archiveRequest)
+  }
+);}
+
+
+
+
+
+export const getArchiveOrderDocumentMutationKey = () => ['archiveOrderDocument'] as const;
+
+export const getArchiveOrderDocumentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderDocument>>, TError,ArchiveOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof archiveOrderDocument>>, TError,ArchiveOrderDocumentMutationVariables, TContext> => {
+
+const mutationKey = getArchiveOrderDocumentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveOrderDocument>>, ArchiveOrderDocumentMutationVariables> = (props) => {
+          const {orderId,documentId,data} = props ?? {};
+
+          return  archiveOrderDocument(orderId,documentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveOrderDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof archiveOrderDocument>>>
+    export type ArchiveOrderDocumentMutationBody = BodyType<ArchiveRequest> | undefined
+    export type ArchiveOrderDocumentMutationError = ErrorType<void>
+    export type ArchiveOrderDocumentMutationVariables = {orderId: string;documentId: string;data?: BodyType<ArchiveRequest>}
+
+    /**
+ * @summary Delete a document (moves it to the Bin)
+ */
+export const useArchiveOrderDocument = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderDocument>>, TError,ArchiveOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof archiveOrderDocument>>,
+        TError,
+        ArchiveOrderDocumentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getArchiveOrderDocumentMutationOptions(options), queryClient);
+    }
+
+export const getRestoreOrderDocumentUrl = (orderId: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/documents/${documentId}/restore`
+}
+
+/**
+ * An approved document can only be restored by an administrator. If another revision is in progress a draft cannot be restored (409).
+ * @summary Restore a document from the Bin
+ */
+export const restoreOrderDocument = async (orderId: string,
+    documentId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRestoreOrderDocumentUrl(orderId,documentId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRestoreOrderDocumentMutationKey = () => ['restoreOrderDocument'] as const;
+
+export const getRestoreOrderDocumentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreOrderDocument>>, TError,RestoreOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof restoreOrderDocument>>, TError,RestoreOrderDocumentMutationVariables, TContext> => {
+
+const mutationKey = getRestoreOrderDocumentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof restoreOrderDocument>>, RestoreOrderDocumentMutationVariables> = (props) => {
+          const {orderId,documentId} = props ?? {};
+
+          return  restoreOrderDocument(orderId,documentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RestoreOrderDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof restoreOrderDocument>>>
+
+    export type RestoreOrderDocumentMutationError = ErrorType<void>
+    export type RestoreOrderDocumentMutationVariables = {orderId: string;documentId: string}
+
+    /**
+ * @summary Restore a document from the Bin
+ */
+export const useRestoreOrderDocument = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreOrderDocument>>, TError,RestoreOrderDocumentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof restoreOrderDocument>>,
+        TError,
+        RestoreOrderDocumentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRestoreOrderDocumentMutationOptions(options), queryClient);
+    }
+
 export const getDownloadOrderDocumentFileUrl = (orderId: string,
     documentId: string,
     format: 'xlsx' | 'pdf',) => {
@@ -3840,6 +4346,264 @@ export function useGetOrderEmails<TData = Awaited<ReturnType<typeof getOrderEmai
 
 
 
+export const getUploadOrderEmailUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/emails`
+}
+
+/**
+ * For an email that did not reach orders@ (or was not matched). The email is linked to this order and the order is rebuilt from all its emails in date order (PO and trims sheets applied). Maximum 25 MB.
+ * @summary Add an email to an order by uploading it (.eml)
+ */
+export const uploadOrderEmail = async (orderId: string,
+    emailUpload: EmailUpload, options?: Parameters<typeof customFetch>[1]): Promise<EmailUploadResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<EmailUploadResult>(getUploadOrderEmailUrl(orderId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(emailUpload)
+  }
+);}
+
+
+
+
+
+export const getUploadOrderEmailMutationKey = () => ['uploadOrderEmail'] as const;
+
+export const getUploadOrderEmailMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadOrderEmail>>, TError,UploadOrderEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadOrderEmail>>, TError,UploadOrderEmailMutationVariables, TContext> => {
+
+const mutationKey = getUploadOrderEmailMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadOrderEmail>>, UploadOrderEmailMutationVariables> = (props) => {
+          const {orderId,data} = props ?? {};
+
+          return  uploadOrderEmail(orderId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadOrderEmailMutationResult = NonNullable<Awaited<ReturnType<typeof uploadOrderEmail>>>
+    export type UploadOrderEmailMutationBody = BodyType<EmailUpload>
+    export type UploadOrderEmailMutationError = ErrorType<void>
+    export type UploadOrderEmailMutationVariables = {orderId: string;data: BodyType<EmailUpload>}
+
+    /**
+ * @summary Add an email to an order by uploading it (.eml)
+ */
+export const useUploadOrderEmail = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadOrderEmail>>, TError,UploadOrderEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof uploadOrderEmail>>,
+        TError,
+        UploadOrderEmailMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadOrderEmailMutationOptions(options), queryClient);
+    }
+
+export const getArchiveOrderEmailUrl = (orderId: string,
+    emailId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/emails/${emailId}/archive`
+}
+
+/**
+ * Data that came only from this email (sizes, trims, lines...) is cleared and the remaining emails are applied again in date order. Values typed in by hand are kept.
+ * @summary Remove an email from an order (moves it to the Bin) and rebuild the order
+ */
+export const archiveOrderEmail = async (orderId: string,
+    emailId: string,
+    archiveRequest?: ArchiveRequest, options?: Parameters<typeof customFetch>[1]): Promise<RebuildReport> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<RebuildReport>(getArchiveOrderEmailUrl(orderId,emailId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(archiveRequest)
+  }
+);}
+
+
+
+
+
+export const getArchiveOrderEmailMutationKey = () => ['archiveOrderEmail'] as const;
+
+export const getArchiveOrderEmailMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderEmail>>, TError,ArchiveOrderEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof archiveOrderEmail>>, TError,ArchiveOrderEmailMutationVariables, TContext> => {
+
+const mutationKey = getArchiveOrderEmailMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveOrderEmail>>, ArchiveOrderEmailMutationVariables> = (props) => {
+          const {orderId,emailId,data} = props ?? {};
+
+          return  archiveOrderEmail(orderId,emailId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveOrderEmailMutationResult = NonNullable<Awaited<ReturnType<typeof archiveOrderEmail>>>
+    export type ArchiveOrderEmailMutationBody = BodyType<ArchiveRequest> | undefined
+    export type ArchiveOrderEmailMutationError = ErrorType<void>
+    export type ArchiveOrderEmailMutationVariables = {orderId: string;emailId: string;data?: BodyType<ArchiveRequest>}
+
+    /**
+ * @summary Remove an email from an order (moves it to the Bin) and rebuild the order
+ */
+export const useArchiveOrderEmail = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveOrderEmail>>, TError,ArchiveOrderEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof archiveOrderEmail>>,
+        TError,
+        ArchiveOrderEmailMutationVariables,
+        TContext
+      > => {
+      return useMutation(getArchiveOrderEmailMutationOptions(options), queryClient);
+    }
+
+export const getRestoreOrderEmailUrl = (orderId: string,
+    emailId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/emails/${emailId}/restore`
+}
+
+/**
+ * @summary Put a removed email back on the order (or confirm a needs-review one) and rebuild the order
+ */
+export const restoreOrderEmail = async (orderId: string,
+    emailId: string, options?: Parameters<typeof customFetch>[1]): Promise<RebuildReport> => {
+
+  return customFetch<RebuildReport>(getRestoreOrderEmailUrl(orderId,emailId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRestoreOrderEmailMutationKey = () => ['restoreOrderEmail'] as const;
+
+export const getRestoreOrderEmailMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreOrderEmail>>, TError,RestoreOrderEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof restoreOrderEmail>>, TError,RestoreOrderEmailMutationVariables, TContext> => {
+
+const mutationKey = getRestoreOrderEmailMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof restoreOrderEmail>>, RestoreOrderEmailMutationVariables> = (props) => {
+          const {orderId,emailId} = props ?? {};
+
+          return  restoreOrderEmail(orderId,emailId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RestoreOrderEmailMutationResult = NonNullable<Awaited<ReturnType<typeof restoreOrderEmail>>>
+
+    export type RestoreOrderEmailMutationError = ErrorType<void>
+    export type RestoreOrderEmailMutationVariables = {orderId: string;emailId: string}
+
+    /**
+ * @summary Put a removed email back on the order (or confirm a needs-review one) and rebuild the order
+ */
+export const useRestoreOrderEmail = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreOrderEmail>>, TError,RestoreOrderEmailMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof restoreOrderEmail>>,
+        TError,
+        RestoreOrderEmailMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRestoreOrderEmailMutationOptions(options), queryClient);
+    }
+
 export const getGetOrderEmailUrl = (orderId: string,
     emailId: string,) => {
 
@@ -4435,6 +5199,186 @@ export const useSetOrderInvoiceNumber = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getSetOrderInvoiceNumberMutationOptions(options), queryClient);
+    }
+
+export const getListBinUrl = () => {
+
+
+
+
+  return `/api/bin`
+}
+
+/**
+ * @summary Everything in the Bin, newest first
+ */
+export const listBin = async ( options?: Parameters<typeof customFetch>[1]): Promise<BinItem[]> => {
+
+  return customFetch<BinItem[]>(getListBinUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBinQueryKey = () => {
+    return [
+    `/api/bin`
+    ] as const;
+    }
+
+
+export const getListBinQueryOptions = <TData = Awaited<ReturnType<typeof listBin>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBin>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBinQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBin>>> = ({ signal }) => listBin({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBin>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListBinQueryResult = NonNullable<Awaited<ReturnType<typeof listBin>>>
+export type ListBinQueryError = ErrorType<unknown>
+
+
+export function useListBin<TData = Awaited<ReturnType<typeof listBin>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBin>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listBin>>,
+          TError,
+          Awaited<ReturnType<typeof listBin>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListBin<TData = Awaited<ReturnType<typeof listBin>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBin>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listBin>>,
+          TError,
+          Awaited<ReturnType<typeof listBin>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListBin<TData = Awaited<ReturnType<typeof listBin>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBin>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Everything in the Bin, newest first
+ */
+
+export function useListBin<TData = Awaited<ReturnType<typeof listBin>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBin>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListBinQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPurgeBinItemUrl = (kind: BinItemKind,
+    orderId: string,
+    itemId: string,) => {
+
+
+
+
+  return `/api/admin/bin/${kind}/${orderId}/${itemId}`
+}
+
+/**
+ * Removes the item and its stored files for good. Purging an order also removes its lines, files, documents and the emails that belong only to it; its BK invoice number is retired and never reused.
+ * @summary Permanently delete one item from the Bin (administrators only)
+ */
+export const purgeBinItem = async (kind: BinItemKind,
+    orderId: string,
+    itemId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getPurgeBinItemUrl(kind,orderId,itemId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getPurgeBinItemMutationKey = () => ['purgeBinItem'] as const;
+
+export const getPurgeBinItemMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof purgeBinItem>>, TError,PurgeBinItemMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof purgeBinItem>>, TError,PurgeBinItemMutationVariables, TContext> => {
+
+const mutationKey = getPurgeBinItemMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof purgeBinItem>>, PurgeBinItemMutationVariables> = (props) => {
+          const {kind,orderId,itemId} = props ?? {};
+
+          return  purgeBinItem(kind,orderId,itemId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PurgeBinItemMutationResult = NonNullable<Awaited<ReturnType<typeof purgeBinItem>>>
+
+    export type PurgeBinItemMutationError = ErrorType<void>
+    export type PurgeBinItemMutationVariables = {kind: BinItemKind;orderId: string;itemId: string}
+
+    /**
+ * @summary Permanently delete one item from the Bin (administrators only)
+ */
+export const usePurgeBinItem = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof purgeBinItem>>, TError,PurgeBinItemMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof purgeBinItem>>,
+        TError,
+        PurgeBinItemMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPurgeBinItemMutationOptions(options), queryClient);
     }
 
 export const getListUsersUrl = () => {
