@@ -1,0 +1,25 @@
+.bin-subject { margin:0 0 12px;padding:10px 12px;background:#f2efe7;border-left:3px solid #c2a45f;border-radius:3px;font-size:12px;color:#34464a;overflow-wrap:anywhere }
+.bin-counter { text-align:right;font-size:9px;color:#8a958f;margin-top:4px }
+.archived-banner { display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;margin:0 0 18px;border:1px solid #e3c6b8;background:repeating-linear-gradient(135deg,#f7ebe4,#f7ebe4 14px,#f4e5dc 14px,#f4e5dc 28px);border-radius:6px;color:#7f3d33 }
+.archived-banner .archived-copy { display:flex;gap:10px;align-items:flex-start;font-size:12px;line-height:1.5;font-weight:600;overflow-wrap:anywhere;min-width:0;flex:1 }
+.archived-banner .archived-copy svg { flex:none;margin-top:2px }
+.archived-banner small { display:block;font-weight:400;color:#93594d;font-size:11px }
+.trash-btn { width:32px;height:32px;display:grid;place-items:center;border:1px solid transparent;border-radius:4px;background:transparent;color:#8a6d66;cursor:pointer;flex:none;transition:background .15s,color .15s }
+.trash-btn:hover { background:#f4e2dc;color:#9d4d3d;border-color:#e8c7ba }
+.trash-btn:focus-visible { outline:2px solid #a9453d;outline-offset:2px }
+.btn-danger-quiet { border-color:#e3c6b8;background:#fbfaf6;color:#9d4d3d }
+.btn-danger-quiet:hover { background:#f4e2dc }
+.email-row-actions { display:flex;justify-content:flex-end;padding:0 14px 8px;border-bottom:1px solid #eeeae1;margin-top:-1px }
+.email-row-actions .btn { min-height:28px;padding:4px 9px;font-size:10px }
+.email-upload-help { margin:0;padding:10px 20px;font-size:11px;color:#6c7977;line-height:1.55;background:#f6f3ec;border-bottom:1px solid #eeeae1 }
+.email-upload-warnings { margin:0 0 16px;padding:10px 14px 10px 30px;font-size:12px;background:#f3ead6;color:#7a5a20;border:1px solid #e7d8b8;border-radius:5px }
+.bin-kind { display:inline-flex;align-items:center;gap:7px;font:10px var(--app-font-mono);text-transform:uppercase;color:#5c7472;white-space:nowrap }
+.bin-kind .document-icon { width:28px;height:28px }
+.bin-title { color:#26393e;font-weight:700;overflow-wrap:anywhere }
+.bin-detail { color:#7e8984;font-size:11px;margin-top:3px;overflow-wrap:anywhere }
+.bin-reason { max-width:240px;color:#5e6f6c;font-style:italic;overflow-wrap:anywhere }
+.bin-actions { display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap }
+.bin-actions .btn { min-height:32px;padding:6px 10px;font-size:11px }
+.bin-row-error td { padding-top:0;border-top:0 }
+.purge-target { font:600 12px var(--app-font-mono);background:#f2efe7;padding:2px 6px;border-radius:3px;overflow-wrap:anywhere }
+.doc-hist-delete { margin-left:auto }

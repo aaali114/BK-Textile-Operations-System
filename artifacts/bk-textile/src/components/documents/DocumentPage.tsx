@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams } from 'wouter';
 import { AlertTriangle, ArrowLeft, Check, Send, Undo2 } from 'lucide-react';
 import {
-  getGetOrderDocumentQueryKey, useApproveOrderDocument, useGetOrderDocument, useRequestOrderDocumentChanges,
+  getGetOrderDocumentQueryKey, getGetOrderQueryKey, useApproveOrderDocument, useGetOrder, useGetOrderDocument, useRequestOrderDocumentChanges,
   useSubmitOrderDocument, useUpdateOrderDocument,
 } from '@workspace/api-client-react';
 import type { OrderDocument } from '@workspace/api-client-react';
@@ -13,6 +13,8 @@ import { DOC_TYPE_LABELS, formToUpdate, formsEqual, settingsToForm, validateDocF
 import { refreshDocuments } from './docs-cache';
 import { DocDialog, DocStatusBadge, DownloadButtons } from './ui';
 import { DocumentPaper } from './DocumentPaper';
+import { archivedBannerText } from '../bin/bin-helpers';
+import '../bin/bin.css';
 import './documents.css';
 
 type Flash = { message: string; error?: boolean } | null;
@@ -76,7 +78,12 @@ export function DocumentPage() {
   const [dialog, setDialog] = useState<null | 'approve' | 'changes'>(null);
   const [note, setNote] = useState('');
   const [dialogError, setDialogError] = useState<string | null>(null);
-  const doc = query.data;
+  const orderQuery = useGetOrder(orderId, { query: { queryKey: getGetOrderQueryKey(orderId), enabled: !!orderId } });
+  // An order in the Bin is read-only, including documents opened by direct link.
+  const order = orderQuery.data;
+  const locked = !order || orderQuery.isError || !!order.archivedAt;
+  const raw = query.data;
+  const doc = raw && (locked || raw.archivedAt) ? { ...raw, canEdit: false, canSubmit: false } : raw;
 
   useEffect(() => {
     if (!dirty) return;
@@ -117,8 +124,11 @@ export function DocumentPage() {
     {query.isError ? <QueryError title="Could not load this document" detail={apiErrorInfo(query.error).message} onRetry={() => query.refetch()} />
       : query.isLoading || !doc ? <div className="panel"><SkeletonRows /></div> : <>
       <PageHeading eyebrow={`${doc.docNumber} · Revision ${doc.revision}`} title={doc.title || DOC_TYPE_LABELS[doc.type]} subtitle={final ? 'Approved documents are permanent and cannot be edited.' : 'Live data from the order. Drafts download with a DRAFT watermark.'}
-        action={<div className="doc-actions"><DocStatusBadge status={doc.status} /><DownloadButtons doc={doc} onError={(m) => setFlash({ message: m, error: true })} /></div>} />
+        action={<div className="doc-actions"><DocStatusBadge status={doc.status} />{!locked && !doc.archivedAt && <DownloadButtons doc={doc} onError={(m) => setFlash({ message: m, error: true })} />}</div>} />
       {flash && <Notice message={flash.message} error={flash.error} onClose={() => setFlash(null)} />}
+      {orderQuery.isError && <QueryError title="Could not verify the order status" detail={apiErrorInfo(orderQuery.error).message} onRetry={() => orderQuery.refetch()} />}
+      {order?.archivedAt && <div className="archived-banner" role="status" data-testid="banner-document-order-archived"><div className="archived-copy"><AlertTriangle size={16} /><div>{archivedBannerText(order, dateTimeText)}<small>This document is read-only. Restore the order from the order page or the Bin to work on it.</small></div></div></div>}
+      {doc.archivedAt && !locked && <div className="archived-banner" role="status" data-testid="banner-document-archived"><div className="archived-copy"><AlertTriangle size={16} /><div>This document is in the Bin — deleted on {dateTimeText(doc.archivedAt)}<small>Restore it from the Bin to use it again.</small></div></div></div>}
       {doc.outOfDate && <div className="doc-warning" role="alert" data-testid="text-out-of-date"><AlertTriangle size={15} /><span><strong>Out of date.</strong> Order data changed since approval — create a new revision from the order’s Documents tab.</span></div>}
       <div className="doc-layout">
         <div className="doc-main">
@@ -142,7 +152,7 @@ export function DocumentPage() {
             <p className="support-note" style={{ marginTop: 0 }}>{dirty ? 'Save your edits before sending.' : problems.length ? 'Resolve the listed problems first.' : 'A different approver will review it.'}</p>
             <button type="button" className="btn btn-primary" style={{ width: '100%' }} disabled={!doc.canSubmit || dirty || problems.length > 0 || submit.isPending} onClick={doSubmit} data-testid="button-send-approval"><Send size={14} />{submit.isPending ? 'Sending…' : 'Send for approval'}</button>
           </div></section>}
-          {doc.status === 'in_review' && <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Four-eyes review</p><h2 className="panel-title">Review</h2></div></div><div style={{ padding: 18, display: 'grid', gap: 9 }}>
+          {doc.status === 'in_review' && !locked && !doc.archivedAt && <section className="panel"><div className="panel-head"><div><p className="panel-kicker">Four-eyes review</p><h2 className="panel-title">Review</h2></div></div><div style={{ padding: 18, display: 'grid', gap: 9 }}>
             {doc.approvalBlocker ? <p className="doc-blocker" data-testid="text-approval-blocker">{doc.approvalBlocker}</p> : <>
               <button type="button" className="btn btn-primary" onClick={() => openDialog('approve')} data-testid="button-approve"><Check size={14} />Approve</button>
               <button type="button" className="btn btn-quiet" onClick={() => openDialog('changes')} data-testid="button-request-changes"><Undo2 size={14} />Request changes</button>
@@ -151,13 +161,13 @@ export function DocumentPage() {
           {doc.canEdit && <Editor key={doc.id} doc={doc} onDirty={setDirty} onSaved={(saved) => applied(saved, 'Draft saved. Preview refreshed.')} onError={(m) => setFlash({ message: m, error: true })} />}
         </aside>
       </div>
-      {dialog === 'approve' && <DocDialog testId="dialog-approve" eyebrow="Irreversible action" title="Approve this document?" onClose={() => setDialog(null)}>
+      {dialog === 'approve' && !locked && !doc.archivedAt && <DocDialog testId="dialog-approve" eyebrow="Irreversible action" title="Approve this document?" onClose={() => setDialog(null)}>
         <p className="doc-confirm"><strong>Approved documents are permanent and cannot be edited.</strong> The final Excel and PDF are stored with fingerprints and any earlier approved revision becomes superseded.</p>
         <div className="form-field"><label htmlFor="approve-note">Note <span className="optional-label">Optional</span></label><textarea id="approve-note" className="textarea" rows={3} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} data-testid="input-approve-note" /></div>
         {dialogError && <div className="feedback error" role="alert" style={{ marginTop: 12, marginBottom: 0 }}>{dialogError}</div>}
         <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={() => setDialog(null)}>Cancel</button><button type="button" className="btn btn-primary" disabled={approve.isPending} onClick={doApprove} data-testid="button-confirm-approve">{approve.isPending ? 'Approving…' : 'Approve permanently'}</button></div>
       </DocDialog>}
-      {dialog === 'changes' && <DocDialog testId="dialog-request-changes" eyebrow="Send back" title="Request changes" onClose={() => setDialog(null)}>
+      {dialog === 'changes' && !locked && !doc.archivedAt && <DocDialog testId="dialog-request-changes" eyebrow="Send back" title="Request changes" onClose={() => setDialog(null)}>
         <div className="form-field"><label htmlFor="changes-note">What needs to change? *</label><textarea id="changes-note" className="textarea" rows={4} maxLength={1000} required value={note} onChange={(e) => setNote(e.target.value)} data-testid="input-changes-note" /></div>
         {dialogError && <div className="feedback error" role="alert" style={{ marginTop: 12, marginBottom: 0 }}>{dialogError}</div>}
         <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={() => setDialog(null)}>Cancel</button><button type="button" className="btn btn-danger" disabled={requestChanges.isPending || !note.trim()} onClick={doRequest} data-testid="button-confirm-request-changes">{requestChanges.isPending ? 'Sending…' : 'Send back'}</button></div>

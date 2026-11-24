@@ -7,14 +7,21 @@ import { apiErrorInfo } from '../orders/helpers';
 import { canReadArea, canWriteArea, firstAllowedPath, hasPermission, type Area } from './policy';
 
 const AccessContext = createContext<CurrentUser | undefined>(undefined);
+/** True inside an order that is in the Bin: everything below is read-only (the API refuses changes with 409). */
+const ReadOnlyContext = createContext(false);
+export function ReadOnlyScope({ locked, children }: { locked: boolean; children: ReactNode }) {
+  return <ReadOnlyContext.Provider value={locked}>{children}</ReadOnlyContext.Provider>;
+}
 export function useAccess() {
   const user = useContext(AccessContext);
+  const locked = useContext(ReadOnlyContext);
   return {
     user,
+    locked,
     canRead: (area: Area) => canReadArea(user, area),
-    canWrite: (area: Area) => canWriteArea(user, area),
-    hasPermission: (permission: Permission) => hasPermission(user, permission),
-    canManageUsers: user?.status === 'active' && user.canManageUsers === true,
+    canWrite: (area: Area) => !locked && canWriteArea(user, area),
+    hasPermission: (permission: Permission) => !locked && hasPermission(user, permission),
+    canManageUsers: !locked && user?.status === 'active' && user.canManageUsers === true,
     homePath: user ? firstAllowedPath(user) : '/access',
   };
 }
