@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.10.0
+ * OpenAPI spec version: 0.10.1
  */
 
 export type EmailMatchMethod = typeof EmailMatchMethod[keyof typeof EmailMatchMethod];
@@ -16,4 +16,5 @@ export const EmailMatchMethod = {
   po_body_only: 'po_body_only',
   manual: 'manual',
   uploaded: 'uploaded',
+  po_sheet: 'po_sheet',
 } as const;

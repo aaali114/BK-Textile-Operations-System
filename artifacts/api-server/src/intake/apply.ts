@@ -212,6 +212,30 @@ async function upsertTrim(
   }
 }
 
+export type SheetPlan = { pos: PoSheetData[]; trims: TrimRow[] | null };
+export type OrderSheet = { kind: "PO sheet"; po: PoSheetData } | { kind: "trims sheet"; rows: TrimRow[] };
+
+/**
+ * Which sheets of one attachment apply to an order. A PO sheet goes only to the
+ * order with that PO number, so one email carrying several POs updates each
+ * order with its own PO. When the whole email holds a single PO sheet it is
+ * still offered to every linked order, so a sheet for the wrong PO is reported
+ * ("PO sheet is for PO X, not this order's PO") instead of silently ignored.
+ * A trims sheet applies to every linked order.
+ */
+export function sheetsForOrder(plan: SheetPlan, orderPoNumber: string | null, poSheetsInEmail: number): OrderSheet[] {
+  if (plan.pos.length) {
+    const own = orderPoNumber ? plan.pos.filter((p) => poKey(p.poNumber) === poKey(orderPoNumber)) : [];
+    if (own.length) return own.map((po) => ({ kind: "PO sheet" as const, po }));
+    return poSheetsInEmail === 1 ? [{ kind: "PO sheet", po: plan.pos[0]! }] : [];
+  }
+  return plan.trims ? [{ kind: "trims sheet", rows: plan.trims }] : [];
+}
+
+export async function applySheet(tx: Tx, ctx: ApplyContext, sheet: OrderSheet): Promise<ApplyResult> {
+  return sheet.kind === "PO sheet" ? applyPoSheet(tx, ctx, sheet.po) : applyTrimsSheet(tx, ctx, sheet.rows);
+}
+
 /** One change-log row per applied attachment, listing every old -> new value. */
 export async function logApplied(tx: Tx, ctx: ApplyContext, kind: string, filename: string, subject: string, result: ApplyResult, reapplied = false) {
   if (!result.changes.length && !result.warnings.length && !result.skipped) return;

@@ -21,7 +21,7 @@ export type MatchInput = {
   /** Extra PO keys to look for without a "PO" marker (e.g. the allowlist). Known orders' POs are always included. */
   watchPoKeys?: string[];
 };
-export type OrderLink = { orderId: string; matchStatus: "matched" | "needs_review"; matchMethod: "po_subject" | "invoice_ref" | "thread"; matchReason: string };
+export type OrderLink = { orderId: string; matchStatus: "matched" | "needs_review"; matchMethod: "po_subject" | "invoice_ref" | "thread" | "po_sheet"; matchReason: string };
 export type MatchResult = { links: OrderLink[]; poNumbersInSubject: string[] };
 
 /**

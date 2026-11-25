@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * B.K. Textile operations API
- * OpenAPI spec version: 0.10.0
+ * OpenAPI spec version: 0.10.1
  */
 import * as zod from 'zod';
 
@@ -2219,7 +2219,7 @@ export const GetOrderEmailsResponseItem = zod.object({
   "category": zod.enum(['order_details', 'tech_pack', 'trims_accessories', 'sample_requirements', 'packaging', 'amendment', 'other', 'unclassified']),
   "parseStatus": zod.enum(['pending', 'parsed', 'partial', 'failed']),
   "matchStatus": zod.enum(['matched', 'needs_review', 'ignored']),
-  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual', 'uploaded']),
+  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual', 'uploaded', 'po_sheet']),
   "matchReason": zod.string().nullable(),
   "matchedAt": zod.coerce.date(),
   "attachments": zod.array(zod.object({
@@ -2376,7 +2376,7 @@ export const GetOrderEmailResponse = zod.object({
   "category": zod.enum(['order_details', 'tech_pack', 'trims_accessories', 'sample_requirements', 'packaging', 'amendment', 'other', 'unclassified']),
   "parseStatus": zod.enum(['pending', 'parsed', 'partial', 'failed']),
   "matchStatus": zod.enum(['matched', 'needs_review', 'ignored']),
-  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual', 'uploaded']),
+  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual', 'uploaded', 'po_sheet']),
   "matchReason": zod.string().nullable(),
   "matchedAt": zod.coerce.date(),
   "attachments": zod.array(zod.object({
@@ -2419,7 +2419,7 @@ export const UpdateOrderEmailResponse = zod.object({
   "category": zod.enum(['order_details', 'tech_pack', 'trims_accessories', 'sample_requirements', 'packaging', 'amendment', 'other', 'unclassified']),
   "parseStatus": zod.enum(['pending', 'parsed', 'partial', 'failed']),
   "matchStatus": zod.enum(['matched', 'needs_review', 'ignored']),
-  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual', 'uploaded']),
+  "matchMethod": zod.enum(['po_subject', 'invoice_ref', 'thread', 'po_body_only', 'manual', 'uploaded', 'po_sheet']),
   "matchReason": zod.string().nullable(),
   "matchedAt": zod.coerce.date(),
   "attachments": zod.array(zod.object({
