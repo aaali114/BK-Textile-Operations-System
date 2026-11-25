@@ -14,12 +14,12 @@ import {
   sourceEmailsTable,
 } from "@workspace/db";
 import { createOrderWithInvoice, OrderInputError } from "../lib/orderCreation";
-import { applySheet, linkedOrderIdsForMessages, logApplied, sheetsForOrder, type ApplyContext } from "./apply";
+import { applySheet, collectEmailSheets, linkedOrderIdsForMessages, logApplied, sheetsForOrder, type ApplyContext } from "./apply";
 import { findPoKeys, invoiceNumbersIn, matchEmail, type KnownOrder, type OrderLink } from "./match";
 import { parseEml, type ParsedEmail } from "./mime";
 import { extractPoSheets, type PoSheetData } from "./poSheet";
 import { isSpreadsheet, readWorkbook, sheetsToText } from "./spreadsheet";
-import { poKey, sameCompany } from "./text";
+import { mentionsCompany, poKey, sameCompany } from "./text";
 import { extractTrimsSheet, type TrimRow } from "./trimsSheet";
 
 export type Envelope = {
@@ -222,9 +222,8 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, allPos = false, s
           const sim = [...simulated.values()].find((v) => v.id === id)!;
           rep.orders.push({ invoiceRef: sim.invoiceRef, poNumber: id.slice(8), matchStatus: "matched", matchMethod: "thread", created: false });
         }
-        // Every PO sheet in the email (all attachments, all tabs), first copy of each PO wins.
-        const sheets = new Map<string, PoSheetData>();
-        for (const a of attachments) for (const s of a.pos) if (!sheets.has(poKey(s.poNumber))) sheets.set(poKey(s.poNumber), s);
+        // Every PO in the email (all attachments, all tabs); sheets sharing a PO number are merged into one PO.
+        const sheets = new Map([...collectEmailSheets(attachments).pos].map(([key, s]) => [key, s.po]));
         // Existing orders whose PO sheet is attached are linked too, even when the subject names another PO.
         for (const [key] of sheets) {
           const owners = orders.filter((o) => o.poNumber && poKey(o.poNumber) === key);
@@ -350,9 +349,19 @@ export function planAttachment(a: ParsedEmail["attachments"][number]): Attachmen
 async function createOrderFromSheet(sheet: PoSheetData, email: ParsedEmail, receivedAt: Date, dryRun: boolean, alreadySimulated = 0) {
   const buyers = await db.select().from(buyersTable);
   const domain = email.fromAddress.split("@")[1] ?? "";
-  const buyer =
+  // 1. the sender's email domain, 2. the sheet's "Buyer", 3. a buying agent named on the sheet
+  // (e.g. "Issued by Spartan Sourcing Agency" while "Buyer" names the brand, which then becomes the end customer)
+  let endCustomer: string | undefined;
+  let buyer =
     buyers.find((b) => b.emailDomains.some((d) => domain === d || domain.endsWith(`.${d}`))) ??
     (sheet.buyerName ? buyers.find((b) => sameCompany(b.name, sheet.buyerName!)) : undefined);
+  if (!buyer) {
+    const named = buyers.filter((b) => sheet.headerText.some((t) => mentionsCompany(t, b.name)));
+    if (named.length === 1) {
+      buyer = named[0];
+      endCustomer = sheet.buyerName ?? undefined;
+    }
+  }
   if (!buyer) return `PO ${sheet.poNumber}: buyer "${sheet.buyerName ?? "unknown"}" does not match any buyer in the system, so no order was created.`;
   if (!sheet.shipDate) return `PO ${sheet.poNumber}: the PO sheet has no ship date, so no order was created.`;
   const quantity = sheet.grandTotalQty ?? sheet.colourways.reduce((s, c) => s + c.sizes.reduce((t, q) => t + q.quantity, 0), 0);
@@ -365,7 +374,7 @@ async function createOrderFromSheet(sheet: PoSheetData, email: ParsedEmail, rece
   }
   try {
     const order = await createOrderWithInvoice(
-      { buyerId: buyer.id, buyer: buyer.name, poNumber: sheet.poNumber, poReceivedAt: receivedAt, style, quantity: Math.max(1, quantity), deliveryDate: sheet.shipDate },
+      { buyerId: buyer.id, buyer: buyer.name, poNumber: sheet.poNumber, poReceivedAt: receivedAt, style, quantity: Math.max(1, quantity), deliveryDate: sheet.shipDate, endCustomer },
       { id: "system:email-intake", label: "Email intake" },
       "email_intake",
     );
@@ -447,16 +456,13 @@ async function storeAndApply(
     // Each order gets its own PO sheet (by PO number) and any trims sheet.
     const matched = links.filter((l) => l.matchStatus === "matched");
     const poOf = new Map((matched.length ? await tx.select({ id: ordersTable.id, poNumber: ordersTable.poNumber }).from(ordersTable).where(inArray(ordersTable.id, matched.map((l) => l.orderId))) : []).map((o) => [o.id, o.poNumber]));
-    const poSheetsInEmail = attachments.reduce((n, a) => n + a.pos.length, 0);
+    const emailSheets = collectEmailSheets(attachments);
     for (const link of matched) {
-      for (const [i, a] of attachments.entries()) {
-        for (const sheet of sheetsForOrder(a, poOf.get(link.orderId) ?? null, poSheetsInEmail)) {
-          const ctx: ApplyContext = { orderId: link.orderId, emailId: stored!.id, attachmentId: storedAttachments[i]!.id, emailDate: date, currencyHint };
-          const result = await applySheet(tx, ctx, sheet);
-          const label = sheet.kind === "PO sheet" && a.pos.length > 1 ? `${a.filename} (PO ${sheet.po.poNumber})` : a.filename;
-          await logApplied(tx, ctx, sheet.kind, label, email.subject, result);
-          rep.attachments.push({ filename: label, kind: a.kind, changes: result.changes.length, warnings: result.warnings, skipped: result.skipped });
-        }
+      for (const sheet of sheetsForOrder(emailSheets, poOf.get(link.orderId) ?? null)) {
+        const ctx: ApplyContext = { orderId: link.orderId, emailId: stored!.id, attachmentId: storedAttachments[sheet.attachmentIndex]!.id, emailDate: date, currencyHint };
+        const result = await applySheet(tx, ctx, sheet);
+        await logApplied(tx, ctx, sheet.kind, sheet.label, email.subject, result);
+        rep.attachments.push({ filename: sheet.label, kind: sheet.kind === "PO sheet" ? "po_sheet" : "trims_sheet", changes: result.changes.length, warnings: result.warnings, skipped: result.skipped });
       }
     }
     for (const a of attachments.filter((x) => !x.pos.length && !x.trims)) {
