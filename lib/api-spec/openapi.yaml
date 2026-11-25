@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.10.0
+  version: 0.10.1
   description: B.K. Textile operations API
 servers:
   - url: /api
@@ -1930,7 +1930,7 @@ components:
       enum: [matched, needs_review, ignored]
     EmailMatchMethod:
       type: string
-      enum: [po_subject, invoice_ref, thread, po_body_only, manual, uploaded]
+      enum: [po_subject, invoice_ref, thread, po_body_only, manual, uploaded, po_sheet]
     EmailAttachment:
       type: object
       required: [id, filename, contentType, sizeBytes, isInline, extractStatus, orderFileId]

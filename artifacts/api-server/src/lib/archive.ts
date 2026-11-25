@@ -317,7 +317,7 @@ export async function uploadEmail(a: Access, orderId: string, input: { filename?
           receivedAt: new Date(),
           bodyText: email.bodyText,
           rawObjectPath: rawPath,
-          category: plans.some((p) => p.po) ? "order_details" : plans.some((p) => p.trims) ? "trims_accessories" : /sample/i.test(email.subject) ? "sample_requirements" : "unclassified",
+          category: plans.some((p) => p.pos.length) ? "order_details" : plans.some((p) => p.trims) ? "trims_accessories" : /sample/i.test(email.subject) ? "sample_requirements" : "unclassified",
           parseStatus: plans.some((p) => p.extractStatus === "failed") ? "partial" : "parsed",
           processedAt: new Date(),
         })

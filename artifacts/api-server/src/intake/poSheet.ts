@@ -1,5 +1,5 @@
 import { type Cell, type Grid, type Sheet, cellDate, cellNumber, cellText } from "./spreadsheet";
-import { isNotRequired, isPlaceholder, norm, normaliseSize } from "./text";
+import { isNotRequired, isPlaceholder, norm, normaliseSize, poKey } from "./text";
 
 export type PoLine = { styleNumber: string; description: string; unitPrice: number | null; quantity: number; amount: number | null };
 export type PoColourway = { lineDescription: string | null; styleNumber: string | null; name: string; sizes: { sizeLabel: string; sizeSort: number; quantity: number }[]; total: number | null };
@@ -97,15 +97,25 @@ export function piecesPerCarton(grid: Grid): number | null {
 
 /** Recognises a buyer purchase-order sheet: a PO number label and a colour x size grid. */
 export function extractPoSheet(sheets: Sheet[]): PoSheetData | null {
+  return extractPoSheets(sheets)[0] ?? null;
+}
+
+/**
+ * Every purchase order in a workbook: one per tab that has a PO number and a
+ * colour/size grid. A PO repeated on a second tab is read once (first tab wins).
+ */
+export function extractPoSheets(sheets: Sheet[]): PoSheetData[] {
+  const found: PoSheetData[] = [];
   for (const { grid } of sheets) {
     const poCell = labelValue(grid, "PO#", "PO #", "PO No", "PO Number", "Purchase Order #");
     // Any format: digits, letters and digits, dashes; it must contain a digit.
     const poNumber = poCell === null ? null : cellText(typeof poCell === "number" ? Math.round(poCell) : poCell).trim();
     const gridHeader = findCell(grid, (t) => ["colors", "colours", "color", "colour"].includes(t));
     if (!poNumber || !/\d/.test(poNumber) || poNumber.length > 40 || !gridHeader) continue;
-    return parse(grid, poNumber, gridHeader);
+    if (found.some((f) => poKey(f.poNumber) === poKey(poNumber))) continue;
+    found.push(parse(grid, poNumber, gridHeader));
   }
-  return null;
+  return found;
 }
 
 function parse(grid: Grid, poNumber: string, gridHeader: Pos): PoSheetData {

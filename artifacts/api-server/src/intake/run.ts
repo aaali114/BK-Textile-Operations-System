@@ -5,6 +5,8 @@ import {
   buyersTable,
   db,
   intakeCursorTable,
+  invoiceCounterTable,
+  invoiceYear,
   ordersTable,
   pool,
   sourceEmailAttachmentsTable,
@@ -12,10 +14,10 @@ import {
   sourceEmailsTable,
 } from "@workspace/db";
 import { createOrderWithInvoice, OrderInputError } from "../lib/orderCreation";
-import { applyPoSheet, applyTrimsSheet, linkedOrderIdsForMessages, logApplied, type ApplyContext } from "./apply";
+import { applySheet, linkedOrderIdsForMessages, logApplied, sheetsForOrder, type ApplyContext } from "./apply";
 import { findPoKeys, invoiceNumbersIn, matchEmail, type KnownOrder, type OrderLink } from "./match";
 import { parseEml, type ParsedEmail } from "./mime";
-import { extractPoSheet, type PoSheetData } from "./poSheet";
+import { extractPoSheets, type PoSheetData } from "./poSheet";
 import { isSpreadsheet, readWorkbook, sheetsToText } from "./spreadsheet";
 import { poKey, sameCompany } from "./text";
 import { extractTrimsSheet, type TrimRow } from "./trimsSheet";
@@ -59,7 +61,8 @@ type AttachmentPlan = {
   extractStatus: "extracted" | "failed" | "not_applicable";
   extractedText: string | null;
   extractError: string | null;
-  po: PoSheetData | null;
+  /** Every PO in the attachment (one per workbook tab); empty when it holds none. */
+  pos: PoSheetData[];
   trims: TrimRow[] | null;
 };
 
@@ -219,22 +222,37 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, allPos = false, s
           const sim = [...simulated.values()].find((v) => v.id === id)!;
           rep.orders.push({ invoiceRef: sim.invoiceRef, poNumber: id.slice(8), matchStatus: "matched", matchMethod: "thread", created: false });
         }
-        for (const po of poNumbersInSubject.filter((p) => allowPo(p) && !simulated.has(p) && !orders.some((o) => o.poNumber && poKey(o.poNumber) === p))) {
-          const sheet = attachments.find((a) => a.po && poKey(a.po.poNumber) === po)?.po;
+        // Every PO sheet in the email (all attachments, all tabs), first copy of each PO wins.
+        const sheets = new Map<string, PoSheetData>();
+        for (const a of attachments) for (const s of a.pos) if (!sheets.has(poKey(s.poNumber))) sheets.set(poKey(s.poNumber), s);
+        // Existing orders whose PO sheet is attached are linked too, even when the subject names another PO.
+        for (const [key] of sheets) {
+          const owners = orders.filter((o) => o.poNumber && poKey(o.poNumber) === key);
+          for (const o of owners) {
+            const existing = links.find((l) => l.orderId === o.id);
+            // its own PO sheet is attached: no doubt which order it belongs to
+            if (existing && owners.length === 1) existing.matchStatus = "matched";
+            if (!existing) links.push({ orderId: o.id, matchStatus: owners.length === 1 ? "matched" : "needs_review", matchMethod: "po_sheet", matchReason: `PO sheet attached for PO ${key}${owners.length > 1 ? ` (PO shared by ${owners.length} buyers)` : ""}` });
+          }
+        }
+        const newPos = [...new Set([...poNumbersInSubject, ...sheets.keys()])];
+        for (const po of newPos.filter((p) => allowPo(p) && !simulated.has(p) && !orders.some((o) => o.poNumber && poKey(o.poNumber) === p))) {
+          const sheet = sheets.get(po);
           if (!sheet) {
             rep.attachments.push({ filename: "-", kind: "note", changes: 0, warnings: [`PO ${po} is not in the system yet and this email has no PO sheet for it, so no order was created.`], skipped: null });
             continue;
           }
-          const created = await createOrderFromSheet(sheet, email, dateOf(email, env), dryRun);
+          const created = await createOrderFromSheet(sheet, email, dateOf(email, env), dryRun, simulated.size);
           if (typeof created === "string") {
             rep.attachments.push({ filename: "-", kind: "note", changes: 0, warnings: [created], skipped: null });
             continue;
           }
           createdOrderIds.add(created.id);
           if (dryRun) simulated.set(po, { id: created.id, invoiceRef: created.invoiceRef ?? sheet.poNumber });
-          rep.orders.push({ invoiceRef: created.invoiceRef, poNumber: sheet.poNumber, matchStatus: "matched", matchMethod: "po_subject", created: true });
+          rep.orders.push({ invoiceRef: created.invoiceRef, poNumber: sheet.poNumber, matchStatus: "matched", matchMethod: poNumbersInSubject.includes(po) ? "po_subject" : "po_sheet", created: true });
           summary.ordersCreated.push(created.invoiceRef ?? `PO ${sheet.poNumber}`);
-          if (!dryRun) links = [...links.filter((l) => l.orderId !== created.id), { orderId: created.id, matchStatus: "matched", matchMethod: "po_subject", matchReason: `subject: PO ${po}; order created from its PO sheet` }];
+          const fromSubject = poNumbersInSubject.includes(po);
+          if (!dryRun) links = [...links.filter((l) => l.orderId !== created.id), { orderId: created.id, matchStatus: "matched", matchMethod: fromSubject ? "po_subject" : "po_sheet", matchReason: `${fromSubject ? `subject: PO ${po}` : `PO sheet attached for PO ${po}`}; order created from its PO sheet` }];
         }
         // ---- the trial only stores emails about allow-listed POs
         const allowedIds = new Set((await knownOrders()).filter((o) => o.poNumber && allowPo(poKey(o.poNumber))).map((o) => o.id));
@@ -252,7 +270,10 @@ async function runLocked({ source, blobs, dryRun, poAllowlist, allPos = false, s
           rep.outcome = "would_store";
           simulatedByMessage.set(email.messageId, [...createdOrderIds, ...links.map((l) => l.orderId)]);
           // In a dry run "changes" is the number of items read (lines + colours, or trims), not a diff.
-          for (const a of attachments) rep.attachments.push({ filename: a.filename, kind: a.kind, changes: a.po ? a.po.colourways.length + a.po.lines.length : (a.trims?.length ?? 0), warnings: a.po?.warnings ?? [], skipped: null });
+          for (const a of attachments) {
+            if (a.pos.length > 1) for (const s of a.pos) rep.attachments.push({ filename: `${a.filename} (PO ${s.poNumber})`, kind: a.kind, changes: s.colourways.length + s.lines.length, warnings: s.warnings, skipped: null });
+            else rep.attachments.push({ filename: a.filename, kind: a.kind, changes: a.pos[0] ? a.pos[0].colourways.length + a.pos[0].lines.length : (a.trims?.length ?? 0), warnings: a.pos[0]?.warnings ?? [], skipped: null });
+          }
           continue;
         }
         await storeAndApply(email, env, uidValidity, source, attachments, links, blobs, rep);
@@ -314,19 +335,19 @@ async function knownOrders(): Promise<(KnownOrder & { invoiceRef: string | null 
 }
 
 export function planAttachment(a: ParsedEmail["attachments"][number]): AttachmentPlan {
-  const base = { ...a, sha256: createHash("sha256").update(a.content).digest("hex"), po: null, trims: null, extractedText: null, extractError: null };
+  const base = { ...a, sha256: createHash("sha256").update(a.content).digest("hex"), pos: [] as PoSheetData[], trims: null, extractedText: null, extractError: null };
   if (!isSpreadsheet(a.filename, a.contentType)) return { ...base, kind: "other", extractStatus: "not_applicable" };
   try {
     const sheets = readWorkbook(a.content);
-    const po = extractPoSheet(sheets);
-    const trims = po ? null : extractTrimsSheet(sheets);
-    return { ...base, po, trims, kind: po ? "po_sheet" : trims ? "trims_sheet" : "spreadsheet", extractStatus: "extracted", extractedText: sheetsToText(sheets) };
+    const pos = extractPoSheets(sheets);
+    const trims = pos.length ? null : extractTrimsSheet(sheets);
+    return { ...base, pos, trims, kind: pos.length ? "po_sheet" : trims ? "trims_sheet" : "spreadsheet", extractStatus: "extracted", extractedText: sheetsToText(sheets) };
   } catch (error) {
     return { ...base, kind: "spreadsheet", extractStatus: "failed", extractError: (error as Error).message };
   }
 }
 
-async function createOrderFromSheet(sheet: PoSheetData, email: ParsedEmail, receivedAt: Date, dryRun: boolean) {
+async function createOrderFromSheet(sheet: PoSheetData, email: ParsedEmail, receivedAt: Date, dryRun: boolean, alreadySimulated = 0) {
   const buyers = await db.select().from(buyersTable);
   const domain = email.fromAddress.split("@")[1] ?? "";
   const buyer =
@@ -336,7 +357,12 @@ async function createOrderFromSheet(sheet: PoSheetData, email: ParsedEmail, rece
   if (!sheet.shipDate) return `PO ${sheet.poNumber}: the PO sheet has no ship date, so no order was created.`;
   const quantity = sheet.grandTotalQty ?? sheet.colourways.reduce((s, c) => s + c.sizes.reduce((t, q) => t + q.quantity, 0), 0);
   const style = [...new Set(sheet.lines.map((l) => l.styleNumber).filter(Boolean))].join(", ") || "See PO";
-  if (dryRun) return { id: `dry-run-${sheet.poNumber}`, invoiceRef: `(next invoice)/BK-${buyer.abbreviation}/${receivedAt.getUTCFullYear()}` };
+  if (dryRun) {
+    // the number it would get: the counter plus the orders this dry run already "created" before it
+    const [counter] = await db.select({ last: invoiceCounterTable.lastNumber }).from(invoiceCounterTable);
+    const next = counter ? String(counter.last + 1 + alreadySimulated) : "(next invoice)";
+    return { id: `dry-run-${sheet.poNumber}`, invoiceRef: `${next}/BK-${buyer.abbreviation}/${invoiceYear(receivedAt)}` };
+  }
   try {
     const order = await createOrderWithInvoice(
       { buyerId: buyer.id, buyer: buyer.name, poNumber: sheet.poNumber, poReceivedAt: receivedAt, style, quantity: Math.max(1, quantity), deliveryDate: sheet.shipDate },
@@ -365,7 +391,7 @@ async function storeAndApply(
   const attachmentPaths = await Promise.all(attachments.map((a) => blobs.put(a.content, a.contentType)));
   const currencyHint = currencyHintOf(email, attachments);
   const date = dateOf(email, env);
-  const hasPo = attachments.some((a) => a.po);
+  const hasPo = attachments.some((a) => a.pos.length);
   const hasTrims = attachments.some((a) => a.trims);
 
   await db.transaction(async (tx) => {
@@ -418,16 +444,22 @@ async function storeAndApply(
       : [];
 
     // Data is applied only to confirmed (matched) orders; needs_review links wait for staff.
-    for (const link of links.filter((l) => l.matchStatus === "matched")) {
+    // Each order gets its own PO sheet (by PO number) and any trims sheet.
+    const matched = links.filter((l) => l.matchStatus === "matched");
+    const poOf = new Map((matched.length ? await tx.select({ id: ordersTable.id, poNumber: ordersTable.poNumber }).from(ordersTable).where(inArray(ordersTable.id, matched.map((l) => l.orderId))) : []).map((o) => [o.id, o.poNumber]));
+    const poSheetsInEmail = attachments.reduce((n, a) => n + a.pos.length, 0);
+    for (const link of matched) {
       for (const [i, a] of attachments.entries()) {
-        if (!a.po && !a.trims) continue;
-        const ctx: ApplyContext = { orderId: link.orderId, emailId: stored!.id, attachmentId: storedAttachments[i]!.id, emailDate: date, currencyHint };
-        const result = a.po ? await applyPoSheet(tx, ctx, a.po) : await applyTrimsSheet(tx, ctx, a.trims!);
-        await logApplied(tx, ctx, a.po ? "PO sheet" : "trims sheet", a.filename, email.subject, result);
-        rep.attachments.push({ filename: a.filename, kind: a.kind, changes: result.changes.length, warnings: result.warnings, skipped: result.skipped });
+        for (const sheet of sheetsForOrder(a, poOf.get(link.orderId) ?? null, poSheetsInEmail)) {
+          const ctx: ApplyContext = { orderId: link.orderId, emailId: stored!.id, attachmentId: storedAttachments[i]!.id, emailDate: date, currencyHint };
+          const result = await applySheet(tx, ctx, sheet);
+          const label = sheet.kind === "PO sheet" && a.pos.length > 1 ? `${a.filename} (PO ${sheet.po.poNumber})` : a.filename;
+          await logApplied(tx, ctx, sheet.kind, label, email.subject, result);
+          rep.attachments.push({ filename: label, kind: a.kind, changes: result.changes.length, warnings: result.warnings, skipped: result.skipped });
+        }
       }
     }
-    for (const a of attachments.filter((x) => !x.po && !x.trims)) {
+    for (const a of attachments.filter((x) => !x.pos.length && !x.trims)) {
       rep.attachments.push({ filename: a.filename, kind: a.kind, changes: 0, warnings: a.extractError ? [a.extractError] : [], skipped: null });
     }
   });

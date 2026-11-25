@@ -13,7 +13,7 @@ import {
   sourceEmailOrdersTable,
   sourceEmailsTable,
 } from "@workspace/db";
-import { applyPoSheet, applyTrimsSheet, logApplied, type ApplyContext } from "./apply";
+import { applySheet, logApplied, sheetsForOrder, type ApplyContext } from "./apply";
 import { parseEml } from "./mime";
 import { currencyHintOf, planAttachment, type BlobReader } from "./run";
 import { isSpreadsheet } from "./spreadsheet";
@@ -61,7 +61,9 @@ export async function reapplyOrderEmails(orderId: string, blobs: BlobReader, act
   }
   prepared.sort((a, b) => a.originalDate.getTime() - b.originalDate.getTime());
 
-  // 2. re-apply oldest first
+  // 2. re-apply oldest first; each email's PO sheets go only to the order with that PO number
+  const [own] = await db.select({ poNumber: ordersTable.poNumber }).from(ordersTable).where(eq(ordersTable.id, orderId));
+  const orderPo = own?.poNumber ?? null;
   const report: ReapplyReport = { orderId, emails: [] };
   for (const { e, parsed, originalDate } of prepared) {
     const entry: ReapplyReport["emails"][number] = {
@@ -78,16 +80,22 @@ export async function reapplyOrderEmails(orderId: string, blobs: BlobReader, act
       plans.push({ a, plan });
     }
     const currencyHint = currencyHintOf(parsed, plans.map((p) => p.plan));
+    const poSheetsInEmail = plans.reduce((n, p) => n + p.plan.pos.length, 0);
     await db.transaction(async (tx) => {
       for (const { a, plan } of plans) {
-        if (!plan.po && !plan.trims) {
+        const sheets = sheetsForOrder(plan, orderPo, poSheetsInEmail);
+        if (!sheets.length && plan.pos.length) continue; // PO sheets for the email's other orders
+        if (!sheets.length) {
           entry.attachments.push({ filename: a.filename, kind: plan.kind, changes: 0, warnings: plan.extractError ? [plan.extractError] : [], skipped: null });
           continue;
         }
-        const ctx: ApplyContext = { orderId, emailId: e.id, attachmentId: a.id, emailDate: originalDate, currencyHint };
-        const result = plan.po ? await applyPoSheet(tx, ctx, plan.po) : await applyTrimsSheet(tx, ctx, plan.trims!);
-        await logApplied(tx, ctx, plan.po ? "PO sheet" : "trims sheet", a.filename, e.subject, result, true);
-        entry.attachments.push({ filename: a.filename, kind: plan.kind, changes: result.changes.length, warnings: result.warnings, skipped: result.skipped });
+        for (const sheet of sheets) {
+          const ctx: ApplyContext = { orderId, emailId: e.id, attachmentId: a.id, emailDate: originalDate, currencyHint };
+          const result = await applySheet(tx, ctx, sheet);
+          const label = sheet.kind === "PO sheet" && plan.pos.length > 1 ? `${a.filename} (PO ${sheet.po.poNumber})` : a.filename;
+          await logApplied(tx, ctx, sheet.kind, label, e.subject, result, true);
+          entry.attachments.push({ filename: label, kind: plan.kind, changes: result.changes.length, warnings: result.warnings, skipped: result.skipped });
+        }
       }
     });
   }
