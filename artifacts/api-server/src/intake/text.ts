@@ -51,6 +51,18 @@ export function companyStems(name: string): string[] {
     .map((t) => t.slice(0, 5));
 }
 
+/**
+ * A company named inside longer text, e.g. buyer "Spartan Apparel Sourcing" in
+ * "Issued by Spartan Sourcing Agency": the name's first word and at least one
+ * more of its words (all of them for a one-word name) appear in the text.
+ */
+export function mentionsCompany(text: string, company: string): boolean {
+  const words = new Set(companyStems(text));
+  const stems = companyStems(company);
+  if (!stems.length || !words.has(stems[0]!)) return false;
+  return stems.length === 1 || stems.slice(1).some((s) => words.has(s));
+}
+
 export function sameCompany(a: string, b: string): boolean {
   const sa = companyStems(a);
   const sb = companyStems(b);

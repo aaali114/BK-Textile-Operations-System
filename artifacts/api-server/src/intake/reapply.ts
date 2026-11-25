@@ -13,7 +13,7 @@ import {
   sourceEmailOrdersTable,
   sourceEmailsTable,
 } from "@workspace/db";
-import { applySheet, logApplied, sheetsForOrder, type ApplyContext } from "./apply";
+import { applySheet, collectEmailSheets, logApplied, sheetsForOrder, type ApplyContext } from "./apply";
 import { parseEml } from "./mime";
 import { currencyHintOf, planAttachment, type BlobReader } from "./run";
 import { isSpreadsheet } from "./spreadsheet";
@@ -80,22 +80,17 @@ export async function reapplyOrderEmails(orderId: string, blobs: BlobReader, act
       plans.push({ a, plan });
     }
     const currencyHint = currencyHintOf(parsed, plans.map((p) => p.plan));
-    const poSheetsInEmail = plans.reduce((n, p) => n + p.plan.pos.length, 0);
+    const emailSheets = collectEmailSheets(plans.map((p) => ({ filename: p.a.filename, pos: p.plan.pos, trims: p.plan.trims })));
     await db.transaction(async (tx) => {
-      for (const { a, plan } of plans) {
-        const sheets = sheetsForOrder(plan, orderPo, poSheetsInEmail);
-        if (!sheets.length && plan.pos.length) continue; // PO sheets for the email's other orders
-        if (!sheets.length) {
-          entry.attachments.push({ filename: a.filename, kind: plan.kind, changes: 0, warnings: plan.extractError ? [plan.extractError] : [], skipped: null });
-          continue;
-        }
-        for (const sheet of sheets) {
-          const ctx: ApplyContext = { orderId, emailId: e.id, attachmentId: a.id, emailDate: originalDate, currencyHint };
-          const result = await applySheet(tx, ctx, sheet);
-          const label = sheet.kind === "PO sheet" && plan.pos.length > 1 ? `${a.filename} (PO ${sheet.po.poNumber})` : a.filename;
-          await logApplied(tx, ctx, sheet.kind, label, e.subject, result, true);
-          entry.attachments.push({ filename: label, kind: plan.kind, changes: result.changes.length, warnings: result.warnings, skipped: result.skipped });
-        }
+      // spreadsheets that are neither a PO nor a trims sheet are listed as read, unchanged
+      for (const { a, plan } of plans.filter((p) => !p.plan.pos.length && !p.plan.trims)) {
+        entry.attachments.push({ filename: a.filename, kind: plan.kind, changes: 0, warnings: plan.extractError ? [plan.extractError] : [], skipped: null });
+      }
+      for (const sheet of sheetsForOrder(emailSheets, orderPo)) {
+        const ctx: ApplyContext = { orderId, emailId: e.id, attachmentId: plans[sheet.attachmentIndex]!.a.id, emailDate: originalDate, currencyHint };
+        const result = await applySheet(tx, ctx, sheet);
+        await logApplied(tx, ctx, sheet.kind, sheet.label, e.subject, result, true);
+        entry.attachments.push({ filename: sheet.label, kind: sheet.kind === "PO sheet" ? "po_sheet" : "trims_sheet", changes: result.changes.length, warnings: result.warnings, skipped: result.skipped });
       }
     });
   }

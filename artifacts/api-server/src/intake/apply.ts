@@ -11,7 +11,7 @@ import {
   sourceEmailsTable,
   trimsTable,
 } from "@workspace/db";
-import type { PoSheetData } from "./poSheet";
+import { mergePoSheets, type PoSheetData } from "./poSheet";
 import { trimLabel, trimType, type TrimRow } from "./trimsSheet";
 import { norm, poKey } from "./text";
 
@@ -84,13 +84,20 @@ export async function applyPoSheet(tx: Tx, ctx: ApplyContext, po: PoSheetData): 
 
   // ---- priced lines
   const existingLines = await tx.select().from(orderLinesTable).where(eq(orderLinesTable.orderId, ctx.orderId));
-  const lineIdByDesc = new Map<string, string>();
+  // a line is its style + description: two styles can share a description ("BURNOUT WASH FLEECE CREW")
+  const lineKey = (style: string | null, desc: string) => `${norm(style ?? "")}|${norm(desc)}`;
+  const lineIdByKey = new Map<string, string>();
+  const lineIdsByDesc = new Map<string, string[]>();
+  const remember = (style: string, desc: string, id: string) => {
+    lineIdByKey.set(lineKey(style, desc), id);
+    lineIdsByDesc.set(norm(desc), [...(lineIdsByDesc.get(norm(desc)) ?? []), id]);
+  };
   for (const [i, line] of po.lines.entries()) {
     const key = `${norm(line.styleNumber)}|${norm(line.description)}`;
     const found = existingLines.find((l) => `${norm(l.styleNumber)}|${norm(l.description)}` === key);
     const values = { unitPrice: line.unitPrice, quantity: line.quantity, sortOrder: i + 1 };
     if (found) {
-      lineIdByDesc.set(norm(line.description), found.id);
+      remember(line.styleNumber, line.description, found.id);
       if (!(await laterWins(tx, found.sourceEmailId, ctx, cache))) continue;
       diff(`line[${line.styleNumber} ${line.description}].`, found as Record<string, unknown>, values, changes);
       await tx.update(orderLinesTable).set({ ...values, ...source(ctx) }).where(eq(orderLinesTable.id, found.id));
@@ -99,7 +106,7 @@ export async function applyPoSheet(tx: Tx, ctx: ApplyContext, po: PoSheetData): 
         .insert(orderLinesTable)
         .values({ orderId: ctx.orderId, styleNumber: line.styleNumber, description: line.description, ...values, ...source(ctx) })
         .returning({ id: orderLinesTable.id });
-      lineIdByDesc.set(norm(line.description), created!.id);
+      remember(line.styleNumber, line.description, created!.id);
       changes.push({ field: `line[${line.styleNumber} ${line.description}]`, from: null, to: `${line.quantity} pcs @ ${line.unitPrice ?? "?"}` });
     }
   }
@@ -112,7 +119,8 @@ export async function applyPoSheet(tx: Tx, ctx: ApplyContext, po: PoSheetData): 
   // ---- colours and sizes
   const existingColours = await tx.select().from(colourwaysTable).where(eq(colourwaysTable.orderId, ctx.orderId));
   for (const [i, cw] of po.colourways.entries()) {
-    const lineId = cw.lineDescription ? (lineIdByDesc.get(norm(cw.lineDescription)) ?? null) : null;
+    const byDesc = cw.lineDescription ? (lineIdsByDesc.get(norm(cw.lineDescription)) ?? []) : [];
+    const lineId = cw.lineDescription ? (lineIdByKey.get(lineKey(cw.styleNumber, cw.lineDescription)) ?? (byDesc.length === 1 ? byDesc[0]! : null)) : null;
     const code = norm(cw.name).toUpperCase();
     const label = `${cw.lineDescription ?? ""} / ${cw.name}`;
     let colour = existingColours.find((c) => c.code === code && c.lineId === lineId);
@@ -121,6 +129,7 @@ export async function applyPoSheet(tx: Tx, ctx: ApplyContext, po: PoSheetData): 
         .insert(colourwaysTable)
         .values({ orderId: ctx.orderId, lineId, code, name: cw.name, sortOrder: i + 1, ...source(ctx) })
         .returning();
+      existingColours.push(colour!);
       changes.push({ field: `colour[${label}]`, from: null, to: cw.name });
     } else if (await laterWins(tx, colour.sourceEmailId, ctx, cache)) {
       await tx.update(colourwaysTable).set({ sortOrder: i + 1, ...source(ctx) }).where(eq(colourwaysTable.id, colour.id));
@@ -212,24 +221,49 @@ async function upsertTrim(
   }
 }
 
-export type SheetPlan = { pos: PoSheetData[]; trims: TrimRow[] | null };
-export type OrderSheet = { kind: "PO sheet"; po: PoSheetData } | { kind: "trims sheet"; rows: TrimRow[] };
+export type AttachmentSheets = { filename: string; pos: PoSheetData[]; trims: TrimRow[] | null };
+export type PoInEmail = { kind: "PO sheet"; key: string; po: PoSheetData; attachmentIndex: number; label: string };
+export type TrimsInEmail = { kind: "trims sheet"; rows: TrimRow[]; attachmentIndex: number; label: string };
+export type OrderSheet = PoInEmail | TrimsInEmail;
+export type EmailSheets = { pos: Map<string, PoInEmail>; trims: TrimsInEmail[] };
 
 /**
- * Which sheets of one attachment apply to an order. A PO sheet goes only to the
- * order with that PO number, so one email carrying several POs updates each
- * order with its own PO. When the whole email holds a single PO sheet it is
- * still offered to every linked order, so a sheet for the wrong PO is reported
- * ("PO sheet is for PO X, not this order's PO") instead of silently ignored.
- * A trims sheet applies to every linked order.
+ * All sheets in one email, grouped by PO number: several attachments or tabs
+ * carrying the same PO (e.g. one file per style) are merged into one PO. The
+ * provenance points at the first attachment that carried it.
  */
-export function sheetsForOrder(plan: SheetPlan, orderPoNumber: string | null, poSheetsInEmail: number): OrderSheet[] {
-  if (plan.pos.length) {
-    const own = orderPoNumber ? plan.pos.filter((p) => poKey(p.poNumber) === poKey(orderPoNumber)) : [];
-    if (own.length) return own.map((po) => ({ kind: "PO sheet" as const, po }));
-    return poSheetsInEmail === 1 ? [{ kind: "PO sheet", po: plan.pos[0]! }] : [];
+export function collectEmailSheets(attachments: AttachmentSheets[]): EmailSheets {
+  const parts = new Map<string, { sheets: PoSheetData[]; at: number[]; names: string[] }>();
+  const trims: TrimsInEmail[] = [];
+  attachments.forEach((a, i) => {
+    for (const po of a.pos) {
+      const key = poKey(po.poNumber);
+      const p = parts.get(key) ?? { sheets: [], at: [], names: [] };
+      p.sheets.push(po);
+      p.at.push(i);
+      p.names.push(a.pos.length > 1 ? `${a.filename} (PO ${po.poNumber})` : a.filename);
+      parts.set(key, p);
+    }
+    if (!a.pos.length && a.trims) trims.push({ kind: "trims sheet", rows: a.trims, attachmentIndex: i, label: a.filename });
+  });
+  const pos = new Map<string, PoInEmail>();
+  for (const [key, p] of parts) {
+    pos.set(key, { kind: "PO sheet", key, po: mergePoSheets(p.sheets), attachmentIndex: p.at[0]!, label: p.names.length > 1 ? `${p.names.length} sheets for PO ${p.sheets[0]!.poNumber}` : p.names[0]! });
   }
-  return plan.trims ? [{ kind: "trims sheet", rows: plan.trims }] : [];
+  return { pos, trims };
+}
+
+/**
+ * Which of an email's sheets apply to an order: the PO sheet with the order's
+ * PO number (so an email carrying several POs updates each order with its own),
+ * plus every trims sheet. When the email holds a single PO it is still offered
+ * to every linked order, so a sheet for the wrong PO is reported ("PO sheet is
+ * for PO X, not this order's PO") instead of silently ignored.
+ */
+export function sheetsForOrder(email: EmailSheets, orderPoNumber: string | null): OrderSheet[] {
+  const own = orderPoNumber ? email.pos.get(poKey(orderPoNumber)) : undefined;
+  const po = own ? [own] : email.pos.size === 1 ? [...email.pos.values()] : [];
+  return [...po, ...email.trims];
 }
 
 export async function applySheet(tx: Tx, ctx: ApplyContext, sheet: OrderSheet): Promise<ApplyResult> {

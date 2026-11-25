@@ -23,6 +23,8 @@ export type PoSheetData = {
   grandTotalAmount: number | null;
   sizeLabels: string[];
   colourways: PoColourway[];
+  /** Every text cell above the colour grid, used to spot the buying agent when "Buyer" names the brand. */
+  headerText: string[];
   fabric: PoFabric | null;
   trims: PoTrim[];
   warnings: string[];
@@ -95,6 +97,10 @@ export function piecesPerCarton(grid: Grid): number | null {
   return null;
 }
 
+// "PO#", "P.O. number :", "PO No." ... compared after norm() (case and punctuation ignored)
+const PO_LABELS = ["PO#", "PO #", "PO No", "PO Number", "Purchase Order #", "Purchase Order No", "P.O. number", "P.O. No", "P.O.#", "P.O. #"];
+const COLOUR_HEADINGS = ["colors", "colours", "color", "colour", "body color", "body colour", "body colors", "body colours", "colorway", "colourway", "color name", "colour name"];
+
 /** Recognises a buyer purchase-order sheet: a PO number label and a colour x size grid. */
 export function extractPoSheet(sheets: Sheet[]): PoSheetData | null {
   return extractPoSheets(sheets)[0] ?? null;
@@ -107,10 +113,10 @@ export function extractPoSheet(sheets: Sheet[]): PoSheetData | null {
 export function extractPoSheets(sheets: Sheet[]): PoSheetData[] {
   const found: PoSheetData[] = [];
   for (const { grid } of sheets) {
-    const poCell = labelValue(grid, "PO#", "PO #", "PO No", "PO Number", "Purchase Order #");
+    const poCell = labelValue(grid, ...PO_LABELS);
     // Any format: digits, letters and digits, dashes; it must contain a digit.
     const poNumber = poCell === null ? null : cellText(typeof poCell === "number" ? Math.round(poCell) : poCell).trim();
-    const gridHeader = findCell(grid, (t) => ["colors", "colours", "color", "colour"].includes(t));
+    const gridHeader = findCell(grid, (t) => COLOUR_HEADINGS.includes(t));
     if (!poNumber || !/\d/.test(poNumber) || poNumber.length > 40 || !gridHeader) continue;
     if (found.some((f) => poKey(f.poNumber) === poKey(poNumber))) continue;
     found.push(parse(grid, poNumber, gridHeader));
@@ -184,7 +190,7 @@ function parse(grid: Grid, poNumber: string, gridHeader: Pos): PoSheetData {
     if (size) sizeCols.push({ c, label: size });
     else warnings.push(`Unrecognised size heading "${t}" in the colour grid.`);
   }
-  const styleCol = headerRow.findIndex((c) => norm(cellText(c ?? null)).startsWith("style"));
+  const styleCol = headerRow.findIndex((c) => { const t = norm(cellText(c ?? null)); return t.startsWith("style") || t === "sty" || t.startsWith("sty "); });
   const colourways: PoColourway[] = [];
   let currentLine: string | null = null;
   let currentStyle: string | null = null;
@@ -205,6 +211,12 @@ function parse(grid: Grid, poNumber: string, gridHeader: Pos): PoSheetData {
     const sum = sizes.reduce((s, q) => s + q.quantity, 0);
     if (total !== null && Math.round(total) !== sum) warnings.push(`Colour "${name}": sizes add up to ${sum} but the row total says ${total}.`);
     colourways.push({ lineDescription: currentLine, styleNumber: currentStyle, name, sizes, total });
+  }
+  for (const cw of colourways) {
+    if (cw.lineDescription !== null) continue;
+    const byStyle = cw.styleNumber ? lines.filter((l) => poKey(l.styleNumber) === poKey(cw.styleNumber!)) : [];
+    const line = byStyle.length === 1 ? byStyle[0] : lines.length === 1 ? lines[0] : undefined;
+    if (line) cw.lineDescription = line.description;
   }
   for (const cw of colourways) {
     if (lines.length && !lines.some((l) => norm(l.description) === norm(cw.lineDescription ?? ""))) {
@@ -263,7 +275,49 @@ function parse(grid: Grid, poNumber: string, gridHeader: Pos): PoSheetData {
     grandTotalAmount,
     sizeLabels: sizeCols.map((s) => s.label),
     colourways,
+    headerText: grid.slice(0, gridHeader.r).flat().map((c) => cellText(c ?? null)).filter((t) => t.length > 2),
     fabric,
+    trims,
+    warnings,
+  };
+}
+
+/**
+ * One PO split over several sheets (e.g. one file per style): combine them into
+ * one PO. Lines and colours are put together; quantities and amounts add up;
+ * header details come from the first sheet that has them.
+ */
+export function mergePoSheets(sheets: PoSheetData[]): PoSheetData {
+  if (sheets.length === 1) return sheets[0]!;
+  const first = <K extends keyof PoSheetData>(k: K) => sheets.find((s) => s[k] !== null && s[k] !== undefined)?.[k] ?? null;
+  const sum = (vals: (number | null)[]) => (vals.every((v) => v !== null) ? Math.round((vals as number[]).reduce((a, b) => a + b, 0) * 100) / 100 : null);
+  const trims: PoTrim[] = [];
+  for (const t of sheets.flatMap((s) => s.trims)) {
+    const seen = trims.find((x) => x.label === t.label);
+    if (!seen) trims.push({ ...t });
+    else if (t.required && !seen.required) Object.assign(seen, t);
+  }
+  const dates = (k: "shipDate" | "poIssueDate") => [...new Set(sheets.map((s) => s[k]).filter(Boolean))];
+  const warnings = sheets.flatMap((s) => s.warnings);
+  if (dates("shipDate").length > 1) warnings.push(`The sheets give different ship dates (${dates("shipDate").join(", ")}); the first one is used.`);
+  return {
+    poNumber: sheets[0]!.poNumber,
+    buyerName: first("buyerName") as string | null,
+    poIssueDate: first("poIssueDate") as string | null,
+    shipDate: first("shipDate") as string | null,
+    priceTerms: first("priceTerms") as string | null,
+    paymentTerms: first("paymentTerms") as string | null,
+    shipVia: first("shipVia") as string | null,
+    countryOfOrigin: first("countryOfOrigin") as string | null,
+    overShipTolerancePct: first("overShipTolerancePct") as number | null,
+    pcsPerCarton: first("pcsPerCarton") as number | null,
+    lines: sheets.flatMap((s) => s.lines),
+    grandTotalQty: sum(sheets.map((s) => s.grandTotalQty)),
+    grandTotalAmount: sum(sheets.map((s) => s.grandTotalAmount)),
+    sizeLabels: [...new Set(sheets.flatMap((s) => s.sizeLabels))],
+    colourways: sheets.flatMap((s) => s.colourways),
+    headerText: sheets.flatMap((s) => s.headerText),
+    fabric: first("fabric") as PoFabric | null,
     trims,
     warnings,
   };
